@@ -30,14 +30,14 @@ type LeaseAck struct {
 }
 
 type Assignment struct {
-	InstanceID  string `json:"instanceId"`
-	TaskID      string `json:"taskId"`
-	Desired     string `json:"desired"`
-	ArtifactURL string `json:"artifactUrl"`
-	StartCmd    string `json:"startCmd"`
-	Phase       string `json:"phase"`
-	Healthy     bool   `json:"healthy"`
-	LastReport  int64  `json:"lastReportAt"`
+	InstanceID   string `json:"instanceId"`
+	DeploymentID string `json:"deploymentId"`
+	Desired      string `json:"desired"`
+	ArtifactURL  string `json:"artifactUrl"`
+	StartCmd     string `json:"startCmd"`
+	Phase        string `json:"phase"`
+	Healthy      bool   `json:"healthy"`
+	LastReport   int64  `json:"lastReportAt"`
 }
 
 type Assignments struct {
@@ -52,16 +52,16 @@ type StatusUpdate struct {
 	TsUnix     int64  `json:"tsUnix"`
 }
 
-type CreateTaskRequest struct {
-	Name     string            `json:"name"`
-	Artifact string            `json:"artifactUrl"` // legacy 单条
-	StartCmd string            `json:"startCmd"`    // legacy 单条
-	Replicas map[string]int    `json:"replicas"`    // legacy: nodeId -> replica count
-	Labels   map[string]string `json:"labels"`
-	Entries  []CreateTaskEntry `json:"entries"` // 新：多条目
+type CreateDeploymentRequest struct {
+	Name     string                  `json:"name"`
+	Artifact string                  `json:"artifactUrl"` // legacy 单条
+	StartCmd string                  `json:"startCmd"`    // legacy 单条
+	Replicas map[string]int          `json:"replicas"`    // legacy: nodeId -> replica count
+	Labels   map[string]string       `json:"labels"`
+	Entries  []CreateDeploymentEntry `json:"entries"` // 新：多条目
 }
 
-type CreateTaskEntry struct {
+type CreateDeploymentEntry struct {
 	Artifact string         `json:"artifactUrl"`
 	StartCmd string         `json:"startCmd"`
 	Replicas map[string]int `json:"replicas"` // nodeId -> replica
@@ -163,11 +163,11 @@ func handleGetAssignments(w http.ResponseWriter, r *http.Request) {
 	for _, a := range assigns {
 		st, ok, _ := store.Current.LatestStatus(a.InstanceID)
 		item := Assignment{
-			InstanceID:  a.InstanceID,
-			TaskID:      a.TaskID,
-			Desired:     string(a.Desired),
-			ArtifactURL: a.ArtifactURL,
-			StartCmd:    a.StartCmd,
+			InstanceID:   a.InstanceID,
+			DeploymentID: a.DeploymentID,
+			Desired:      string(a.Desired),
+			ArtifactURL:  a.ArtifactURL,
+			StartCmd:     a.StartCmd,
 		}
 		if ok {
 			item.Phase = st.Phase
@@ -199,12 +199,12 @@ func handleStatusUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func handleCreateTask(w http.ResponseWriter, r *http.Request) {
+func handleCreateDeployment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var req CreateTaskRequest
+	var req CreateDeploymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -216,27 +216,27 @@ func handleCreateTask(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "missing fields", http.StatusBadRequest)
 			return
 		}
-		entries = []CreateTaskEntry{{Artifact: req.Artifact, StartCmd: req.StartCmd, Replicas: req.Replicas}}
+		entries = []CreateDeploymentEntry{{Artifact: req.Artifact, StartCmd: req.StartCmd, Replicas: req.Replicas}}
 	}
 	if req.Name == "" {
 		http.Error(w, "name required", http.StatusBadRequest)
 		return
 	}
-	taskID, instances, _ := store.Current.CreateTask(req.Name, req.Labels)
+	deploymentID, instances, _ := store.Current.CreateDeployment(req.Name, req.Labels)
 	for _, e := range entries {
 		if e.Artifact == "" || len(e.Replicas) == 0 {
 			continue
 		}
 		for nodeID, replicas := range e.Replicas {
 			for i := 0; i < replicas; i++ {
-				iid := store.Current.NewInstanceID(taskID)
+				iid := store.Current.NewInstanceID(deploymentID)
 				_ = store.Current.AddAssignment(nodeID, store.Assignment{
-					InstanceID:  iid,
-					TaskID:      taskID,
-					NodeID:      nodeID,
-					Desired:     store.DesiredRunning,
-					ArtifactURL: e.Artifact,
-					StartCmd:    e.StartCmd,
+					InstanceID:   iid,
+					DeploymentID: deploymentID,
+					NodeID:       nodeID,
+					Desired:      store.DesiredRunning,
+					ArtifactURL:  e.Artifact,
+					StartCmd:     e.StartCmd,
 				})
 				notify.Publish(nodeID)
 				instances = append(instances, iid)
@@ -244,8 +244,8 @@ func handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, map[string]any{
-		"taskId":    taskID,
-		"instances": instances,
+		"deploymentId": deploymentID,
+		"instances":    instances,
 	})
 }
 

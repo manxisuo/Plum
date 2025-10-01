@@ -12,7 +12,7 @@ type Artifact = {
 	createdAt: number
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const loading = ref(false)
 const items = ref<Artifact[]>([])
 const uploadUrl = `${API_BASE}/v1/apps/upload`
@@ -51,6 +51,13 @@ async function del(id: string) {
 }
 
 onMounted(load)
+
+function artifactHref(row: Artifact): string {
+  const u = row.url || ''
+  if (u.startsWith('http://') || u.startsWith('https://')) return u
+  const base = API_BASE || 'http://127.0.0.1:8080'
+  return u.startsWith('/') ? `${base}${u}` : `${base}/${u}`
+}
 </script>
 
 <template>
@@ -80,7 +87,7 @@ onMounted(load)
       <el-table-column prop="version" label="Version" width="140" />
       <el-table-column label="Artifact">
         <template #default="{ row }">
-          <a :href="row.url" target="_blank">{{ row.url }}</a>
+          <a :href="artifactHref(row)" target="_blank">{{ artifactHref(row) }}</a>
         </template>
       </el-table-column>
       <el-table-column prop="sizeBytes" label="Size(Bytes)" width="140" />

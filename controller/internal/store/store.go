@@ -18,12 +18,12 @@ const (
 )
 
 type Assignment struct {
-	InstanceID  string
-	TaskID      string
-	NodeID      string
-	Desired     DesiredState
-	ArtifactURL string
-	StartCmd    string
+	InstanceID   string
+	DeploymentID string
+	NodeID       string
+	Desired      DesiredState
+	ArtifactURL  string
+	StartCmd     string
 }
 
 type InstanceStatus struct {
@@ -44,10 +44,10 @@ type Artifact struct {
 	CreatedAt  int64
 }
 
-type Task struct {
-	TaskID string
-	Name   string
-	Labels map[string]string
+type Deployment struct {
+	DeploymentID string
+	Name         string
+	Labels       map[string]string
 }
 
 // Service endpoint exposed by an instance
@@ -74,25 +74,25 @@ type Store interface {
 	AddAssignment(nodeID string, a Assignment) error
 	DeleteAssignment(instanceID string) error
 	DeleteStatusesForInstance(instanceID string) error
-	DeleteAssignmentsForTask(taskID string) error
+	DeleteAssignmentsForDeployment(deploymentID string) error
 	UpdateAssignmentDesired(instanceID string, desired DesiredState) error
 	AppendStatus(instanceID string, st InstanceStatus) error
 	LatestStatus(instanceID string) (InstanceStatus, bool, error)
 
 	CountAssignmentsByArtifactPath(path string) (int, error)
 	CountAssignmentsForNode(nodeID string) (int, error)
-	CreateTask(name string, labels map[string]string) (string, []string, error)
-	NewInstanceID(taskID string) string
+	CreateDeployment(name string, labels map[string]string) (string, []string, error)
+	NewInstanceID(deploymentID string) string
 
 	SaveArtifact(a Artifact) (string, error)
 	ListArtifacts() ([]Artifact, error)
 	GetArtifact(id string) (Artifact, bool, error)
 	DeleteArtifact(id string) error
 
-	ListTasks() ([]Task, error)
-	GetTask(id string) (Task, bool, error)
-	DeleteTask(id string) error
-	ListAssignmentsForTask(taskID string) ([]Assignment, error)
+	ListDeployments() ([]Deployment, error)
+	GetDeployment(id string) (Deployment, bool, error)
+	DeleteDeployment(id string) error
+	ListAssignmentsForDeployment(deploymentID string) ([]Assignment, error)
 
 	// Services / discovery
 	ReplaceEndpointsForInstance(nodeID string, instanceID string, eps []Endpoint) error

@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from './views/Home.vue'
-import TaskList from './views/TaskList.vue'
+import DeploymentsList from './views/DeploymentsList.vue'
 import TaskCreate from './views/TaskCreate.vue'
-import TaskDetail from './views/TaskDetail.vue'
-import TaskConfig from './views/TaskConfig.vue'
+import DeploymentDetail from './views/DeploymentDetail.vue'
+import DeploymentConfig from './views/DeploymentConfig.vue'
 import Nodes from './views/Nodes.vue'
 import Apps from './views/Apps.vue'
 import Assignments from './views/Assignments.vue'
@@ -18,10 +18,11 @@ export const router = createRouter({
     { path: '/apps', component: Apps },
     { path: '/services', component: Services },
     { path: '/assignments', component: Assignments },
-    { path: '/tasks', component: TaskList },
-    { path: '/tasks/create', component: TaskCreate },
-    { path: '/tasks/:id', component: TaskDetail, props: true },
-    { path: '/tasks/:id/config', component: TaskConfig, props: true },
+    // deployments
+    { path: '/deployments', component: DeploymentsList },
+    { path: '/deployments/create', component: TaskCreate },
+    { path: '/deployments/:id', component: DeploymentDetail, props: true },
+    { path: '/deployments/:id/config', component: DeploymentConfig, props: true },
   ]
 })
 

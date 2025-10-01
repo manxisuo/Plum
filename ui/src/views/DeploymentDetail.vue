@@ -3,16 +3,16 @@ import { onMounted, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
 const id = route.params.id as string
 const loading = ref(false)
-const task = ref<any>(null)
+const deployment = ref<any>(null)
 const assigns = ref<any[]>([])
 const opLoading = ref(false)
 const selectedNode = ref<string>('')
 
-const nodesInTask = computed(() => {
+const nodesInDeployment = computed(() => {
   const seen = new Set<string>()
   const out: string[] = []
   for (const row of assigns.value) {
@@ -25,10 +25,10 @@ const nodesInTask = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const res = await fetch(`${API_BASE}/v1/tasks/${encodeURIComponent(id)}`)
+    const res = await fetch(`${API_BASE}/v1/deployments/${encodeURIComponent(id)}`)
     if (!res.ok) throw new Error('HTTP '+res.status)
     const json = await res.json()
-    task.value = json.task
+    deployment.value = json.deployment
     assigns.value = json.assignments || []
   } catch (e:any) {
     ElMessage.error(e?.message || '加载失败')
@@ -88,18 +88,18 @@ async function stopByNode() {
 
 <template>
   <div>
-    <h3>Task 详情</h3>
+    <h3>Deployment 详情</h3>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
       <el-button type="warning" :loading="opLoading" @click="stopAll">全部停止</el-button>
       <el-select v-model="selectedNode" placeholder="选择节点" style="width:200px;">
-        <el-option v-for="n in nodesInTask" :key="n" :label="n" :value="n" />
+        <el-option v-for="n in nodesInDeployment" :key="n" :label="n" :value="n" />
       </el-select>
       <el-button type="warning" :loading="opLoading" @click="stopByNode">按节点停止</el-button>
     </div>
-    <el-descriptions v-if="task" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item label="TaskID">{{ task.taskId || task.TaskID }}</el-descriptions-item>
-      <el-descriptions-item label="Name">{{ task.name || task.Name }}</el-descriptions-item>
-      <el-descriptions-item label="Labels" :span="2"><code>{{ JSON.stringify(task.labels || task.Labels || {}) }}</code></el-descriptions-item>
+    <el-descriptions v-if="deployment" :column="2" border style="margin-bottom:12px;">
+      <el-descriptions-item label="DeploymentID">{{ deployment.deploymentId }}</el-descriptions-item>
+      <el-descriptions-item label="Name">{{ deployment.name || deployment.Name }}</el-descriptions-item>
+      <el-descriptions-item label="Labels" :span="2"><code>{{ JSON.stringify(deployment.labels || deployment.Labels || {}) }}</code></el-descriptions-item>
     </el-descriptions>
     <el-table :data="assigns" v-loading="loading" style="width:100%">
       <el-table-column label="InstanceID" width="300">

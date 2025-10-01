@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
-type Assignment = { instanceId: string; taskId?: string; desired: string; artifactUrl: string; startCmd: string }
+type Assignment = { instanceId: string; deploymentId?: string; desired: string; artifactUrl: string; startCmd: string }
 type Assignments = { items: Assignment[] }
 type NodeDTO = { nodeId: string; ip: string }
 const nodeId = ref('nodeA')
@@ -62,7 +62,7 @@ onBeforeUnmount(() => { closeSSE() })
     </el-form>
     <el-alert v-if="error" type="error" :closable="false" :title="`错误：${error}`" />
     <el-table v-loading="loading" :data="data.items" style="width:100%; margin-top:12px;">
-      <el-table-column prop="taskId" label="Task" width="200" />
+      <el-table-column prop="deploymentId" label="Deployment" width="200" />
       <el-table-column prop="instanceId" label="Instance" width="200" />
       <el-table-column prop="desired" label="Desired" width="80" />
       <el-table-column prop="phase" label="Phase" width="80" />

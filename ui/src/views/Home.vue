@@ -4,13 +4,13 @@ import * as echarts from 'echarts'
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 
 type NodeRow = { nodeId: string; health?: string }
-type TaskRow = { taskId: string; instances: number }
+type DeploymentRow = { deploymentId: string; instances: number }
 type Artifact = { sizeBytes: number }
 type Endpoint = { serviceName: string }
 
 const loading = ref(false)
 const nodes = ref<NodeRow[]>([])
-const tasks = ref<TaskRow[]>([])
+const deployments = ref<DeploymentRow[]>([])
 const services = ref<string[]>([])
 const endpointsCount = ref(0)
 const artifactsTotal = ref(0)
@@ -25,12 +25,12 @@ async function loadAll() {
   try {
     const [nRes, tRes, sRes, aRes] = await Promise.all([
       fetch(`${API_BASE}/v1/nodes`),
-      fetch(`${API_BASE}/v1/tasks`),
+      fetch(`${API_BASE}/v1/deployments`),
       fetch(`${API_BASE}/v1/services/list`),
       fetch(`${API_BASE}/v1/apps`),
     ])
     if (nRes.ok) nodes.value = await nRes.json() as any
-    if (tRes.ok) tasks.value = await tRes.json() as any
+    if (tRes.ok) deployments.value = await tRes.json() as any
     if (sRes.ok) services.value = await sRes.json() as any
     if (aRes.ok) {
       const apps = await aRes.json() as Artifact[]
@@ -49,7 +49,7 @@ async function loadAll() {
 
 const healthyNodes = () => nodes.value.filter(n => (n as any).health === 'Healthy').length
 const unhealthyNodes = () => nodes.value.length - healthyNodes()
-const runningInstances = () => tasks.value.reduce((s, t) => s + (t.instances||0), 0)
+const runningInstances = () => deployments.value.reduce((s, t) => s + (t.instances||0), 0)
 
 onMounted(loadAll)
 onBeforeUnmount(()=>{ chartServices?.dispose(); chartNodes?.dispose(); chartServices=null; chartNodes=null })
@@ -95,7 +95,7 @@ watch([services, nodes], ()=>{ nextTick().then(renderCharts) })
     <h3>Plum 概览</h3>
     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:12px;">
       <el-card><div><strong>Nodes</strong><div style="font-size:24px;">{{ nodes.length }}</div><small>Healthy {{ healthyNodes() }} / Unhealthy {{ unhealthyNodes() }}</small></div></el-card>
-      <el-card><div><strong>Tasks</strong><div style="font-size:24px;">{{ tasks.length }}</div><small>Instances ~ {{ runningInstances() }}</small></div></el-card>
+      <el-card><div><strong>Deployments</strong><div style="font-size:24px;">{{ deployments.length }}</div><small>Instances ~ {{ runningInstances() }}</small></div></el-card>
       <el-card><div><strong>Services</strong><div style="font-size:24px;">{{ services.length }}</div><small>Endpoints {{ endpointsCount }}</small></div></el-card>
       <el-card><div><strong>Artifacts</strong><div style="font-size:24px;">≈ {{ (artifactsTotal/1024/1024).toFixed(1) }} MB</div></div></el-card>
     </div>

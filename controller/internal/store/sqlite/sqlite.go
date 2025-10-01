@@ -40,19 +40,20 @@ func migrate(db *sql.DB) error {
 			labels TEXT,
 			last_seen INTEGER
 		);`,
-		`CREATE TABLE IF NOT EXISTS tasks (
-			task_id TEXT PRIMARY KEY,
-			name TEXT,
-			labels TEXT
-		);`,
+		// Deployments storage
+		`CREATE TABLE IF NOT EXISTS deployments (
+            deployment_id TEXT PRIMARY KEY,
+            name TEXT,
+            labels TEXT
+        );`,
 		`CREATE TABLE IF NOT EXISTS assignments (
-			instance_id TEXT PRIMARY KEY,
-			task_id TEXT NOT NULL,
-			node_id TEXT NOT NULL,
-			desired TEXT NOT NULL,
-			artifact_url TEXT,
-			start_cmd TEXT
-		);`,
+            instance_id TEXT PRIMARY KEY,
+            deployment_id TEXT NOT NULL,
+            node_id TEXT NOT NULL,
+            desired TEXT NOT NULL,
+            artifact_url TEXT,
+            start_cmd TEXT
+        );`,
 		`CREATE TABLE IF NOT EXISTS statuses (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			instance_id TEXT NOT NULL,
@@ -145,7 +146,7 @@ func (s *sqliteStore) DeleteNode(id string) error {
 }
 
 func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment, error) {
-	rows, err := s.db.Query(`SELECT instance_id, task_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE node_id=?`, nodeID)
+	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE node_id=?`, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +154,7 @@ func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment,
 	var out []store.Assignment
 	for rows.Next() {
 		var a store.Assignment
-		if err := rows.Scan(&a.InstanceID, &a.TaskID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
+		if err := rows.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -162,9 +163,9 @@ func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment,
 }
 
 func (s *sqliteStore) GetAssignment(instanceID string) (store.Assignment, bool, error) {
-	row := s.db.QueryRow(`SELECT instance_id, task_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE instance_id=?`, instanceID)
+	row := s.db.QueryRow(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE instance_id=?`, instanceID)
 	var a store.Assignment
-	if err := row.Scan(&a.InstanceID, &a.TaskID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
+	if err := row.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.Assignment{}, false, nil
 		}
@@ -177,8 +178,8 @@ func (s *sqliteStore) AddAssignment(nodeID string, a store.Assignment) error {
 	if nodeID == "" {
 		return errors.New("nodeID required")
 	}
-	_, err := s.db.Exec(`INSERT INTO assignments(instance_id, task_id, node_id, desired, artifact_url, start_cmd) VALUES(?,?,?,?,?,?)`,
-		a.InstanceID, a.TaskID, nodeID, a.Desired, a.ArtifactURL, a.StartCmd,
+	_, err := s.db.Exec(`INSERT INTO assignments(instance_id, deployment_id, node_id, desired, artifact_url, start_cmd) VALUES(?,?,?,?,?,?)`,
+		a.InstanceID, a.DeploymentID, nodeID, a.Desired, a.ArtifactURL, a.StartCmd,
 	)
 	return err
 }
@@ -204,30 +205,31 @@ func (s *sqliteStore) LatestStatus(instanceID string) (store.InstanceStatus, boo
 	return st, true, nil
 }
 
-func (s *sqliteStore) CreateTask(name string, labels map[string]string) (string, []string, error) {
+// Deployments helpers
+func (s *sqliteStore) CreateDeployment(name string, labels map[string]string) (string, []string, error) {
 	id := newID()
 	labelsJSON, _ := json.Marshal(labels)
-	if _, err := s.db.Exec(`INSERT INTO tasks(task_id, name, labels) VALUES(?,?,?)`, id, name, string(labelsJSON)); err != nil {
+	if _, err := s.db.Exec(`INSERT INTO deployments(deployment_id, name, labels) VALUES(?,?,?)`, id, name, string(labelsJSON)); err != nil {
 		return "", nil, err
 	}
 	return id, []string{}, nil
 }
 
-func (s *sqliteStore) NewInstanceID(taskID string) string {
-	return taskID + "-" + newID()[:8]
+func (s *sqliteStore) NewInstanceID(deploymentID string) string {
+	return deploymentID + "-" + newID()[:8]
 }
 
-func (s *sqliteStore) ListTasks() ([]store.Task, error) {
-	rows, err := s.db.Query(`SELECT task_id, name, labels FROM tasks ORDER BY rowid DESC`)
+func (s *sqliteStore) ListDeployments() ([]store.Deployment, error) {
+	rows, err := s.db.Query(`SELECT deployment_id, name, labels FROM deployments ORDER BY rowid DESC`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []store.Task
+	var out []store.Deployment
 	for rows.Next() {
-		var t store.Task
+		var t store.Deployment
 		var labelsStr string
-		if err := rows.Scan(&t.TaskID, &t.Name, &labelsStr); err != nil {
+		if err := rows.Scan(&t.DeploymentID, &t.Name, &labelsStr); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
@@ -236,27 +238,27 @@ func (s *sqliteStore) ListTasks() ([]store.Task, error) {
 	return out, rows.Err()
 }
 
-func (s *sqliteStore) GetTask(id string) (store.Task, bool, error) {
-	row := s.db.QueryRow(`SELECT task_id, name, labels FROM tasks WHERE task_id=?`, id)
-	var t store.Task
+func (s *sqliteStore) GetDeployment(id string) (store.Deployment, bool, error) {
+	row := s.db.QueryRow(`SELECT deployment_id, name, labels FROM deployments WHERE deployment_id=?`, id)
+	var t store.Deployment
 	var labelsStr string
-	if err := row.Scan(&t.TaskID, &t.Name, &labelsStr); err != nil {
+	if err := row.Scan(&t.DeploymentID, &t.Name, &labelsStr); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return store.Task{}, false, nil
+			return store.Deployment{}, false, nil
 		}
-		return store.Task{}, false, err
+		return store.Deployment{}, false, err
 	}
 	_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
 	return t, true, nil
 }
 
-func (s *sqliteStore) DeleteTask(id string) error {
-	_, err := s.db.Exec(`DELETE FROM tasks WHERE task_id=?`, id)
+func (s *sqliteStore) DeleteDeployment(id string) error {
+	_, err := s.db.Exec(`DELETE FROM deployments WHERE deployment_id=?`, id)
 	return err
 }
 
-func (s *sqliteStore) ListAssignmentsForTask(taskID string) ([]store.Assignment, error) {
-	rows, err := s.db.Query(`SELECT instance_id, task_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE task_id=?`, taskID)
+func (s *sqliteStore) ListAssignmentsForDeployment(deploymentID string) ([]store.Assignment, error) {
+	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE deployment_id=?`, deploymentID)
 	if err != nil {
 		return nil, err
 	}
@@ -264,13 +266,15 @@ func (s *sqliteStore) ListAssignmentsForTask(taskID string) ([]store.Assignment,
 	var out []store.Assignment
 	for rows.Next() {
 		var a store.Assignment
-		if err := rows.Scan(&a.InstanceID, &a.TaskID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
+		if err := rows.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
 	}
 	return out, rows.Err()
 }
+
+// No backward-compat: project early stage
 
 func (s *sqliteStore) DeleteAssignment(instanceID string) error {
 	_, err := s.db.Exec(`DELETE FROM assignments WHERE instance_id=?`, instanceID)
@@ -287,8 +291,8 @@ func (s *sqliteStore) DeleteStatusesForInstance(instanceID string) error {
 	return err
 }
 
-func (s *sqliteStore) DeleteAssignmentsForTask(taskID string) error {
-	_, err := s.db.Exec(`DELETE FROM assignments WHERE task_id=?`, taskID)
+func (s *sqliteStore) DeleteAssignmentsForDeployment(deploymentID string) error {
+	_, err := s.db.Exec(`DELETE FROM assignments WHERE deployment_id=?`, deploymentID)
 	return err
 }
 

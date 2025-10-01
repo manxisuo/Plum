@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 type Artifact = { artifactId: string; name: string; version: string; url: string }
 type NodeDTO = { nodeId: string; ip: string }
 
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
 
 const loading = ref(false)
@@ -54,10 +54,10 @@ async function doCreate() {
     for (const kv of labelRows.value) { if (kv.key) labels[kv.key] = kv.value }
     const body = { name: form.value.name, entries, labels: Object.keys(labels).length ? labels : undefined }
     loading.value = true
-    const res = await fetch(`${API_BASE}/v1/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const res = await fetch(`${API_BASE}/v1/deployments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     ElMessage.success('已创建')
-    router.push('/tasks')
+    router.push('/deployments')
   } catch (e:any) {
     ElMessage.error(e?.message || '创建失败')
   } finally { loading.value = false }
@@ -68,7 +68,7 @@ onMounted(() => { loadRefs(); if (!entriesRows.value.length) addEntry() })
 
 <template>
   <div>
-    <h3>创建任务</h3>
+    <h3>创建部署</h3>
     <el-form label-width="120px" :disabled="loading">
       <el-form-item label="Name"><el-input v-model="form.name" /></el-form-item>
       <el-form-item label="Entries">

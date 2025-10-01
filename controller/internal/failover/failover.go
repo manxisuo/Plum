@@ -117,19 +117,19 @@ func migrateNode(badNode string, healthySet map[string]bool) {
 			continue
 		}
 		// Create new assignment on target
-		newIID := store.Current.NewInstanceID(a.TaskID)
+		newIID := store.Current.NewInstanceID(a.DeploymentID)
 		err := store.Current.AddAssignment(target, store.Assignment{
-			InstanceID:  newIID,
-			TaskID:      a.TaskID,
-			NodeID:      target,
-			Desired:     store.DesiredRunning,
-			ArtifactURL: a.ArtifactURL,
-			StartCmd:    a.StartCmd,
+			InstanceID:   newIID,
+			DeploymentID: a.DeploymentID,
+			NodeID:       target,
+			Desired:      store.DesiredRunning,
+			ArtifactURL:  a.ArtifactURL,
+			StartCmd:     a.StartCmd,
 		})
 		if err != nil {
 			log.Printf("failover: add assignment %s->%s error: %v", a.InstanceID, target, err)
 		} else {
-			log.Printf("failover: migrated instance %s (task %s) from %s to %s as %s", a.InstanceID, a.TaskID, badNode, target, newIID)
+			log.Printf("failover: migrated instance %s (deployment %s) from %s to %s as %s", a.InstanceID, a.DeploymentID, badNode, target, newIID)
 			notify.Publish(target)
 		}
 		// small jitter to avoid burst

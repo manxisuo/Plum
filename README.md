@@ -3,7 +3,7 @@
 分布式服务框架（MVP/Walking Skeleton）。当前包含：
 - 控制面（Go，HTTP API，SQLite 持久化）
 - 节点 Agent（C++17，libcurl，下载/解压/运行进程，上报状态，按 desired 调谐）
-- Web UI（Vite + Vue 3 + TypeScript，Element Plus，路由化页面：Assignments/Nodes/Apps/Tasks）
+- Web UI（Vite + Vue 3 + TypeScript，Element Plus，路由化页面：Home/Assignments/Nodes/Apps/Deployments/Services）
 
 ## 1. 环境准备
 
@@ -80,25 +80,42 @@ make agent-run                  # 运行（默认 AGENT_NODE_ID=nodeA，CONTROLL
 ```
 自定义环境变量：
 ```bash
-AGENT_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 AGENT_DATA_DIR=/tmp/plum-agent ./agent/build/plum_agent
+AGENT_NODE_ID=nodeB CONTROLLER_BASE=http://127.0.0.1:8080 AGENT_DATA_DIR=/tmp/plum-agent ./agent/build/plum_agent
 ```
 
-### 2.3 创建一个演示任务（用于看到分配）
-在控制面运行后，新开终端执行：
+### 2.3 创建一个演示部署（用于看到分配）
+控制面运行后，新开终端执行：
 ```bash
-curl -s -XPOST http://127.0.0.1:8080/v1/tasks \
+curl -s -XPOST http://127.0.0.1:8080/v1/deployments \
   -H 'Content-Type: application/json' \
   -d '{
-    "name":"demo-task",
+    "name":"demo-deploy",
     "entries": [
       {
         "artifactUrl":"/artifacts/your_app.zip",
         "startCmd":"",
-        "replicas":{"nodeA":1}
+        "replicas":{"nodeA":1, "nodeB":1}
       }
     ]
   }' | jq .
 ```
+
+### 2.4 Web UI（Vite + Vue 3 + TS）
+```bash
+cd /home/stone/code/Plum
+make ui         # 安装依赖（首次）
+make ui-dev     # 开发模式（默认端口 5173，若被占用会自动递增）
+# 浏览器访问 http://127.0.0.1:5173 （或终端提示的实际端口）
+```
+主要路由：
+- /home：系统总览（KPI 卡片 + ECharts：节点健康、各服务端点数）
+- /assignments：展示期望(Desired) + 实际(Phase/Healthy/LastReportAt)，行级 Start/Stop
+- /nodes：节点列表（删除会做在用检查）
+- /apps：应用工件上传/列表/删除（在用检查，可下载 ZIP）
+- /deployments：部署列表（进入详情/配置/删除）
+- /deployments/create：创建部署（多条目/多节点副本，startCmd 可选，默认跑包内 ./start.sh）
+- /deployments/:id：部署详情（行级 Start/Stop/删除，支持“全部停止/按节点停止”批量操作）
+- /services：服务与端点视图（左侧服务列表，右侧端点明细）
 
 ### 2.5 服务注册与发现（最小版）
 - 注册：Agent 启动应用后读取包内 `meta.ini` 中的 `service=` 行并注册端点；随后周期心跳。
@@ -111,27 +128,6 @@ name=demo-app
 version=1.0.0
 service=orders:http:8080
 service=inventory:http:9090
-```
-
-### 2.4 Web UI（Vite + Vue 3 + TS）
-```bash
-cd /home/stone/code/Plum
-make ui         # 安装依赖（首次）
-make ui-dev     # 开发模式（默认端口 5173）
-# 浏览器访问 http://127.0.0.1:5173
-```
-主要路由：
-- /assignments：展示期望(Desired) + 实际(Phase/Healthy/LastReportAt)，行级 Start/Stop
-- /nodes：节点列表（删除会做在用检查）
-- /apps：应用工件上传/列表/删除（在用检查）
-- /tasks：任务列表（进入详情/配置/删除）
-- /tasks/create：创建任务（多条目，多节点副本，startCmd 可选，默认跑包内 ./start.sh）
-- /tasks/:id：任务详情（行级 Start/Stop/删除，支持“全部停止/按节点停止”批量操作）
-
-如果控制面不在默认地址，可在 UI 启动时指定：
-```bash
-cd ui
-VITE_API_BASE=http://127.0.0.1:8080 npm run dev
 ```
 
 ## 3. 常用环境变量
@@ -149,21 +145,21 @@ VITE_API_BASE=http://127.0.0.1:8080 npm run dev
 Plum/
 ├─ controller/                 # 控制面（Go）
 │  ├─ cmd/server/main.go       # 程序入口
-│  ├─ internal/httpapi/        # 路由/处理器（nodes/apps/tasks/assignments）
+│  ├─ internal/httpapi/        # 路由/处理器（nodes/apps/deployments/assignments/services/sse）
 │  └─ internal/store/          # 存储接口与 SQLite 实现
 ├─ agent/                      # 节点 Agent（C++17）
 │  ├─ CMakeLists.txt
 │  └─ src/
-│     ├─ main.cpp              # 心跳、拉取分配、调谐循环
-│     ├─ http_client.hpp/.cpp  # libcurl 封装
-│     ├─ reconciler.hpp/.cpp   # 下载/解压/进程监督/状态上报
+│     ├─ main.cpp              # 心跳、SSE、拉取分配、调谐循环
+│     ├─ http_client.hpp/.cpp  # libcurl 封装（GET/POST/DELETE）
+│     ├─ reconciler.hpp/.cpp   # 下载/解压/进程监督/状态上报/服务注册
 │     └─ fs_utils.hpp/.cpp     # 目录/解压辅助
 ├─ ui/                         # Web UI（Vite + Vue 3 + TS, Element Plus）
 │  ├─ index.html
 │  ├─ src/main.ts              # 应用入口
 │  ├─ src/router.ts            # 路由
 │  ├─ src/App.vue              # 布局+菜单
-│  └─ src/views/*              # Assignments/Nodes/Apps/TaskList/TaskDetail/TaskCreate/TaskConfig
+│  └─ src/views/*              # Home/Assignments/Nodes/Apps/Deployments/Services
 ├─ docs/assistant/POSTCARD.md  # AI 协作“项目明信片”
 ├─ tools/make_sync_packet.sh   # 生成 sync_packet.txt（上下文同步）
 └─ Makefile                    # 顶层便捷命令
@@ -173,35 +169,37 @@ Plum/
 
 ### 5.1 已完成（阶段性）
 - 控制面：
-  - SQLite 存储（nodes/tasks/assignments/statuses/artifacts）
-  - Apps：上传/列表/删除（删除前检查是否被 assignments 引用，409）
-  - Nodes：列表/详情/删除（删除前检查是否被 assignments 引用，409）；心跳注册
-  - Tasks：创建（支持 entries[] 多条目，startCmd 可选，默认 ./start.sh）、列表、详情、删除（级联清理 assignments/statuses）、限制名称不可修改、PATCH 仅改 labels
+  - SQLite 存储（nodes/deployments/assignments/statuses/artifacts/endpoints）
+  - Deployments：创建/列表/详情/配置（labels PATCH 不改名）/删除（级联清理 assignments/statuses）
   - Assignments：按节点获取（含 desired 与最新 Phase/Healthy/LastReportAt）、PATCH desired（Running/Stopped）、DELETE 单条
+  - Services（注册与发现）：
+    - 注册/替换端点：POST `/v1/services/register`
+    - 端点心跳与健康覆盖：POST `/v1/services/heartbeat`
+    - 删除实例端点：DELETE `/v1/services?instanceId=`
+    - 发现：GET `/v1/discovery?service=&version=&protocol=&limit=`；服务列表：GET `/v1/services/list`
+  - SSE：节点级事件流 `/v1/stream?nodeId=`（Agent/前端使用，Start/Stop 等操作秒级生效）
+  - 故障迁移：节点不健康时，将该节点上 desired=Running 的实例随机迁移到健康节点
+  - Swagger UI：`/swagger`（OpenAPI 文档统一 Deployment 术语）
 - Agent：
-  - 周期拉取 assignments（只拉起 desired=Running 的实例）
-  - 下载 zip（支持 http/https 与相对路径自动拼接）、解压、执行 startCmd 或默认 ./start.sh
-  - 上报状态：Running/Stopped/Exited/Failed，Failed 包含退出码
-  - 调谐：先回收→停止（TERM，超时 5s KILL）→启动；以会话/进程组方式启动并组信号终止，避免残留
+  - 周期拉取 assignments + SSE 推送唤醒（更实时）；解析 `meta.ini` 中 `service=` 行并注册端点；定期心跳
+  - 停止实例时，自动删除对应端点；SIGINT/SIGTERM 优雅退出并清理子进程
+  - 修复 JSON 解析导致 `startCmd` 丢失 `/` 的问题
 - Web UI：
-  - 路由化页面（Assignments/Nodes/Apps/Tasks）
-  - Assignments：Desired/Phase/Healthy/LastReportAt，行级 Start/Stop
-  - Tasks：列表（按钮间距修正）、详情（行级 Start/Stop/删除；“全部停止/按节点停止”批量操作）、创建（多条目/多节点副本，startCmd 可选）、配置（查看条目推导与编辑 labels）
+  - 导航：Home/Assignments/Nodes/Apps/Deployments/Services（不再折叠 More）
+  - Home：KPI 卡片 + ECharts（节点健康环图、各服务端点数柱状）
+  - Deployments：列表/创建/详情/配置（统一 Deployment 文案与路由）
+  - Assignments：实时刷新（SSE）与行级操作；列展示 Deployment
+  - Apps：ZIP 上传/列表/删除；Artifact 下载链接修复（支持 `VITE_API_BASE`）
 
 ### 5.2 待办（下一阶段）
-- 健康探针与心跳健康：超时标记 Unknown/Unhealthy
-- 任务“强制删除”选项（先下发 Stopped 再清理）
+- 强化健康：端点/实例健康探针（HTTP/TCP），心跳超时 Unknown/Unhealthy
+- 故障恢复策略：自动回切/再均衡控制器（稳定期与限速）
+- 单点解析接口：`/v1/resolve?service=...&strategy=random|round_robin&hashKey=...`
 - 更细化的权限与用户体系（RBAC）
 - 进程日志采集与查看（本地/集中式）
 - 更完备的错误处理与前端提示（把 409 等转换成友好文案）
-- 接入 `swaggo/swag` 注释生成 OpenAPI，并用 `http-swagger` 提供 Swagger UI
-- 故障节点恢复后处理策略：
-  - 保持现状（默认）：不回切，最稳。
-  - 手动回切：提供“迁回到原节点/指定节点”的管理操作。
-  - 自动回切/再均衡：增加稳定期与限速
-    - 配置项示例：FAILBACK_ENABLED、FAILBACK_STABLE_SEC、FAILBACK_MAX_RATE
-    - 策略示例：原节点健康稳定一段时间后，将部分实例按限速迁回（自动回切/再均衡控制器：恢复后按稳定期与限速迁回）；或引入“首选节点/亲和”标签进行温和再均衡。
-- 提供单点解析接口：`/v1/resolve?service=...&strategy=random|round_robin&hashKey=...`（返回一个可用端点）
+- 系统级 SSE（汇总事件），Home 实时增量刷新
+- Swagger 注释生成：接入 `swaggo/swag`（注解 → OpenAPI）
 
 ### 5.3 设计原则
 - 声明式：控制面描述“期望状态”，Agent 对齐“实际状态”。
@@ -210,69 +208,13 @@ Plum/
 - 可观测：默认指标/日志/事件可查询；问题可追踪、可告警。
 - 安全默认开启：mTLS、RBAC、审计日志。
 
-### 5.4 里程碑
-- M0（已完成）Walking Skeleton：
-  - 控制面最小 HTTP：心跳、分配、任务创建、状态上报（内存态）。
-  - Agent 心跳 + 拉取分配；UI 查询节点分配。
-- M1 基础部署：
-  - 多节点/副本的直接调度（按 `replicas`）
-  - Agent 进程监督：启动/停止/重启（指数退避）
-  - 健康检查（HTTP/TCP 探针）
-  - 本地日志（按实例滚动）与基本状态机
-- M2 服务注册与发现 + 基础监控/告警：
-  - Register/Heartbeat/Discover 接口与租约（TTL）
-  - Prometheus 指标导出，基础规则告警（CPU、崩溃、健康异常）
-- M3 持久化与 HA：
-  - 元数据从内存/SQLite 迁移至 etcd（或 Consul）
-  - 控制面多副本，Leader 选举，租约与幂等控制
-- M4 调度与编排：
-  - 亲和/反亲和、节点标签与约束，滚动/金丝雀/蓝绿发布
-  - 失败回滚，容量与配额（配合 M7）
-- M5 运行时抽象与容器化（可选）：
-  - `process` → `containerd/Docker` 插拔式运行时
-  - 资源限制（CPU/内存）与隔离（cgroups/Job Objects）
-- M6 网络与服务网格（可选）：
-  - 端到端 mTLS，Sidecar/无 Sidecar 模式
-  - 服务层路由、慢启动、故障注入（实验性）
-- M7 多租户与安全：
-  - 命名空间/项目，RBAC，限额与配额，审计日志
-- M8 可观测性完善：
-  - 指标/日志/追踪三栈（Prometheus+Loki/ELK+OTel）
-  - SLO/错误预算与告警联动
-- M9 扩展与生态：
-  - gRPC/OpenAPI 开放接口，Webhook/Operator，SDK（Go/C++/TS）
-  - 插件机制（调度器/运行时/探针/日志采集）
-- M10 Windows 路线（Phase W）：
-  - W0 编译通过 → W1 进程监督 → W2 Windows Service → W3 性能计数器 → W4 试点 → W5 容器
-- M11 交付与升级：
-  - Helm/Compose 清单、离线包、灰度升级、配置与密钥管理
+### 5.4 里程碑（摘要）
+- M1 基础部署：副本调度、进程监督、健康检查、日志
+- M2 服务注册与发现 + 基础监控/告警
+- M3 持久化与 HA：etcd/Consul、多副本、幂等控制
+- M4 调度与编排：亲和/反亲和、滚动/金丝雀/蓝绿发布
 
-### 5.5 子系统目标
-- 控制面：
-  - API Server、控制器（任务/实例/节点/服务）、调度器、事件总线（NATS 可选）
-  - 幂等（operation_id）、版本化（resource_version）、一致性边界（强一致元数据、最终一致状态）
-- 数据面（Agent）：
-  - 归档下载与校验、解压缓存、进程监督、健康探针、回传状态
-  - 断网可恢复、离线缓存、限速与重试
-- 注册与发现：
-  - 实例注册/心跳、租约与过期、客户端发现与缓存策略
-- 日志与指标：
-  - 实例本地日志滚动，集中式采集可选（Loki/ELK）；Prometheus 指标
-- 告警：
-  - 规则引擎（阈值、速率、组合），通知渠道（邮件/飞书/钉钉/Slack）
-- 安全：
-  - mTLS（CA/证书下发与轮换）、RBAC、审计日志、密钥与配置
-- 存储：
-  - etcd 作为源数据存储；SQLite 仅用于轻量/单机场景
-- UI/UX：
-  - 仪表盘、任务/实例/节点/服务的视图与动作、日志/事件/告警查询
-
-### 5.6 非目标（短期暂缓）
-- Serverless FaaS 平台化能力
-- 跨云/多集群联邦与全局一致流量治理
-- 完整 Service Mesh 全家桶（保留集成接口）
-
-### 5.7 风险与约束
+### 5.5 风险与约束
 - 保持日志与大对象远离 etcd（仅存元数据/小配置）
 - 所有控制面操作需可重放/幂等；明确超时/重试策略
 - 弱网与边缘环境：优先 Pull/心跳、流量压缩与批量上报
@@ -285,12 +227,17 @@ Plum/
 - Nodes：
   - POST `/v1/nodes/heartbeat` → `{ ttlSec }`
   - GET `/v1/nodes`、GET `/v1/nodes/{id}`、DELETE `/v1/nodes/{id}`（若在用，409）
-- Tasks：
-  - POST `/v1/tasks`（支持 `entries[]`；`startCmd` 可选，缺省跑 `./start.sh`）
-  - GET `/v1/tasks`、GET `/v1/tasks/{id}`（含 assignments）
-  - PATCH `/v1/tasks/{id}`（更新 labels；名称不可改）
-  - DELETE `/v1/tasks/{id}`（级联清理 assignments/statuses）
+- Deployments：
+  - POST `/v1/deployments`（支持 `entries[]`；`startCmd` 可选，缺省跑 `./start.sh`）
+  - GET `/v1/deployments`、GET `/v1/deployments/{id}`（含 assignments）
+  - PATCH `/v1/deployments/{id}`（更新 labels；名称不可改）
+  - DELETE `/v1/deployments/{id}`（级联清理 assignments/statuses）
 - Assignments：
   - GET `/v1/assignments?nodeId=`（返回 desired + 最新 Phase/Healthy/LastReportAt）
   - PATCH `/v1/assignments/{instanceId}` `{ desired: Running|Stopped }`
   - DELETE `/v1/assignments/{instanceId}`
+- SSE：
+  - GET `/v1/stream?nodeId=` → 事件：`update`
+- Services（注册/发现）：
+  - POST `/v1/services/register`、POST `/v1/services/heartbeat`、DELETE `/v1/services?instanceId=`
+  - GET `/v1/discovery?service=&version=&protocol=&limit=`，GET `/v1/services/list`

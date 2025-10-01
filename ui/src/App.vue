@@ -17,7 +17,7 @@ const error = ref<string | null>(null)
 const data = ref<Assignments>({ items: [] })
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
-const tab = ref<'assignments' | 'nodes' | 'apps' | 'tasks'>('assignments')
+const tab = ref<'assignments' | 'nodes' | 'apps' | 'deployments'>('assignments')
 const url = computed(() => `${API_BASE}/v1/assignments?nodeId=${encodeURIComponent(nodeId.value)}`)
 
 async function fetchAssignments() {
@@ -42,13 +42,13 @@ fetchAssignments()
     <el-header>
       <div style="display:flex; align-items:center; gap:16px;">
         <strong>Plum</strong>
-        <el-menu mode="horizontal" :default-active="$route.path">
+        <el-menu mode="horizontal" :default-active="$route.path" :ellipsis="false" style="flex:1;">
           <el-menu-item index="/"><RouterLink to="/">Home</RouterLink></el-menu-item>
           <el-menu-item index="/assignments"><RouterLink to="/assignments">Assignments</RouterLink></el-menu-item>
           <el-menu-item index="/nodes"><RouterLink to="/nodes">Nodes</RouterLink></el-menu-item>
           <el-menu-item index="/apps"><RouterLink to="/apps">Apps</RouterLink></el-menu-item>
           <el-menu-item index="/services"><RouterLink to="/services">Services</RouterLink></el-menu-item>
-          <el-menu-item index="/tasks"><RouterLink to="/tasks">Tasks</RouterLink></el-menu-item>
+          <el-menu-item index="/deployments"><RouterLink to="/deployments">Deployments</RouterLink></el-menu-item>
         </el-menu>
       </div>
     </el-header>

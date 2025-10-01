@@ -6,11 +6,11 @@ import { ElMessage } from 'element-plus'
 type Artifact = { artifactId: string; name: string; version: string; url: string }
 type NodeDTO = { nodeId: string; ip: string }
 
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
 const id = route.params.id as string
 const loading = ref(false)
-const task = ref<any>(null)
+const deployment = ref<any>(null)
 const artifacts = ref<Artifact[]>([])
 const nodes = ref<NodeDTO[]>([])
 // entries read-only for now (future: edit)
@@ -21,14 +21,14 @@ async function load() {
   loading.value = true
   try {
     const [tRes, aRes, nRes] = await Promise.all([
-      fetch(`${API_BASE}/v1/tasks/${encodeURIComponent(id)}`),
+      fetch(`${API_BASE}/v1/deployments/${encodeURIComponent(id)}`),
       fetch(`${API_BASE}/v1/apps`),
       fetch(`${API_BASE}/v1/nodes`)
     ])
     if (!tRes.ok) throw new Error('HTTP '+tRes.status)
     const tj = await tRes.json()
-    task.value = tj.task
-    labels.value = (tj.task?.labels || tj.task?.Labels || {})
+    deployment.value = tj.deployment
+    labels.value = (tj.deployment?.labels || tj.deployment?.Labels || {})
     // reconstruct entries roughly from assignments (group by artifactUrl+startCmd)
     const asgs = (tj.assignments || []) as any[]
     const keyMap = new Map<string, any>()
@@ -48,23 +48,16 @@ async function load() {
   finally { loading.value = false }
 }
 
-async function saveLabels() {
-  try {
-    const res = await fetch(`${API_BASE}/v1/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ labels: labels.value, name: task.value?.name || task.value?.Name }) })
-    if (!res.ok) throw new Error('HTTP '+res.status)
-    ElMessage.success('已保存')
-  } catch (e:any) { ElMessage.error(e?.message || '保存失败') }
-}
 
 onMounted(load)
 </script>
 
 <template>
   <div>
-    <h3>任务配置</h3>
-    <el-descriptions v-if="task" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item label="TaskID">{{ task.taskId || task.TaskID }}</el-descriptions-item>
-      <el-descriptions-item label="Name">{{ task.name || task.Name }}</el-descriptions-item>
+    <h3>部署配置</h3>
+    <el-descriptions v-if="deployment" :column="2" border style="margin-bottom:12px;">
+      <el-descriptions-item label="DeploymentID">{{ deployment.deploymentId }}</el-descriptions-item>
+      <el-descriptions-item label="Name">{{ deployment.name || deployment.Name }}</el-descriptions-item>
     </el-descriptions>
 
     <h4>Entries（根据当前 assignments 推导）</h4>
@@ -83,7 +76,7 @@ onMounted(load)
       <el-input :model-value="k" disabled style="flex:1" />
       <el-input v-model="labels[k]" style="flex:2" />
     </div>
-    <el-button type="primary" @click="saveLabels">保存</el-button>
+    
   </div>
 </template>
 

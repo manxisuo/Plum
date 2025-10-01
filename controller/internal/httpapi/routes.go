@@ -27,6 +27,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/assignments", withCORS(handleGetAssignments))
 	mux.HandleFunc("/v1/assignments/", withCORS(handleAssignmentByID))
 	mux.HandleFunc("/v1/instances/status", withCORS(handleStatusUpdate))
-	mux.HandleFunc("/v1/tasks", withCORS(handleTasks))
-	mux.HandleFunc("/v1/tasks/", withCORS(handleTaskByID))
+	// deployments
+	mux.HandleFunc("/v1/deployments", withCORS(handleDeployments))
+	mux.HandleFunc("/v1/deployments/", withCORS(handleDeploymentByID))
 }

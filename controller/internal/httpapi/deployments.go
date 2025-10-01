@@ -8,57 +8,58 @@ import (
 	"plum/controller/internal/store"
 )
 
-type TaskDTO struct {
-	TaskID    string            `json:"taskId"`
-	Name      string            `json:"name"`
-	Labels    map[string]string `json:"labels"`
-	Instances int               `json:"instances"`
+type DeploymentDTO struct {
+	DeploymentID string            `json:"deploymentId"`
+	Name         string            `json:"name"`
+	Labels       map[string]string `json:"labels"`
+	Instances    int               `json:"instances"`
 }
 
-func handleTasks(w http.ResponseWriter, r *http.Request) {
+func handleDeployments(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		handleListTasks(w, r)
+		handleListDeployments(w, r)
 	case http.MethodPost:
-		handleCreateTask(w, r)
+		handleCreateDeployment(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-func handleListTasks(w http.ResponseWriter, r *http.Request) {
+func handleListDeployments(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	tasks, err := store.Current.ListTasks()
+	deployments, err := store.Current.ListDeployments()
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	out := make([]TaskDTO, 0, len(tasks))
-	for _, t := range tasks {
-		assigns, _ := store.Current.ListAssignmentsForTask(t.TaskID)
-		out = append(out, TaskDTO{TaskID: t.TaskID, Name: t.Name, Labels: t.Labels, Instances: len(assigns)})
+	out := make([]DeploymentDTO, 0, len(deployments))
+	for _, t := range deployments {
+		assigns, _ := store.Current.ListAssignmentsForDeployment(t.DeploymentID)
+		out = append(out, DeploymentDTO{DeploymentID: t.DeploymentID, Name: t.Name, Labels: t.Labels, Instances: len(assigns)})
 	}
 	writeJSON(w, out)
 }
 
-func handleTaskByID(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/v1/tasks/")
-	if id == "" {
+func handleDeploymentByID(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	id := strings.TrimPrefix(path, "/v1/deployments/")
+	if id == "" || id == path {
 		http.NotFound(w, r)
 		return
 	}
 	switch r.Method {
 	case http.MethodGet:
-		t, ok, _ := store.Current.GetTask(id)
+		t, ok, _ := store.Current.GetDeployment(id)
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-		assigns, _ := store.Current.ListAssignmentsForTask(id)
-		writeJSON(w, map[string]any{"task": t, "assignments": assigns})
+		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
+		writeJSON(w, map[string]any{"deployment": t, "assignments": assigns})
 	case http.MethodPatch:
 		var body struct {
 			Name   string            `json:"name"`
@@ -67,39 +68,38 @@ func handleTaskByID(w http.ResponseWriter, r *http.Request) {
 		if err := jsonNewDecoder(w, r, &body); err != nil {
 			return
 		}
-		// simple: get and recreate name/labels in store task (no dedicated update yet)
-		t, ok, _ := store.Current.GetTask(id)
+		// simple: get and recreate name/labels in store deployment (no dedicated update yet)
+		t, ok, _ := store.Current.GetDeployment(id)
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
 		// name is immutable
 		if body.Name != "" && body.Name != t.Name {
-			http.Error(w, "task name is immutable", http.StatusBadRequest)
+			http.Error(w, "deployment name is immutable", http.StatusBadRequest)
 			return
 		}
 		if body.Labels != nil {
 			t.Labels = body.Labels
 			// emulate labels update via delete+insert (keeping same name)
-			_ = store.Current.DeleteTask(id)
-			newID, _, err := store.Current.CreateTask(t.Name, t.Labels)
+			_ = store.Current.DeleteDeployment(id)
+			newID, _, err := store.Current.CreateDeployment(t.Name, t.Labels)
 			if err != nil {
 				http.Error(w, "db error", http.StatusInternalServerError)
 				return
 			}
-			writeJSON(w, map[string]any{"taskId": newID})
+			writeJSON(w, map[string]any{"deploymentId": newID})
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
 	case http.MethodDelete:
-		// 级联删除：先删 assignments 与相关 statuses，再删 task
-		assigns, _ := store.Current.ListAssignmentsForTask(id)
+		// 级联删除：先删 assignments 与相关 statuses，再删 deployment
+		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
 		for _, a := range assigns {
-			_ = store.Current.DeleteEndpointsForInstance(a.InstanceID)
 			_ = store.Current.DeleteStatusesForInstance(a.InstanceID)
 		}
-		_ = store.Current.DeleteAssignmentsForTask(id)
-		_ = store.Current.DeleteTask(id)
+		_ = store.Current.DeleteAssignmentsForDeployment(id)
+		_ = store.Current.DeleteDeployment(id)
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
