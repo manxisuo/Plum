@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"plum/controller/internal/notify"
 	"plum/controller/internal/store"
 )
 
@@ -129,6 +130,7 @@ func migrateNode(badNode string, healthySet map[string]bool) {
 			log.Printf("failover: add assignment %s->%s error: %v", a.InstanceID, target, err)
 		} else {
 			log.Printf("failover: migrated instance %s (task %s) from %s to %s as %s", a.InstanceID, a.TaskID, badNode, target, newIID)
+			notify.Publish(target)
 		}
 		// small jitter to avoid burst
 		time.Sleep(time.Duration(50+rand.Intn(200)) * time.Millisecond)

@@ -80,7 +80,7 @@ make agent-run                  # 运行（默认 AGENT_NODE_ID=nodeA，CONTROLL
 ```
 自定义环境变量：
 ```bash
-AGENT_NODE_ID=nodeB CONTROLLER_BASE=http://127.0.0.1:8080 AGENT_DATA_DIR=/tmp/plum-agent ./agent/build/plum_agent
+AGENT_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 AGENT_DATA_DIR=/tmp/plum-agent ./agent/build/plum_agent
 ```
 
 ### 2.3 创建一个演示任务（用于看到分配）
@@ -98,6 +98,19 @@ curl -s -XPOST http://127.0.0.1:8080/v1/tasks \
       }
     ]
   }' | jq .
+```
+
+### 2.5 服务注册与发现（最小版）
+- 注册：Agent 启动应用后读取包内 `meta.ini` 中的 `service=` 行并注册端点；随后周期心跳。
+- 发现：`GET /v1/discovery?service=orders&version=&protocol=http&limit=20`
+- 主动健康：应用也可主动调用 `/v1/services/heartbeat` 覆盖端点健康（当前不启用探针）。
+
+`meta.ini` 示例（可多行）：
+```
+name=demo-app
+version=1.0.0
+service=orders:http:8080
+service=inventory:http:9090
 ```
 
 ### 2.4 Web UI（Vite + Vue 3 + TS）
@@ -188,6 +201,7 @@ Plum/
   - 自动回切/再均衡：增加稳定期与限速
     - 配置项示例：FAILBACK_ENABLED、FAILBACK_STABLE_SEC、FAILBACK_MAX_RATE
     - 策略示例：原节点健康稳定一段时间后，将部分实例按限速迁回（自动回切/再均衡控制器：恢复后按稳定期与限速迁回）；或引入“首选节点/亲和”标签进行温和再均衡。
+- 提供单点解析接口：`/v1/resolve?service=...&strategy=random|round_robin&hashKey=...`（返回一个可用端点）
 
 ### 5.3 设计原则
 - 声明式：控制面描述“期望状态”，Agent 对齐“实际状态”。

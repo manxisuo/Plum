@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"plum/controller/internal/failover"
+	"plum/controller/internal/notify"
 	"plum/controller/internal/store"
 )
 
@@ -237,6 +238,7 @@ func handleCreateTask(w http.ResponseWriter, r *http.Request) {
 					ArtifactURL: e.Artifact,
 					StartCmd:    e.StartCmd,
 				})
+				notify.Publish(nodeID)
 				instances = append(instances, iid)
 			}
 		}

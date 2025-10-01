@@ -6,8 +6,11 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <curl/curl.h>
 #include <atomic>
 #include <csignal>
+#include <condition_variable>
+#include <mutex>
 
 static std::string getenv_or(const char* key, const char* defv) {
 	const char* v = std::getenv(key);
@@ -15,6 +18,9 @@ static std::string getenv_or(const char* key, const char* defv) {
 }
 
 static std::atomic<bool> g_stop{false};
+static std::atomic<bool> g_nudge{false};
+static std::condition_variable g_cv;
+static std::mutex g_mtx;
 
 static void handle_sigint(int) {
     g_stop.store(true);
@@ -28,6 +34,33 @@ int main() {
 
     std::signal(SIGINT, handle_sigint);
     std::signal(SIGTERM, handle_sigint);
+
+    // SSE listener: notify immediate sync on server events
+    std::thread sse_thr([&](){
+        while (!g_stop.load()) {
+            // use a dedicated CURL easy handle for streaming
+            CURL* c = curl_easy_init();
+            if (!c) { std::this_thread::sleep_for(std::chrono::seconds(1)); continue; }
+            std::string url = controller + "/v1/stream?nodeId=" + node_id;
+            curl_easy_setopt(c, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(c, CURLOPT_HTTPGET, 1L);
+            curl_easy_setopt(c, CURLOPT_TIMEOUT, 0L); // no overall timeout
+            curl_easy_setopt(c, CURLOPT_TCP_KEEPALIVE, 1L);
+            curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, +[](char* ptr, size_t size, size_t nmemb, void* userdata) -> size_t {
+                // any incoming chunk means there is an update; nudge reconciler
+                (void)userdata;
+                g_nudge.store(true);
+                g_cv.notify_one();
+                return size * nmemb;
+            });
+            // perform streaming; on network error, retry after short sleep
+            CURLcode rc = curl_easy_perform(c);
+            curl_easy_cleanup(c);
+            if (g_stop.load()) break;
+            (void)rc;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    });
 
     while (!g_stop.load()) {
 		// Heartbeat (Register)
@@ -69,13 +102,26 @@ int main() {
                 }
 			}
 			reconciler.sync(items);
+            // register services for running instances (best-effort)
+            for (auto& it : items) {
+                reconciler.register_services(it.instanceId, node_id, "127.0.0.1");
+            }
+            // heartbeat endpoints
+            for (auto& it : items) {
+                reconciler.heartbeat_services(it.instanceId);
+            }
 		}
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        // wait up to 5s or until nudged by SSE
+        std::unique_lock<std::mutex> lk(g_mtx);
+        g_cv.wait_for(lk, std::chrono::seconds(5), [](){ return g_stop.load() || g_nudge.load(); });
+        g_nudge.store(false);
 	}
+    // graceful stop: stop all child instances we started
     // graceful stop: stop all child instances we started
     reconciler.sync({});
     reconciler.stop_all_sync();
+    if (sse_thr.joinable()) sse_thr.join();
 	return 0;
 }
 

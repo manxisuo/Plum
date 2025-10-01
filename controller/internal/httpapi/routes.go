@@ -11,9 +11,16 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/swagger/", handleSwaggerUI)
 	mux.HandleFunc("/swagger/openapi.json", withCORS(handleOpenAPI))
 	// nodes & health
+	mux.HandleFunc("/v1/stream", withCORS(handleSSEStream))
 	mux.HandleFunc("/v1/nodes/heartbeat", withCORS(handleHeartbeat))
 	mux.HandleFunc("/v1/nodes", withCORS(handleNodes))
 	mux.HandleFunc("/v1/nodes/", withCORS(handleNodeByID))
+	// services (register/discovery)
+	mux.HandleFunc("/v1/services/register", withCORS(handleRegisterEndpoints))
+	mux.HandleFunc("/v1/services/heartbeat", withCORS(handleHeartbeatEndpoints))
+	mux.HandleFunc("/v1/services", withCORS(handleDeleteEndpoints)) // DELETE ?instanceId=
+	mux.HandleFunc("/v1/services/list", withCORS(handleListServices))
+	mux.HandleFunc("/v1/discovery", withCORS(handleDiscover))
 	mux.HandleFunc("/v1/apps", withCORS(handleListApps))
 	mux.HandleFunc("/v1/apps/upload", withCORS(handleAppUpload))
 	mux.HandleFunc("/v1/apps/", withCORS(handleDeleteApp))

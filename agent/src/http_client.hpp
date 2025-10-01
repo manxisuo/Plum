@@ -15,6 +15,7 @@ public:
 
 	HttpResponse post_json(const std::string& url, const std::string& json_body, int timeout_sec = 5);
 	HttpResponse get(const std::string& url, int timeout_sec = 5);
+    HttpResponse del(const std::string& url, int timeout_sec = 5);
 
 private:
 	void* curl_ {nullptr};

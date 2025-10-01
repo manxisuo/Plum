@@ -104,7 +104,9 @@ void Reconciler::ensure_stopped_except(const std::unordered_map<std::string,bool
 			} else if (now - it->second.stop_sent_ts >= 5) {
                 kill(-it->second.pid, SIGKILL);
 				int status=0; (void)waitpid(it->second.pid, &status, WNOHANG);
-				post_status(it->first, "Stopped", 0, true);
+                post_status(it->first, "Stopped", 0, true);
+                // remove service endpoints for this instance
+                delete_services(it->first);
 				it = instance_state_.erase(it);
 			} else {
 				++it;
@@ -140,6 +142,56 @@ void Reconciler::post_status(const std::string& instance_id, const std::string& 
     long ts = (long) (std::time(nullptr));
     std::string body = std::string("{\"instanceId\":\"") + instance_id + "\",\"phase\":\"" + phase + "\",\"exitCode\":" + std::to_string(exit_code) + ",\"healthy\":" + (healthy?"true":"false") + ",\"tsUnix\":" + std::to_string(ts) + "}";
     (void)http_->post_json(controller_ + "/v1/instances/status", body);
+}
+
+// Minimal service registration: read meta.ini if present under app_dir and register endpoints
+void Reconciler::register_services(const std::string& instance_id, const std::string& node_id, const std::string& ip) {
+    if (!http_) return;
+    // meta.ini path: base_dir_/instance_id/app/meta.ini
+    std::string meta = (std::filesystem::path(base_dir_) / instance_id / "app" / "meta.ini").string();
+    if (!file_exists(meta)) return;
+    // Very simple parse: look for lines like service=<name>:<protocol>:<port> or multiple lines
+    FILE* fp = std::fopen(meta.c_str(), "r"); if (!fp) return;
+    char buf[512];
+    std::vector<std::tuple<std::string,std::string,int>> entries;
+    while (std::fgets(buf, sizeof(buf), fp)) {
+        std::string line(buf);
+        if (line.rfind("service=", 0) == 0) {
+            std::string v = line.substr(8);
+            // trim
+            while (!v.empty() && (v.back()=='\n' || v.back()=='\r' || v.back()==' ')) v.pop_back();
+            size_t p1 = v.find(':'); size_t p2 = v.find(':', p1==std::string::npos?0:p1+1);
+            if (p1!=std::string::npos && p2!=std::string::npos) {
+                std::string name = v.substr(0, p1);
+                std::string proto = v.substr(p1+1, p2-p1-1);
+                int port = std::atoi(v.substr(p2+1).c_str());
+                if (!name.empty() && port>0) entries.emplace_back(name, proto, port);
+            }
+        }
+    }
+    std::fclose(fp);
+    if (entries.empty()) return;
+    // build JSON
+    std::string body = std::string("{") + "\"instanceId\":\"" + instance_id + "\",\"nodeId\":\"" + node_id + "\",\"ip\":\"" + ip + "\",\"endpoints\":[";
+    bool first = true;
+    for (auto& t : entries) {
+        if (!first) body += ","; first=false;
+        body += "{\"serviceName\":\"" + std::get<0>(t) + "\",\"protocol\":\"" + std::get<1>(t) + "\",\"port\":" + std::to_string(std::get<2>(t)) + "}";
+    }
+    body += "]}";
+    (void)http_->post_json(controller_ + "/v1/services/register", body);
+}
+
+void Reconciler::heartbeat_services(const std::string& instance_id) {
+    if (!http_) return;
+    std::string body = std::string("{\"instanceId\":\"") + instance_id + "\"}";
+    (void)http_->post_json(controller_ + "/v1/services/heartbeat", body);
+}
+
+void Reconciler::delete_services(const std::string& instance_id) {
+    if (!http_) return;
+    std::string url = controller_ + "/v1/services?instanceId=" + instance_id;
+    (void)http_->del(url);
 }
 
 void Reconciler::stop_all_sync() {

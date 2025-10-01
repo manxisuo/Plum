@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-const API_BASE = import.meta.env.VITE_API_BASE || ''
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 type Assignment = { instanceId: string; taskId?: string; desired: string; artifactUrl: string; startCmd: string }
 type Assignments = { items: Assignment[] }
 type NodeDTO = { nodeId: string; ip: string }
@@ -31,6 +31,23 @@ async function setDesired(id: string, desired: 'Running'|'Stopped') {
   if (!res.ok) return
   fetchAssignments()
 }
+
+// SSE subscribe to updates for current node
+let es: EventSource | null = null
+function openSSE(){
+  if (!nodeId.value) return
+  closeSSE()
+  try {
+    es = new EventSource(`${API_BASE}/v1/stream?nodeId=${encodeURIComponent(nodeId.value)}`)
+    es.addEventListener('update', () => { fetchAssignments() })
+  } catch {}
+}
+function closeSSE(){
+  if (es) { es.close(); es = null }
+}
+watch(nodeId, () => { openSSE(); fetchAssignments() })
+onMounted(() => { openSSE() })
+onBeforeUnmount(() => { closeSSE() })
 </script>
 
 <template>

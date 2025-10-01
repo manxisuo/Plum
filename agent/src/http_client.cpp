@@ -77,4 +77,26 @@ HttpResponse HttpClient::get(const std::string& url, int timeout_sec) {
 	return {status, response};
 }
 
+HttpResponse HttpClient::del(const std::string& url, int timeout_sec) {
+    if (!curl_) return {};
+    std::string response;
+    char errbuf[CURL_ERROR_SIZE] = {0};
+    CURL* c = static_cast<CURL*>(curl_);
+    curl_easy_reset(c);
+    curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(c, CURLOPT_ERRORBUFFER, errbuf);
+    curl_easy_setopt(c, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(c, CURLOPT_CUSTOMREQUEST, "DELETE");
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, timeout_sec);
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_callback);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &response);
+    CURLcode res = curl_easy_perform(c);
+    long status = 0;
+    curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &status);
+    if (res != CURLE_OK) {
+        return {0, {}};
+    }
+    return {status, response};
+}
+
 

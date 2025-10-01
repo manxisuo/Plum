@@ -16,6 +16,9 @@ public:
 	Reconciler(const std::string& base_dir, HttpClient* http, const std::string& controller_base);
 	void sync(const std::vector<AssignmentItem>& items);
     void stop_all_sync();
+    void register_services(const std::string& instance_id, const std::string& node_id, const std::string& ip);
+    void heartbeat_services(const std::string& instance_id);
+	void delete_services(const std::string& instance_id);
 
 private:
 	std::string base_dir_;
