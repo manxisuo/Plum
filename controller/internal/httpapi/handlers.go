@@ -1,244 +1,255 @@
 package httpapi
 
 import (
-    "encoding/json"
-    "log"
-    "net/http"
-    "strconv"
-    "time"
+	"encoding/json"
+	"log"
+	"net/http"
+	"strconv"
+	"time"
 
-    "plum/controller/internal/store"
+	"plum/controller/internal/failover"
+	"plum/controller/internal/store"
 )
 
 type NodeHello struct {
-    NodeID string            `json:"nodeId"`
-    IP     string            `json:"ip"`
-    Labels map[string]string `json:"labels"`
+	NodeID string            `json:"nodeId"`
+	IP     string            `json:"ip"`
+	Labels map[string]string `json:"labels"`
 }
 
 type NodeDTO struct {
-    NodeID   string            `json:"nodeId"`
-    IP       string            `json:"ip"`
-    Labels   map[string]string `json:"labels"`
-    LastSeen int64             `json:"lastSeen"`
+	NodeID   string            `json:"nodeId"`
+	IP       string            `json:"ip"`
+	Labels   map[string]string `json:"labels"`
+	LastSeen int64             `json:"lastSeen"`
 }
 
 type LeaseAck struct {
-    TTLSec int64 `json:"ttlSec"`
+	TTLSec int64 `json:"ttlSec"`
 }
 
 type Assignment struct {
-    InstanceID  string `json:"instanceId"`
-    TaskID      string `json:"taskId"`
-    Desired     string `json:"desired"`
-    ArtifactURL string `json:"artifactUrl"`
-    StartCmd    string `json:"startCmd"`
-    Phase       string `json:"phase"`
-    Healthy     bool   `json:"healthy"`
-    LastReport  int64  `json:"lastReportAt"`
+	InstanceID  string `json:"instanceId"`
+	TaskID      string `json:"taskId"`
+	Desired     string `json:"desired"`
+	ArtifactURL string `json:"artifactUrl"`
+	StartCmd    string `json:"startCmd"`
+	Phase       string `json:"phase"`
+	Healthy     bool   `json:"healthy"`
+	LastReport  int64  `json:"lastReportAt"`
 }
 
 type Assignments struct {
-    Items []Assignment `json:"items"`
+	Items []Assignment `json:"items"`
 }
 
 type StatusUpdate struct {
-    InstanceID string `json:"instanceId"`
-    Phase      string `json:"phase"`
-    ExitCode   int32  `json:"exitCode"`
-    Healthy    bool   `json:"healthy"`
-    TsUnix     int64  `json:"tsUnix"`
+	InstanceID string `json:"instanceId"`
+	Phase      string `json:"phase"`
+	ExitCode   int32  `json:"exitCode"`
+	Healthy    bool   `json:"healthy"`
+	TsUnix     int64  `json:"tsUnix"`
 }
 
 type CreateTaskRequest struct {
-    Name       string            `json:"name"`
-    Artifact   string            `json:"artifactUrl"` // legacy 单条
-    StartCmd   string            `json:"startCmd"`   // legacy 单条
-    Replicas   map[string]int    `json:"replicas"`   // legacy: nodeId -> replica count
-    Labels     map[string]string `json:"labels"`
-    Entries    []CreateTaskEntry `json:"entries"`    // 新：多条目
+	Name     string            `json:"name"`
+	Artifact string            `json:"artifactUrl"` // legacy 单条
+	StartCmd string            `json:"startCmd"`    // legacy 单条
+	Replicas map[string]int    `json:"replicas"`    // legacy: nodeId -> replica count
+	Labels   map[string]string `json:"labels"`
+	Entries  []CreateTaskEntry `json:"entries"` // 新：多条目
 }
 
 type CreateTaskEntry struct {
-    Artifact string         `json:"artifactUrl"`
-    StartCmd string         `json:"startCmd"`
-    Replicas map[string]int `json:"replicas"` // nodeId -> replica
+	Artifact string         `json:"artifactUrl"`
+	StartCmd string         `json:"startCmd"`
+	Replicas map[string]int `json:"replicas"` // nodeId -> replica
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK)
-    _, _ = w.Write([]byte("ok"))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("ok"))
 }
 
 func handleHeartbeat(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost {
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-    var hello NodeHello
-    if err := json.NewDecoder(r.Body).Decode(&hello); err != nil {
-        http.Error(w, "bad request", http.StatusBadRequest)
-        return
-    }
-    now := time.Now()
-    _ = store.Current.UpsertNode(hello.NodeID, store.Node{
-        NodeID:   hello.NodeID,
-        IP:       hello.IP,
-        Labels:   hello.Labels,
-        LastSeen: now,
-    })
-    // For walking skeleton, fixed TTL
-    writeJSON(w, LeaseAck{TTLSec: 15})
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var hello NodeHello
+	if err := json.NewDecoder(r.Body).Decode(&hello); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	now := time.Now()
+	_ = store.Current.UpsertNode(hello.NodeID, store.Node{
+		NodeID:   hello.NodeID,
+		IP:       hello.IP,
+		Labels:   hello.Labels,
+		LastSeen: now,
+	})
+	// For walking skeleton, fixed TTL
+	writeJSON(w, LeaseAck{TTLSec: 15})
 }
 
 func handleNodes(w http.ResponseWriter, r *http.Request) {
-    switch r.Method {
-    case http.MethodGet:
-        nodes, _ := store.Current.ListNodes()
-        out := make([]NodeDTO, 0, len(nodes))
-        for _, n := range nodes {
-            out = append(out, NodeDTO{NodeID: n.NodeID, IP: n.IP, Labels: n.Labels, LastSeen: n.LastSeen.Unix()})
-        }
-        writeJSON(w, out)
-    default:
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-    }
+	switch r.Method {
+	case http.MethodGet:
+		nodes, _ := store.Current.ListNodes()
+		health := failover.ComputeHealth()
+		out := make([]map[string]any, 0, len(nodes))
+		for _, n := range nodes {
+			out = append(out, map[string]any{
+				"nodeId":   n.NodeID,
+				"ip":       n.IP,
+				"labels":   n.Labels,
+				"lastSeen": n.LastSeen.Unix(),
+				"health":   string(health[n.NodeID]),
+			})
+		}
+		writeJSON(w, out)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func handleNodeByID(w http.ResponseWriter, r *http.Request) {
-    // path: /v1/nodes/{id}
-    id := r.URL.Path[len("/v1/nodes/"):]
-    if id == "" {
-        http.NotFound(w, r)
-        return
-    }
-    switch r.Method {
-    case http.MethodGet:
-        n, ok, _ := store.Current.GetNode(id)
-        if !ok { http.NotFound(w, r); return }
-        writeJSON(w, NodeDTO{NodeID: n.NodeID, IP: n.IP, Labels: n.Labels, LastSeen: n.LastSeen.Unix()})
-    case http.MethodDelete:
-        // 若有 assignments 引用该节点，拒绝删除
-        if n, _ := store.Current.CountAssignmentsForNode(id); n > 0 {
-            http.Error(w, "node in use", http.StatusConflict)
-            return
-        }
-        _ = store.Current.DeleteNode(id)
-        w.WriteHeader(http.StatusNoContent)
-    default:
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-    }
+	// path: /v1/nodes/{id}
+	id := r.URL.Path[len("/v1/nodes/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		n, ok, _ := store.Current.GetNode(id)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, NodeDTO{NodeID: n.NodeID, IP: n.IP, Labels: n.Labels, LastSeen: n.LastSeen.Unix()})
+	case http.MethodDelete:
+		// 若有 assignments 引用该节点，拒绝删除
+		if n, _ := store.Current.CountAssignmentsForNode(id); n > 0 {
+			http.Error(w, "node in use", http.StatusConflict)
+			return
+		}
+		_ = store.Current.DeleteNode(id)
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func handleGetAssignments(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodGet {
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-    nodeID := r.URL.Query().Get("nodeId")
-    if nodeID == "" {
-        http.Error(w, "nodeId required", http.StatusBadRequest)
-        return
-    }
-    assigns, _ := store.Current.ListAssignmentsForNode(nodeID)
-    // Optional: throttle size with limit=
-    if lim := r.URL.Query().Get("limit"); lim != "" {
-        if n, err := strconv.Atoi(lim); err == nil && n < len(assigns) {
-            assigns = assigns[:n]
-        }
-    }
-    res := Assignments{Items: make([]Assignment, 0, len(assigns))}
-    for _, a := range assigns {
-        st, ok, _ := store.Current.LatestStatus(a.InstanceID)
-        item := Assignment{
-            InstanceID:  a.InstanceID,
-            TaskID:      a.TaskID,
-            Desired:     string(a.Desired),
-            ArtifactURL: a.ArtifactURL,
-            StartCmd:    a.StartCmd,
-        }
-        if ok {
-            item.Phase = st.Phase
-            item.Healthy = st.Healthy
-            item.LastReport = st.TsUnix
-        }
-        res.Items = append(res.Items, item)
-    }
-    writeJSON(w, res)
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	nodeID := r.URL.Query().Get("nodeId")
+	if nodeID == "" {
+		http.Error(w, "nodeId required", http.StatusBadRequest)
+		return
+	}
+	assigns, _ := store.Current.ListAssignmentsForNode(nodeID)
+	// Optional: throttle size with limit=
+	if lim := r.URL.Query().Get("limit"); lim != "" {
+		if n, err := strconv.Atoi(lim); err == nil && n < len(assigns) {
+			assigns = assigns[:n]
+		}
+	}
+	res := Assignments{Items: make([]Assignment, 0, len(assigns))}
+	for _, a := range assigns {
+		st, ok, _ := store.Current.LatestStatus(a.InstanceID)
+		item := Assignment{
+			InstanceID:  a.InstanceID,
+			TaskID:      a.TaskID,
+			Desired:     string(a.Desired),
+			ArtifactURL: a.ArtifactURL,
+			StartCmd:    a.StartCmd,
+		}
+		if ok {
+			item.Phase = st.Phase
+			item.Healthy = st.Healthy
+			item.LastReport = st.TsUnix
+		}
+		res.Items = append(res.Items, item)
+	}
+	writeJSON(w, res)
 }
 
 func handleStatusUpdate(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost {
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-    var su StatusUpdate
-    if err := json.NewDecoder(r.Body).Decode(&su); err != nil {
-        http.Error(w, "bad request", http.StatusBadRequest)
-        return
-    }
-    _ = store.Current.AppendStatus(su.InstanceID, store.InstanceStatus{
-        InstanceID: su.InstanceID,
-        Phase:      su.Phase,
-        ExitCode:   int(su.ExitCode),
-        Healthy:    su.Healthy,
-        TsUnix:     su.TsUnix,
-    })
-    w.WriteHeader(http.StatusNoContent)
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var su StatusUpdate
+	if err := json.NewDecoder(r.Body).Decode(&su); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	_ = store.Current.AppendStatus(su.InstanceID, store.InstanceStatus{
+		InstanceID: su.InstanceID,
+		Phase:      su.Phase,
+		ExitCode:   int(su.ExitCode),
+		Healthy:    su.Healthy,
+		TsUnix:     su.TsUnix,
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func handleCreateTask(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPost {
-        http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-    var req CreateTaskRequest
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        http.Error(w, "bad request", http.StatusBadRequest)
-        return
-    }
-    // 规范化为 entries（兼容旧格式），startCmd 可选
-    entries := req.Entries
-    if len(entries) == 0 {
-        if req.Name == "" || req.Artifact == "" || len(req.Replicas) == 0 {
-            http.Error(w, "missing fields", http.StatusBadRequest)
-            return
-        }
-        entries = []CreateTaskEntry{{Artifact: req.Artifact, StartCmd: req.StartCmd, Replicas: req.Replicas}}
-    }
-    if req.Name == "" {
-        http.Error(w, "name required", http.StatusBadRequest)
-        return
-    }
-    taskID, instances, _ := store.Current.CreateTask(req.Name, req.Labels)
-    for _, e := range entries {
-        if e.Artifact == "" || len(e.Replicas) == 0 { continue }
-        for nodeID, replicas := range e.Replicas {
-            for i := 0; i < replicas; i++ {
-                iid := store.Current.NewInstanceID(taskID)
-                _ = store.Current.AddAssignment(nodeID, store.Assignment{
-                    InstanceID:  iid,
-                    TaskID:      taskID,
-                    NodeID:      nodeID,
-                    Desired:     store.DesiredRunning,
-                    ArtifactURL: e.Artifact,
-                    StartCmd:    e.StartCmd,
-                })
-                instances = append(instances, iid)
-            }
-        }
-    }
-    writeJSON(w, map[string]any{
-        "taskId":    taskID,
-        "instances": instances,
-    })
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req CreateTaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	// 规范化为 entries（兼容旧格式），startCmd 可选
+	entries := req.Entries
+	if len(entries) == 0 {
+		if req.Name == "" || req.Artifact == "" || len(req.Replicas) == 0 {
+			http.Error(w, "missing fields", http.StatusBadRequest)
+			return
+		}
+		entries = []CreateTaskEntry{{Artifact: req.Artifact, StartCmd: req.StartCmd, Replicas: req.Replicas}}
+	}
+	if req.Name == "" {
+		http.Error(w, "name required", http.StatusBadRequest)
+		return
+	}
+	taskID, instances, _ := store.Current.CreateTask(req.Name, req.Labels)
+	for _, e := range entries {
+		if e.Artifact == "" || len(e.Replicas) == 0 {
+			continue
+		}
+		for nodeID, replicas := range e.Replicas {
+			for i := 0; i < replicas; i++ {
+				iid := store.Current.NewInstanceID(taskID)
+				_ = store.Current.AddAssignment(nodeID, store.Assignment{
+					InstanceID:  iid,
+					TaskID:      taskID,
+					NodeID:      nodeID,
+					Desired:     store.DesiredRunning,
+					ArtifactURL: e.Artifact,
+					StartCmd:    e.StartCmd,
+				})
+				instances = append(instances, iid)
+			}
+		}
+	}
+	writeJSON(w, map[string]any{
+		"taskId":    taskID,
+		"instances": instances,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
-    w.Header().Set("Content-Type", "application/json")
-    if err := json.NewEncoder(w).Encode(v); err != nil {
-        log.Printf("write json error: %v", err)
-    }
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("write json error: %v", err)
+	}
 }
-
-

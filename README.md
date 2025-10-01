@@ -67,6 +67,11 @@ curl -s http://127.0.0.1:8080/healthz
 CONTROLLER_ADDR=:9090 CONTROLLER_DATA_DIR=/home/stone/code/Plum ./controller/bin/controller
 ```
 
+### 2.1.1 Swagger UI（API 说明与测试）
+控制面启动后，访问：
+- 浏览器打开 http://127.0.0.1:8080/swagger
+- OpenAPI JSON: http://127.0.0.1:8080/swagger/openapi.json
+
 ### 2.2 Agent（C++）
 ```bash
 cd /home/stone/code/Plum
@@ -176,6 +181,13 @@ Plum/
 - 更细化的权限与用户体系（RBAC）
 - 进程日志采集与查看（本地/集中式）
 - 更完备的错误处理与前端提示（把 409 等转换成友好文案）
+- 接入 `swaggo/swag` 注释生成 OpenAPI，并用 `http-swagger` 提供 Swagger UI
+- 故障节点恢复后处理策略：
+  - 保持现状（默认）：不回切，最稳。
+  - 手动回切：提供“迁回到原节点/指定节点”的管理操作。
+  - 自动回切/再均衡：增加稳定期与限速
+    - 配置项示例：FAILBACK_ENABLED、FAILBACK_STABLE_SEC、FAILBACK_MAX_RATE
+    - 策略示例：原节点健康稳定一段时间后，将部分实例按限速迁回（自动回切/再均衡控制器：恢复后按稳定期与限速迁回）；或引入“首选节点/亲和”标签进行温和再均衡。
 
 ### 5.3 设计原则
 - 声明式：控制面描述“期望状态”，Agent 对齐“实际状态”。
