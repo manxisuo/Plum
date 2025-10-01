@@ -1,0 +1,157 @@
+#include "reconciler.hpp"
+#include "fs_utils.hpp"
+#include "http_client.hpp"
+#include <cstdio>
+#include <filesystem>
+#include <sstream>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <ctime>
+#include <iostream>
+#include <signal.h>
+#include <thread>
+#include <chrono>
+
+Reconciler::Reconciler(const std::string& base_dir, HttpClient* http, const std::string& controller_base)
+    : base_dir_(base_dir), http_(http), controller_(controller_base) {
+	ensure_dir(base_dir_);
+}
+
+void Reconciler::sync(const std::vector<AssignmentItem>& items) {
+	std::unordered_map<std::string,bool> keep;
+	for (const auto& it : items) keep[it.instanceId] = true;
+	// Order: reap exited -> stop extras -> start missing
+	reap_exited();
+	ensure_stopped_except(keep);
+	for (const auto& it : items) ensure_running(it);
+}
+
+static std::string join(const std::string& a, const std::string& b) { return (std::filesystem::path(a) / b).string(); }
+static std::string ltrim_commas_spaces(std::string s) {
+    size_t i = 0;
+    while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n' || s[i] == ',')) ++i;
+    if (i > 0) s.erase(0, i);
+    return s;
+}
+
+void Reconciler::ensure_running(const AssignmentItem& it) {
+    auto sit = instance_state_.find(it.instanceId);
+    if (sit != instance_state_.end()) {
+        // If process still alive, nothing to do
+        if (kill(sit->second.pid, 0) == 0) return;
+        // Stale record, cleanup
+        instance_state_.erase(sit);
+    }
+	std::string inst_dir = join(base_dir_, it.instanceId);
+	ensure_dir(inst_dir);
+	std::string zip_path = join(inst_dir, "pkg.zip");
+	// download
+    if (!file_exists(zip_path)) {
+        auto resp = http_->get(it.artifactUrl);
+        if (resp.status_code != 200) {
+            std::cerr << "download failed status=" << resp.status_code << " url=" << it.artifactUrl << "\n";
+            return;
+        }
+        if (resp.body.empty()) {
+            std::cerr << "download empty body url=" << it.artifactUrl << "\n";
+            return;
+        }
+        FILE* fp = std::fopen(zip_path.c_str(), "wb");
+        if (!fp) { std::perror("fopen zip_path"); return; }
+        size_t wn = fwrite(resp.body.data(), 1, resp.body.size(), fp);
+        std::fclose(fp);
+        if (wn != resp.body.size()) { std::cerr << "write zip truncated: " << wn << "/" << resp.body.size() << "\n"; return; }
+        std::cerr << "saved artifact to " << zip_path << " size=" << wn << "\n";
+    }
+	// unzip
+	std::string app_dir = join(inst_dir, "app");
+	ensure_dir(app_dir);
+    if (!file_exists(join(app_dir, "start.sh"))) {
+        if (!unzip_zip(zip_path, app_dir)) { std::cerr << "unzip failed; ensure 'unzip' is installed. zip=" << zip_path << "\n"; return; }
+    }
+	// start
+    std::string sh = join(app_dir, "start.sh");
+    ::chmod(sh.c_str(), 0755);
+    std::string cmdline = it.startCmd;
+    cmdline = ltrim_commas_spaces(cmdline);
+    if (cmdline.empty()) cmdline = "./start.sh";
+    std::string full_cmd = "cd '" + app_dir + "' && " + cmdline;
+    std::cerr << "exec: " << full_cmd << "\n";
+    pid_t pid = fork();
+	if (pid == 0) {
+		// child
+        // 新建会话/进程组，便于组信号终止
+        (void)setsid();
+        execl("/bin/sh", "sh", "-c", full_cmd.c_str(), (char*)nullptr);
+		std::perror("exec");
+		_Exit(127);
+	} else if (pid > 0) {
+		instance_state_[it.instanceId] = { pid, 0 };
+        post_status(it.instanceId, "Running", 0, true);
+	}
+}
+
+void Reconciler::ensure_stopped_except(const std::unordered_map<std::string,bool>& keep) {
+    long now = (long)std::time(nullptr);
+	for (auto it = instance_state_.begin(); it != instance_state_.end(); ) {
+		if (!keep.count(it->first)) {
+            if (it->second.stop_sent_ts == 0) {
+                // 发送到进程组
+                kill(-it->second.pid, SIGTERM);
+				it->second.stop_sent_ts = now;
+				++it;
+			} else if (now - it->second.stop_sent_ts >= 5) {
+                kill(-it->second.pid, SIGKILL);
+				int status=0; (void)waitpid(it->second.pid, &status, WNOHANG);
+				post_status(it->first, "Stopped", 0, true);
+				it = instance_state_.erase(it);
+			} else {
+				++it;
+			}
+		} else {
+			++it;
+		}
+	}
+}
+
+void Reconciler::reap_exited() {
+    for (auto it = instance_state_.begin(); it != instance_state_.end(); ) {
+        int status = 0;
+        pid_t r = waitpid(it->second.pid, &status, WNOHANG);
+        if (r == it->second.pid) {
+            if (it->second.stop_sent_ts > 0) {
+                // 是我们请求的停止
+                post_status(it->first, "Stopped", 0, true);
+            } else {
+                int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+                bool ok = (code == 0);
+                post_status(it->first, ok ? "Exited" : "Failed", code, ok);
+            }
+            it = instance_state_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void Reconciler::post_status(const std::string& instance_id, const std::string& phase, int exit_code, bool healthy) {
+    if (!http_) return;
+    long ts = (long) (std::time(nullptr));
+    std::string body = std::string("{\"instanceId\":\"") + instance_id + "\",\"phase\":\"" + phase + "\",\"exitCode\":" + std::to_string(exit_code) + ",\"healthy\":" + (healthy?"true":"false") + ",\"tsUnix\":" + std::to_string(ts) + "}";
+    (void)http_->post_json(controller_ + "/v1/instances/status", body);
+}
+
+void Reconciler::stop_all_sync() {
+    std::unordered_map<std::string,bool> empty;
+    // 最长等待 ~7s：先发 TERM，5s 后升级为 KILL，再清理
+    for (int i = 0; i < 70; ++i) {
+        ensure_stopped_except(empty);
+        reap_exited();
+        if (instance_state_.empty()) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    // 最后一遍，确保残留强制清理
+    ensure_stopped_except(empty);
+    reap_exited();
+}

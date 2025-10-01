@@ -1,0 +1,35 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node / Vite (UI)
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/.vite/
+ui/.eslintcache
+
+# Go build outputs
+controller/bin/
+controller/dist/
+
+# C++ build (CMake)
+agent/build/
+
+# SQLite runtime files
+controller.db
+controller.db-shm
+controller.db-wal
+
+# Artifacts served by controller
+artifacts/
+**/artifacts/
+
+# Logs / temps
+*.log
+*.tmp
+*.bak
