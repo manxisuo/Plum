@@ -84,6 +84,36 @@ func migrate(db *sql.DB) error {
             last_seen INTEGER,
             PRIMARY KEY(service_name, instance_id, ip, port, protocol)
         );`,
+		// Tasks (Phase A minimal)
+		`CREATE TABLE IF NOT EXISTS tasks (
+            task_id TEXT PRIMARY KEY,
+            name TEXT,
+            executor TEXT,
+            target_kind TEXT,
+            target_ref TEXT,
+            state TEXT,
+            payload_json TEXT,
+            result_json TEXT,
+            error TEXT,
+            timeout_sec INTEGER,
+            max_retries INTEGER,
+            attempt INTEGER,
+            scheduled_on TEXT,
+            created_at INTEGER,
+            started_at INTEGER,
+            finished_at INTEGER,
+            labels TEXT
+        );`,
+		// Workers for embedded executor
+		`CREATE TABLE IF NOT EXISTS workers (
+            worker_id TEXT PRIMARY KEY,
+            node_id TEXT,
+            url TEXT,
+            tasks TEXT,
+            labels TEXT,
+            capacity INTEGER,
+            last_seen INTEGER
+        );`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -446,6 +476,110 @@ func (s *sqliteStore) GetArtifact(id string) (store.Artifact, bool, error) {
 
 func (s *sqliteStore) DeleteArtifact(id string) error {
 	_, err := s.db.Exec(`DELETE FROM artifacts WHERE artifact_id=?`, id)
+	return err
+}
+
+// Workers (embedded)
+func (s *sqliteStore) RegisterWorker(w store.Worker) error {
+	tasksJSON, _ := json.Marshal(w.Tasks)
+	labelsJSON, _ := json.Marshal(w.Labels)
+	_, err := s.db.Exec(`INSERT INTO workers(worker_id, node_id, url, tasks, labels, capacity, last_seen) VALUES(?,?,?,?,?,?,?)
+        ON CONFLICT(worker_id) DO UPDATE SET node_id=excluded.node_id, url=excluded.url, tasks=excluded.tasks, labels=excluded.labels, capacity=excluded.capacity, last_seen=excluded.last_seen`,
+		w.WorkerID, w.NodeID, w.URL, string(tasksJSON), string(labelsJSON), w.Capacity, w.LastSeen,
+	)
+	return err
+}
+
+func (s *sqliteStore) HeartbeatWorker(workerID string, capacity int, lastSeen int64) error {
+	_, err := s.db.Exec(`UPDATE workers SET capacity=?, last_seen=? WHERE worker_id=?`, capacity, lastSeen, workerID)
+	return err
+}
+
+func (s *sqliteStore) ListWorkers() ([]store.Worker, error) {
+	rows, err := s.db.Query(`SELECT worker_id, node_id, url, tasks, labels, capacity, last_seen FROM workers ORDER BY last_seen DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.Worker
+	for rows.Next() {
+		var w store.Worker
+		var tasksStr, labelsStr string
+		if err := rows.Scan(&w.WorkerID, &w.NodeID, &w.URL, &tasksStr, &labelsStr, &w.Capacity, &w.LastSeen); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(tasksStr), &w.Tasks)
+		_ = json.Unmarshal([]byte(labelsStr), &w.Labels)
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
+// Tasks (Phase A minimal)
+func (s *sqliteStore) CreateTask(t store.Task) (string, error) {
+	if t.TaskID == "" {
+		t.TaskID = newID()
+	}
+	labelsJSON, _ := json.Marshal(t.Labels)
+	_, err := s.db.Exec(`INSERT INTO tasks(task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.TaskID, t.Name, t.Executor, t.TargetKind, t.TargetRef, t.State, t.PayloadJSON, t.ResultJSON, t.Error, t.TimeoutSec, t.MaxRetries, t.Attempt, t.ScheduledOn, t.CreatedAt, t.StartedAt, t.FinishedAt, string(labelsJSON),
+	)
+	if err != nil {
+		return "", err
+	}
+	return t.TaskID, nil
+}
+
+func (s *sqliteStore) GetTask(id string) (store.Task, bool, error) {
+	row := s.db.QueryRow(`SELECT task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels FROM tasks WHERE task_id=?`, id)
+	var t store.Task
+	var labelsStr string
+	if err := row.Scan(&t.TaskID, &t.Name, &t.Executor, &t.TargetKind, &t.TargetRef, &t.State, &t.PayloadJSON, &t.ResultJSON, &t.Error, &t.TimeoutSec, &t.MaxRetries, &t.Attempt, &t.ScheduledOn, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &labelsStr); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.Task{}, false, nil
+		}
+		return store.Task{}, false, err
+	}
+	_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
+	return t, true, nil
+}
+
+func (s *sqliteStore) ListTasks() ([]store.Task, error) {
+	rows, err := s.db.Query(`SELECT task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels FROM tasks ORDER BY created_at DESC, task_id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.Task
+	for rows.Next() {
+		var t store.Task
+		var labelsStr string
+		if err := rows.Scan(&t.TaskID, &t.Name, &t.Executor, &t.TargetKind, &t.TargetRef, &t.State, &t.PayloadJSON, &t.ResultJSON, &t.Error, &t.TimeoutSec, &t.MaxRetries, &t.Attempt, &t.ScheduledOn, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &labelsStr); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (s *sqliteStore) DeleteTask(id string) error {
+	_, err := s.db.Exec(`DELETE FROM tasks WHERE task_id=?`, id)
+	return err
+}
+
+func (s *sqliteStore) UpdateTaskState(id string, state string) error {
+	_, err := s.db.Exec(`UPDATE tasks SET state=? WHERE task_id=?`, state, id)
+	return err
+}
+
+func (s *sqliteStore) UpdateTaskRunning(id string, startedAt int64, scheduledOn string, attempt int) error {
+	_, err := s.db.Exec(`UPDATE tasks SET state='Running', started_at=?, scheduled_on=?, attempt=? WHERE task_id=?`, startedAt, scheduledOn, attempt, id)
+	return err
+}
+
+func (s *sqliteStore) UpdateTaskFinished(id string, state string, resultJSON string, errMsg string, finishedAt int64, attempt int) error {
+	_, err := s.db.Exec(`UPDATE tasks SET state=?, result_json=?, error=?, finished_at=?, attempt=? WHERE task_id=?`, state, resultJSON, errMsg, finishedAt, attempt, id)
 	return err
 }
 

@@ -9,6 +9,8 @@ import Apps from './views/Apps.vue'
 import Assignments from './views/Assignments.vue'
 // @ts-ignore: vite handles .vue type
 import Services from './views/Services.vue'
+// @ts-ignore
+import Tasks from './views/Tasks.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +19,7 @@ export const router = createRouter({
     { path: '/nodes', component: Nodes },
     { path: '/apps', component: Apps },
     { path: '/services', component: Services },
+    { path: '/tasks', component: Tasks },
     { path: '/assignments', component: Assignments },
     // deployments
     { path: '/deployments', component: DeploymentsList },

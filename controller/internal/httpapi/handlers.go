@@ -255,3 +255,162 @@ func writeJSON(w http.ResponseWriter, v any) {
 		log.Printf("write json error: %v", err)
 	}
 }
+
+// ---- Tasks (Phase A minimal) ----
+
+type CreateTaskRequest struct {
+	Name       string            `json:"name"`
+	Executor   string            `json:"executor"`   // service|embedded|os_process
+	TargetKind string            `json:"targetKind"` // service|deployment|node
+	TargetRef  string            `json:"targetRef"`
+	Payload    map[string]any    `json:"payload"`
+	Labels     map[string]string `json:"labels"`
+	TimeoutSec int               `json:"timeoutSec"`
+	MaxRetries int               `json:"maxRetries"`
+}
+
+func handleTasks(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		list, err := store.Current.ListTasks()
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, list)
+	case http.MethodPost:
+		var req CreateTaskRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		payloadJSON, _ := json.Marshal(req.Payload)
+		id, err := store.Current.CreateTask(store.Task{
+			Name:        req.Name,
+			Executor:    req.Executor,
+			TargetKind:  req.TargetKind,
+			TargetRef:   req.TargetRef,
+			State:       "Pending",
+			PayloadJSON: string(payloadJSON),
+			TimeoutSec:  req.TimeoutSec,
+			MaxRetries:  req.MaxRetries,
+			CreatedAt:   time.Now().Unix(),
+			Labels:      req.Labels,
+		})
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		// notify tasks stream
+		notify.PublishTasks()
+		writeJSON(w, map[string]any{"taskId": id})
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleTaskByID(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[len("/v1/tasks/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		t, ok, err := store.Current.GetTask(id)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, t)
+	case http.MethodDelete:
+		_ = store.Current.DeleteTask(id)
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// ---- Workers (embedded) ----
+
+type RegisterWorkerRequest struct {
+	WorkerID string            `json:"workerId"`
+	NodeID   string            `json:"nodeId"`
+	URL      string            `json:"url"`
+	Tasks    []string          `json:"tasks"`
+	Labels   map[string]string `json:"labels"`
+	Capacity int               `json:"capacity"`
+}
+
+func handleRegisterWorker(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req RegisterWorkerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.WorkerID == "" {
+		http.Error(w, "workerId required", http.StatusBadRequest)
+		return
+	}
+	err := store.Current.RegisterWorker(store.Worker{
+		WorkerID: req.WorkerID,
+		NodeID:   req.NodeID,
+		URL:      req.URL,
+		Tasks:    req.Tasks,
+		Labels:   req.Labels,
+		Capacity: req.Capacity,
+		LastSeen: time.Now().Unix(),
+	})
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type HeartbeatWorkerRequest struct {
+	WorkerID string `json:"workerId"`
+	Capacity int    `json:"capacity"`
+}
+
+func handleHeartbeatWorker(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req HeartbeatWorkerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.WorkerID == "" {
+		http.Error(w, "workerId required", http.StatusBadRequest)
+		return
+	}
+	if err := store.Current.HeartbeatWorker(req.WorkerID, req.Capacity, time.Now().Unix()); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func handleListWorkers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	list, err := store.Current.ListWorkers()
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, list)
+}

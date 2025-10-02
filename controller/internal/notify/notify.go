@@ -10,7 +10,7 @@ type subscriber struct {
 
 type Notifier struct {
 	mu   sync.Mutex
-	subs map[string]map[*subscriber]struct{} // nodeId -> subs
+	subs map[string]map[*subscriber]struct{} // key -> subs (nodeId 或 task:*)
 }
 
 var global = &Notifier{subs: make(map[string]map[*subscriber]struct{})}
@@ -50,4 +50,13 @@ func Publish(nodeID string) {
 			}
 		}
 	}
+}
+
+// Tasks channel (global)
+func SubscribeTasks() (chan struct{}, func()) {
+	return Subscribe("__tasks__")
+}
+
+func PublishTasks() {
+	Publish("__tasks__")
 }

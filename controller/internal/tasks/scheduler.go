@@ -1,0 +1,152 @@
+package tasks
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
+	"plum/controller/internal/notify"
+	"plum/controller/internal/store"
+)
+
+func intervalSeconds() int {
+	if v := os.Getenv("TASK_SCHED_INTERVAL_SEC"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 2
+}
+
+// Start a minimal scheduler: Pending -> Running -> Succeeded (builtin only)
+func Start() {
+	go func() {
+		iv := time.Duration(intervalSeconds()) * time.Second
+		for {
+			time.Sleep(iv)
+			tick()
+		}
+	}()
+}
+
+func tick() {
+	tasks, err := store.Current.ListTasks()
+	if err != nil {
+		return
+	}
+	now := time.Now().Unix()
+	for _, t := range tasks {
+		if t.State == "Pending" {
+			// minimal: mark Running
+			_ = store.Current.UpdateTaskRunning(t.TaskID, now, "controller", t.Attempt+1)
+			// builtin executors: Name prefix "builtin." executes locally
+			if len(t.Name) >= 8 && t.Name[:8] == "builtin." {
+				runBuiltin(t)
+			} else if t.Executor == "embedded" {
+				runEmbedded(t)
+			}
+			notify.PublishTasks()
+		}
+	}
+	// watchdog: mark long-running running tasks as Failed
+	for _, t := range tasks {
+		if t.State == "Running" && t.StartedAt > 0 {
+			if now-t.StartedAt >= int64(embeddedTimeoutMs()/1000+5) {
+				_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "controller watchdog timeout", now, t.Attempt)
+			}
+		}
+	}
+}
+
+func runBuiltin(t store.Task) {
+	// simulate simple builtins: builtin.echo, builtin.sleep, builtin.fail
+	var payload map[string]any
+	_ = json.Unmarshal([]byte(t.PayloadJSON), &payload)
+	switch t.Name {
+	case "builtin.echo":
+		res := map[string]any{"echo": payload}
+		b, _ := json.Marshal(res)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(b), "", time.Now().Unix(), t.Attempt)
+	case "builtin.sleep":
+		d := 1.0
+		if v, ok := payload["seconds"]; ok {
+			switch vv := v.(type) {
+			case float64:
+				d = vv
+			}
+		}
+		time.Sleep(time.Duration(d*1000) * time.Millisecond)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", "{}", "", time.Now().Unix(), t.Attempt)
+	case "builtin.fail":
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "builtin fail", time.Now().Unix(), t.Attempt)
+	default:
+		log.Printf("tasks: unknown builtin %s", t.Name)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "unknown builtin", time.Now().Unix(), t.Attempt)
+	}
+	notify.PublishTasks()
+}
+
+func embeddedTimeoutMs() int {
+	if v := os.Getenv("TASK_EMBEDDED_TIMEOUT_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 5000
+}
+
+func runEmbedded(t store.Task) {
+	workers, err := store.Current.ListWorkers()
+	if err != nil || len(workers) == 0 {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no workers", time.Now().Unix(), t.Attempt)
+		return
+	}
+	var candidate *store.Worker
+	for i := range workers {
+		w := &workers[i]
+		for _, name := range w.Tasks {
+			if name == t.Name {
+				candidate = w
+				break
+			}
+		}
+		if candidate != nil {
+			break
+		}
+	}
+	if candidate == nil || candidate.URL == "" {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no matching worker or URL", time.Now().Unix(), t.Attempt)
+		return
+	}
+	log.Printf("tasks: dispatch %s to worker %s url=%s", t.Name, candidate.WorkerID, candidate.URL)
+	// synchronous POST to worker URL with task payload
+	m := map[string]any{"taskId": t.TaskID, "name": t.Name}
+	var payload any
+	_ = json.Unmarshal([]byte(t.PayloadJSON), &payload)
+	m["payload"] = payload
+	bs, _ := json.Marshal(m)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(embeddedTimeoutMs())*time.Millisecond)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, candidate.URL, bytes.NewReader(bs))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("tasks: call worker error: %v", err)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", err.Error(), time.Now().Unix(), t.Attempt)
+		return
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(rb), "", time.Now().Unix(), t.Attempt)
+	} else {
+		log.Printf("tasks: worker responded %d body=%s", resp.StatusCode, string(rb))
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(rb), resp.Status, time.Now().Unix(), t.Attempt)
+	}
+}

@@ -34,6 +34,27 @@ type InstanceStatus struct {
 	TsUnix     int64
 }
 
+// Task (short job) minimal model for Phase A
+type Task struct {
+	TaskID      string
+	Name        string
+	Executor    string // service | embedded | os_process
+	TargetKind  string // service | deployment | node (depending on executor)
+	TargetRef   string // e.g. serviceName/version/protocol or deploymentId/nodeId
+	State       string // Pending | Scheduled | Running | Succeeded | Failed | Timeout | Canceled
+	PayloadJSON string // raw JSON input
+	ResultJSON  string // raw JSON output
+	Error       string
+	TimeoutSec  int
+	MaxRetries  int
+	Attempt     int
+	ScheduledOn string // nodeId or endpoint info (optional)
+	CreatedAt   int64
+	StartedAt   int64
+	FinishedAt  int64
+	Labels      map[string]string
+}
+
 type Artifact struct {
 	ArtifactID string
 	AppName    string
@@ -62,6 +83,17 @@ type Endpoint struct {
 	Labels      map[string]string
 	Healthy     bool
 	LastSeen    int64
+}
+
+// Embedded Worker capability (executor=embedded)
+type Worker struct {
+	WorkerID string
+	NodeID   string
+	URL      string   // callback endpoint (optional for MVP)
+	Tasks    []string // supported task names
+	Labels   map[string]string
+	Capacity int
+	LastSeen int64
 }
 
 type Store interface {
@@ -100,6 +132,20 @@ type Store interface {
 	DeleteEndpointsForInstance(instanceID string) error
 	ListEndpointsByService(serviceName string, version string, protocol string) ([]Endpoint, error)
 	ListServices() ([]string, error)
+
+	// Tasks (Phase A minimal)
+	CreateTask(t Task) (string, error)
+	GetTask(id string) (Task, bool, error)
+	ListTasks() ([]Task, error)
+	DeleteTask(id string) error
+	UpdateTaskState(id string, state string) error
+	UpdateTaskRunning(id string, startedAt int64, scheduledOn string, attempt int) error
+	UpdateTaskFinished(id string, state string, resultJSON string, errMsg string, finishedAt int64, attempt int) error
+
+	// Workers (embedded)
+	RegisterWorker(w Worker) error
+	HeartbeatWorker(workerID string, capacity int, lastSeen int64) error
+	ListWorkers() ([]Worker, error)
 }
 
 var Current Store

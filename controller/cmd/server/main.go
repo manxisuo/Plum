@@ -9,6 +9,7 @@ import (
 	"plum/controller/internal/httpapi"
 	"plum/controller/internal/store"
 	sqlitestore "plum/controller/internal/store/sqlite"
+	"plum/controller/internal/tasks"
 )
 
 func main() {
@@ -32,6 +33,8 @@ func main() {
 	httpapi.RegisterRoutes(mux)
 	// start failover loop
 	failover.Start()
+	// start tasks scheduler (minimal)
+	tasks.Start()
 
 	// static file server for artifacts
 	dataDir := os.Getenv("CONTROLLER_DATA_DIR")

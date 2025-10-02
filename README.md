@@ -200,6 +200,11 @@ Plum/
 - 更完备的错误处理与前端提示（把 409 等转换成友好文案）
 - 系统级 SSE（汇总事件），Home 实时增量刷新
 - Swagger 注释生成：接入 `swaggo/swag`（注解 → OpenAPI）
+ - 新“Task（短作业）/编排”技术路线（分阶段）：
+   - 阶段A（MVP）：最小任务模型与API（/v1/tasks），Task/Attempt 状态机（Pending→Running→Succeeded/Failed），存储与查询，SSE 推送
+   - 阶段B：执行器 Service/Process 双通道（服务端点调用或 Agent 进程执行），调度（健康+标签+随机），超时/取消/重试（退避），幂等键
+   - 阶段C：编排（顺序/并行/条件/DAG），定时/事件触发，限流/优先级/配额，UI 可视化与审计
+   - 阶段D：与工作流引擎对接（如 Temporal/Conductor）或引入代码式编排 SDK
 
 ### 5.3 设计原则
 - 声明式：控制面描述“期望状态”，Agent 对齐“实际状态”。

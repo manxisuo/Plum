@@ -66,6 +66,19 @@ func handleOpenAPI(w http.ResponseWriter, r *http.Request) {
 			"/v1/services/heartbeat": OA{"post": OA{"summary": "Heartbeat for endpoints with health overrides", "requestBody": OA{"required": true, "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/HeartbeatRequest"}}}}, "responses": OA{"204": OA{"description": "No Content"}}}},
 			"/v1/services":           OA{"delete": OA{"summary": "Delete all endpoints for an instance", "parameters": []any{OA{"name": "instanceId", "in": "query", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"204": OA{"description": "No Content"}}}},
 			"/v1/discovery":          OA{"get": OA{"summary": "Discover endpoints by service", "parameters": []any{OA{"name": "service", "in": "query", "required": true, "schema": OA{"type": "string"}}, OA{"name": "version", "in": "query", "schema": OA{"type": "string"}}, OA{"name": "protocol", "in": "query", "schema": OA{"type": "string"}}, OA{"name": "limit", "in": "query", "schema": OA{"type": "integer"}}}, "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"type": "array", "items": OA{"$ref": "#/components/schemas/EndpointDTO"}}}}}}}},
+			// Workers (embedded)
+			"/v1/workers/register":  OA{"post": OA{"summary": "Register or update embedded worker", "requestBody": OA{"required": true, "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/RegisterWorkerRequest"}}}}, "responses": OA{"204": OA{"description": "No Content"}}}},
+			"/v1/workers/heartbeat": OA{"post": OA{"summary": "Worker heartbeat", "requestBody": OA{"required": true, "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/HeartbeatWorkerRequest"}}}}, "responses": OA{"204": OA{"description": "No Content"}}}},
+			"/v1/workers":           OA{"get": OA{"summary": "List workers", "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"type": "array", "items": OA{"$ref": "#/components/schemas/Worker"}}}}}}}},
+			// Tasks (Phase A minimal)
+			"/v1/tasks": OA{
+				"get":  OA{"summary": "List tasks", "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"type": "array", "items": OA{"$ref": "#/components/schemas/Task"}}}}}}},
+				"post": OA{"summary": "Create task", "requestBody": OA{"required": true, "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/CreateTaskRequest"}}}}, "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"type": "object", "properties": OA{"taskId": OA{"type": "string"}}}}}}}},
+			},
+			"/v1/tasks/{id}": OA{
+				"get":    OA{"summary": "Get task", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/Task"}}}}, "404": OA{"description": "Not Found"}}},
+				"delete": OA{"summary": "Delete task", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"204": OA{"description": "No Content"}}},
+			},
 		},
 		"components": OA{"schemas": OA{
 			"NodeHello":               OA{"type": "object", "properties": OA{"nodeId": OA{"type": "string"}, "ip": OA{"type": "string"}, "labels": OA{"type": "object", "additionalProperties": OA{"type": "string"}}}, "required": []any{"nodeId"}},
@@ -85,6 +98,40 @@ func handleOpenAPI(w http.ResponseWriter, r *http.Request) {
 			"EndpointDTO":             OA{"type": "object", "properties": OA{"serviceName": OA{"type": "string"}, "instanceId": OA{"type": "string"}, "nodeId": OA{"type": "string"}, "ip": OA{"type": "string"}, "port": OA{"type": "integer"}, "protocol": OA{"type": "string"}, "version": OA{"type": "string"}, "labels": OA{"type": "object", "additionalProperties": OA{"type": "string"}}, "healthy": OA{"type": "boolean"}, "lastSeen": OA{"type": "integer", "format": "int64"}}},
 			"RegisterRequest":         OA{"type": "object", "properties": OA{"instanceId": OA{"type": "string"}, "nodeId": OA{"type": "string"}, "ip": OA{"type": "string"}, "endpoints": OA{"type": "array", "items": OA{"$ref": "#/components/schemas/EndpointDTO"}}}, "required": []any{"instanceId", "nodeId", "ip", "endpoints"}},
 			"HeartbeatRequest":        OA{"type": "object", "properties": OA{"instanceId": OA{"type": "string"}, "health": OA{"type": "array", "items": OA{"$ref": "#/components/schemas/EndpointDTO"}}}, "required": []any{"instanceId"}},
+			// Workers schemas
+			"RegisterWorkerRequest":  OA{"type": "object", "properties": OA{"workerId": OA{"type": "string"}, "nodeId": OA{"type": "string"}, "url": OA{"type": "string"}, "tasks": OA{"type": "array", "items": OA{"type": "string"}}, "labels": OA{"type": "object", "additionalProperties": OA{"type": "string"}}, "capacity": OA{"type": "integer"}}, "required": []any{"workerId"}},
+			"HeartbeatWorkerRequest": OA{"type": "object", "properties": OA{"workerId": OA{"type": "string"}, "capacity": OA{"type": "integer"}}, "required": []any{"workerId"}},
+			"Worker":                 OA{"type": "object", "properties": OA{"WorkerID": OA{"type": "string"}, "NodeID": OA{"type": "string"}, "URL": OA{"type": "string"}, "Tasks": OA{"type": "array", "items": OA{"type": "string"}}, "Labels": OA{"type": "object", "additionalProperties": OA{"type": "string"}}, "Capacity": OA{"type": "integer"}, "LastSeen": OA{"type": "integer", "format": "int64"}}},
+			// Tasks schemas
+			"Task": OA{"type": "object", "properties": OA{
+				"TaskID":      OA{"type": "string"},
+				"Name":        OA{"type": "string"},
+				"Executor":    OA{"type": "string", "enum": []any{"service", "embedded", "os_process"}},
+				"TargetKind":  OA{"type": "string", "enum": []any{"service", "deployment", "node"}},
+				"TargetRef":   OA{"type": "string"},
+				"State":       OA{"type": "string", "enum": []any{"Pending", "Scheduled", "Running", "Succeeded", "Failed", "Timeout", "Canceled"}},
+				"PayloadJSON": OA{"type": "string"},
+				"ResultJSON":  OA{"type": "string"},
+				"Error":       OA{"type": "string"},
+				"TimeoutSec":  OA{"type": "integer"},
+				"MaxRetries":  OA{"type": "integer"},
+				"Attempt":     OA{"type": "integer"},
+				"ScheduledOn": OA{"type": "string"},
+				"CreatedAt":   OA{"type": "integer", "format": "int64"},
+				"StartedAt":   OA{"type": "integer", "format": "int64"},
+				"FinishedAt":  OA{"type": "integer", "format": "int64"},
+				"Labels":      OA{"type": "object", "additionalProperties": OA{"type": "string"}},
+			}},
+			"CreateTaskRequest": OA{"type": "object", "properties": OA{
+				"name":       OA{"type": "string"},
+				"executor":   OA{"type": "string", "enum": []any{"service", "embedded", "os_process"}},
+				"targetKind": OA{"type": "string", "enum": []any{"service", "deployment", "node"}},
+				"targetRef":  OA{"type": "string"},
+				"payload":    OA{"type": "object"},
+				"labels":     OA{"type": "object", "additionalProperties": OA{"type": "string"}},
+				"timeoutSec": OA{"type": "integer"},
+				"maxRetries": OA{"type": "integer"},
+			}, "required": []any{"name", "executor"}},
 		}},
 	}
 	w.Header().Set("Content-Type", "application/json")
