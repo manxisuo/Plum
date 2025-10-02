@@ -36,23 +36,24 @@ type InstanceStatus struct {
 
 // Task (short job) minimal model for Phase A
 type Task struct {
-	TaskID      string
-	Name        string
-	Executor    string // service | embedded | os_process
-	TargetKind  string // service | deployment | node (depending on executor)
-	TargetRef   string // e.g. serviceName/version/protocol or deploymentId/nodeId
-	State       string // Pending | Scheduled | Running | Succeeded | Failed | Timeout | Canceled
-	PayloadJSON string // raw JSON input
-	ResultJSON  string // raw JSON output
-	Error       string
-	TimeoutSec  int
-	MaxRetries  int
-	Attempt     int
-	ScheduledOn string // nodeId or endpoint info (optional)
-	CreatedAt   int64
-	StartedAt   int64
-	FinishedAt  int64
-	Labels      map[string]string
+	TaskID       string
+	Name         string
+	Executor     string // service | embedded | os_process
+	TargetKind   string // service | deployment | node (depending on executor)
+	TargetRef    string // e.g. serviceName/version/protocol or deploymentId/nodeId
+	State        string // Pending | Scheduled | Running | Succeeded | Failed | Timeout | Canceled
+	PayloadJSON  string // raw JSON input
+	ResultJSON   string // raw JSON output
+	Error        string
+	TimeoutSec   int
+	MaxRetries   int
+	Attempt      int
+	ScheduledOn  string // nodeId or endpoint info (optional)
+	CreatedAt    int64
+	StartedAt    int64
+	FinishedAt   int64
+	Labels       map[string]string
+	OriginTaskID string // for grouping reruns; empty means original
 }
 
 type Artifact struct {
@@ -94,6 +95,42 @@ type Worker struct {
 	Labels   map[string]string
 	Capacity int
 	LastSeen int64
+}
+
+// Workflow (sequential MVP)
+type WorkflowStep struct {
+	StepID     string
+	Name       string // taskName
+	Executor   string // service|embedded|os_process
+	TimeoutSec int
+	MaxRetries int
+	Ord        int // sequence order
+}
+
+type Workflow struct {
+	WorkflowID string
+	Name       string
+	Labels     map[string]string
+	Steps      []WorkflowStep
+}
+
+type WorkflowRun struct {
+	RunID      string
+	WorkflowID string
+	State      string // Pending|Running|Succeeded|Failed|Canceled
+	CreatedAt  int64
+	StartedAt  int64
+	FinishedAt int64
+}
+
+type StepRun struct {
+	RunID      string
+	StepID     string
+	TaskID     string
+	State      string // Pending|Running|Succeeded|Failed
+	StartedAt  int64
+	FinishedAt int64
+	Ord        int
 }
 
 type Store interface {
@@ -146,6 +183,19 @@ type Store interface {
 	RegisterWorker(w Worker) error
 	HeartbeatWorker(workerID string, capacity int, lastSeen int64) error
 	ListWorkers() ([]Worker, error)
+
+	// Workflows (sequential MVP)
+	CreateWorkflow(wf Workflow) (string, error)
+	ListWorkflows() ([]Workflow, error)
+	GetWorkflow(id string) (Workflow, bool, error)
+	CreateWorkflowRun(workflowID string) (string, error)
+	GetWorkflowRun(runID string) (WorkflowRun, bool, error)
+	ListWorkflowRuns() ([]WorkflowRun, error)
+	ListWorkflowSteps(id string) ([]WorkflowStep, error)
+	ListStepRuns(runID string) ([]StepRun, error)
+	InsertStepRun(sr StepRun) error
+	UpdateStepRunTask(runID string, stepID string, taskID string, state string, startedAt int64) error
+	UpdateWorkflowRunState(runID string, state string, ts int64) error
 }
 
 var Current Store

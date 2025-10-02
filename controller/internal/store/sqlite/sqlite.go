@@ -102,7 +102,8 @@ func migrate(db *sql.DB) error {
             created_at INTEGER,
             started_at INTEGER,
             finished_at INTEGER,
-            labels TEXT
+            labels TEXT,
+            origin_task_id TEXT
         );`,
 		// Workers for embedded executor
 		`CREATE TABLE IF NOT EXISTS workers (
@@ -120,7 +121,39 @@ func migrate(db *sql.DB) error {
 			return err
 		}
 	}
+	// Online schema upgrades (add columns if missing)
+	if err := ensureColumn(db, "tasks", "origin_task_id", "TEXT"); err != nil {
+		return err
+	}
 	return nil
+}
+
+// ensureColumn adds a column if not exists for a given table
+func ensureColumn(db *sql.DB, table string, col string, typ string) error {
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	present := false
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
+		if name == col {
+			present = true
+			break
+		}
+	}
+	if present {
+		return nil
+	}
+	_, err = db.Exec("ALTER TABLE " + table + " ADD COLUMN " + col + " " + typ)
+	return err
 }
 
 func (s *sqliteStore) UpsertNode(id string, n store.Node) error {
@@ -521,8 +554,8 @@ func (s *sqliteStore) CreateTask(t store.Task) (string, error) {
 		t.TaskID = newID()
 	}
 	labelsJSON, _ := json.Marshal(t.Labels)
-	_, err := s.db.Exec(`INSERT INTO tasks(task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		t.TaskID, t.Name, t.Executor, t.TargetKind, t.TargetRef, t.State, t.PayloadJSON, t.ResultJSON, t.Error, t.TimeoutSec, t.MaxRetries, t.Attempt, t.ScheduledOn, t.CreatedAt, t.StartedAt, t.FinishedAt, string(labelsJSON),
+	_, err := s.db.Exec(`INSERT INTO tasks(task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels, origin_task_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		t.TaskID, t.Name, t.Executor, t.TargetKind, t.TargetRef, t.State, t.PayloadJSON, t.ResultJSON, t.Error, t.TimeoutSec, t.MaxRetries, t.Attempt, t.ScheduledOn, t.CreatedAt, t.StartedAt, t.FinishedAt, string(labelsJSON), t.OriginTaskID,
 	)
 	if err != nil {
 		return "", err
@@ -531,10 +564,10 @@ func (s *sqliteStore) CreateTask(t store.Task) (string, error) {
 }
 
 func (s *sqliteStore) GetTask(id string) (store.Task, bool, error) {
-	row := s.db.QueryRow(`SELECT task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels FROM tasks WHERE task_id=?`, id)
+	row := s.db.QueryRow(`SELECT task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels, origin_task_id FROM tasks WHERE task_id=?`, id)
 	var t store.Task
 	var labelsStr string
-	if err := row.Scan(&t.TaskID, &t.Name, &t.Executor, &t.TargetKind, &t.TargetRef, &t.State, &t.PayloadJSON, &t.ResultJSON, &t.Error, &t.TimeoutSec, &t.MaxRetries, &t.Attempt, &t.ScheduledOn, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &labelsStr); err != nil {
+	if err := row.Scan(&t.TaskID, &t.Name, &t.Executor, &t.TargetKind, &t.TargetRef, &t.State, &t.PayloadJSON, &t.ResultJSON, &t.Error, &t.TimeoutSec, &t.MaxRetries, &t.Attempt, &t.ScheduledOn, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &labelsStr, &t.OriginTaskID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.Task{}, false, nil
 		}
@@ -545,7 +578,7 @@ func (s *sqliteStore) GetTask(id string) (store.Task, bool, error) {
 }
 
 func (s *sqliteStore) ListTasks() ([]store.Task, error) {
-	rows, err := s.db.Query(`SELECT task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels FROM tasks ORDER BY created_at DESC, task_id DESC`)
+	rows, err := s.db.Query(`SELECT task_id, name, executor, target_kind, target_ref, state, payload_json, result_json, error, timeout_sec, max_retries, attempt, scheduled_on, created_at, started_at, finished_at, labels, origin_task_id FROM tasks ORDER BY created_at DESC, task_id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +587,7 @@ func (s *sqliteStore) ListTasks() ([]store.Task, error) {
 	for rows.Next() {
 		var t store.Task
 		var labelsStr string
-		if err := rows.Scan(&t.TaskID, &t.Name, &t.Executor, &t.TargetKind, &t.TargetRef, &t.State, &t.PayloadJSON, &t.ResultJSON, &t.Error, &t.TimeoutSec, &t.MaxRetries, &t.Attempt, &t.ScheduledOn, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &labelsStr); err != nil {
+		if err := rows.Scan(&t.TaskID, &t.Name, &t.Executor, &t.TargetKind, &t.TargetRef, &t.State, &t.PayloadJSON, &t.ResultJSON, &t.Error, &t.TimeoutSec, &t.MaxRetries, &t.Attempt, &t.ScheduledOn, &t.CreatedAt, &t.StartedAt, &t.FinishedAt, &labelsStr, &t.OriginTaskID); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
@@ -594,4 +627,49 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// ---- Workflows (sequential MVP - placeholder implementations) ----
+func (s *sqliteStore) CreateWorkflow(wf store.Workflow) (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func (s *sqliteStore) ListWorkflows() ([]store.Workflow, error) {
+	return []store.Workflow{}, nil
+}
+
+func (s *sqliteStore) GetWorkflow(id string) (store.Workflow, bool, error) {
+	return store.Workflow{}, false, nil
+}
+
+func (s *sqliteStore) CreateWorkflowRun(workflowID string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func (s *sqliteStore) GetWorkflowRun(runID string) (store.WorkflowRun, bool, error) {
+	return store.WorkflowRun{}, false, nil
+}
+
+func (s *sqliteStore) ListWorkflowRuns() ([]store.WorkflowRun, error) {
+	return []store.WorkflowRun{}, nil
+}
+
+func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error) {
+	return []store.WorkflowStep{}, nil
+}
+
+func (s *sqliteStore) ListStepRuns(runID string) ([]store.StepRun, error) {
+	return []store.StepRun{}, nil
+}
+
+func (s *sqliteStore) InsertStepRun(sr store.StepRun) error {
+	return errors.New("not implemented")
+}
+
+func (s *sqliteStore) UpdateStepRunTask(runID string, stepID string, taskID string, state string, startedAt int64) error {
+	return errors.New("not implemented")
+}
+
+func (s *sqliteStore) UpdateWorkflowRunState(runID string, state string, ts int64) error {
+	return errors.New("not implemented")
 }

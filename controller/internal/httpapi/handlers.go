@@ -267,6 +267,7 @@ type CreateTaskRequest struct {
 	Labels     map[string]string `json:"labels"`
 	TimeoutSec int               `json:"timeoutSec"`
 	MaxRetries int               `json:"maxRetries"`
+	AutoStart  bool              `json:"autoStart"`
 }
 
 func handleTasks(w http.ResponseWriter, r *http.Request) {
@@ -285,12 +286,16 @@ func handleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		payloadJSON, _ := json.Marshal(req.Payload)
+		initialState := "Pending"
+		if !req.AutoStart {
+			initialState = "Queued"
+		}
 		id, err := store.Current.CreateTask(store.Task{
 			Name:        req.Name,
 			Executor:    req.Executor,
 			TargetKind:  req.TargetKind,
 			TargetRef:   req.TargetRef,
-			State:       "Pending",
+			State:       initialState,
 			PayloadJSON: string(payloadJSON),
 			TimeoutSec:  req.TimeoutSec,
 			MaxRetries:  req.MaxRetries,
@@ -301,8 +306,9 @@ func handleTasks(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "db error", http.StatusInternalServerError)
 			return
 		}
-		// notify tasks stream
-		notify.PublishTasks()
+		if req.AutoStart {
+			notify.PublishTasks()
+		}
 		writeJSON(w, map[string]any{"taskId": id})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -333,6 +339,82 @@ func handleTaskByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// POST /v1/tasks/start/{id}
+func handleTaskStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := r.URL.Path[len("/v1/tasks/start/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	// set state from Queued->Pending and notify
+	if err := store.Current.UpdateTaskState(id, "Pending"); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	notify.PublishTasks()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// POST /v1/tasks/rerun/{id}  -> create a new task with same fields
+func handleTaskRerun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := r.URL.Path[len("/v1/tasks/rerun/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	t, ok, err := store.Current.GetTask(id)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	origin := t.TaskID
+	if t.OriginTaskID != "" {
+		origin = t.OriginTaskID
+	}
+	newID, err := store.Current.CreateTask(store.Task{
+		Name: t.Name, Executor: t.Executor, TargetKind: t.TargetKind, TargetRef: t.TargetRef,
+		State: "Pending", PayloadJSON: t.PayloadJSON, TimeoutSec: t.TimeoutSec, MaxRetries: t.MaxRetries,
+		CreatedAt: time.Now().Unix(), Labels: t.Labels, OriginTaskID: origin,
+	})
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	notify.PublishTasks()
+	writeJSON(w, map[string]any{"taskId": newID})
+}
+
+// POST /v1/tasks/cancel/{id}
+func handleTaskCancel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := r.URL.Path[len("/v1/tasks/cancel/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if err := store.Current.UpdateTaskState(id, "Canceled"); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	notify.PublishTasks()
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ---- Workers (embedded) ----

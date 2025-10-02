@@ -75,6 +75,9 @@ func handleOpenAPI(w http.ResponseWriter, r *http.Request) {
 				"get":  OA{"summary": "List tasks", "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"type": "array", "items": OA{"$ref": "#/components/schemas/Task"}}}}}}},
 				"post": OA{"summary": "Create task", "requestBody": OA{"required": true, "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/CreateTaskRequest"}}}}, "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"type": "object", "properties": OA{"taskId": OA{"type": "string"}}}}}}}},
 			},
+			"/v1/tasks/start/{id}":  OA{"post": OA{"summary": "Start queued task", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"204": OA{"description": "No Content"}}}},
+			"/v1/tasks/rerun/{id}":  OA{"post": OA{"summary": "Rerun task (create new)", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"200": OA{"description": "OK"}}}},
+			"/v1/tasks/cancel/{id}": OA{"post": OA{"summary": "Cancel task", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"204": OA{"description": "No Content"}}}},
 			"/v1/tasks/{id}": OA{
 				"get":    OA{"summary": "Get task", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"200": OA{"description": "OK", "content": OA{"application/json": OA{"schema": OA{"$ref": "#/components/schemas/Task"}}}}, "404": OA{"description": "Not Found"}}},
 				"delete": OA{"summary": "Delete task", "parameters": []any{OA{"name": "id", "in": "path", "required": true, "schema": OA{"type": "string"}}}, "responses": OA{"204": OA{"description": "No Content"}}},
@@ -131,6 +134,7 @@ func handleOpenAPI(w http.ResponseWriter, r *http.Request) {
 				"labels":     OA{"type": "object", "additionalProperties": OA{"type": "string"}},
 				"timeoutSec": OA{"type": "integer"},
 				"maxRetries": OA{"type": "integer"},
+				"autoStart":  OA{"type": "boolean"},
 			}, "required": []any{"name", "executor"}},
 		}},
 	}

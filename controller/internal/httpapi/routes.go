@@ -38,4 +38,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/tasks", withCORS(handleTasks))
 	mux.HandleFunc("/v1/tasks/", withCORS(handleTaskByID))
 	mux.HandleFunc("/v1/tasks/stream", withCORS(handleTasksSSE))
+	mux.HandleFunc("/v1/tasks/start/", withCORS(handleTaskStart))
+	mux.HandleFunc("/v1/tasks/rerun/", withCORS(handleTaskRerun))
+	mux.HandleFunc("/v1/tasks/cancel/", withCORS(handleTaskCancel))
 }
