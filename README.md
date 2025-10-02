@@ -1,7 +1,5 @@
 # Plum
 
-<img width="1024" height="1024" alt="favicon" src="https://github.com/user-attachments/assets/bf570ef5-ea4b-4d95-8375-c58464ad3129" />
-
 分布式服务框架（MVP/Walking Skeleton）。当前包含：
 - 控制面（Go，HTTP API，SQLite 持久化）
 - 节点 Agent（C++17，libcurl，下载/解压/运行进程，上报状态，按 desired 调谐）

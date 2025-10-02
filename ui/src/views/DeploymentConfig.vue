@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 type Artifact = { artifactId: string; name: string; version: string; url: string }
 type NodeDTO = { nodeId: string; ip: string }
@@ -50,28 +51,29 @@ async function load() {
 
 
 onMounted(load)
+const { t } = useI18n()
 </script>
 
 <template>
   <div>
-    <h3>部署配置</h3>
+    <h3>{{ t('deploymentConfig.title') }}</h3>
     <el-descriptions v-if="deployment" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item label="DeploymentID">{{ deployment.deploymentId }}</el-descriptions-item>
-      <el-descriptions-item label="Name">{{ deployment.name || deployment.Name }}</el-descriptions-item>
+      <el-descriptions-item :label="t('deploymentDetail.desc.deploymentId')">{{ deployment.deploymentId }}</el-descriptions-item>
+      <el-descriptions-item :label="t('deploymentDetail.desc.name')">{{ deployment.name || deployment.Name }}</el-descriptions-item>
     </el-descriptions>
 
-    <h4>Entries（根据当前 assignments 推导）</h4>
+    <h4>{{ t('deploymentConfig.entriesTitle') }}</h4>
     <el-table :data="entries" v-loading="loading" style="width:100%; margin-bottom:12px;">
-      <el-table-column prop="artifactUrl" label="Artifact" />
-      <el-table-column prop="startCmd" label="StartCmd" />
-      <el-table-column label="Replicas">
+      <el-table-column prop="artifactUrl" :label="t('deploymentConfig.columns.artifact')" />
+      <el-table-column prop="startCmd" :label="t('deploymentConfig.columns.startCmd')" />
+      <el-table-column :label="t('deploymentConfig.columns.replicas')">
         <template #default="{ row }">
           <code>{{ JSON.stringify(row.replicas) }}</code>
         </template>
       </el-table-column>
     </el-table>
 
-    <h4>Labels</h4>
+    <h4>{{ t('deploymentConfig.labelsTitle') }}</h4>
     <div v-for="(v,k) in labels" :key="k" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
       <el-input :model-value="k" disabled style="flex:1" />
       <el-input v-model="labels[k]" style="flex:2" />

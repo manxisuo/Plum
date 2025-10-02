@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 type Artifact = {
 	artifactId: string
@@ -51,6 +52,7 @@ async function del(id: string) {
 }
 
 onMounted(load)
+const { t } = useI18n()
 
 function artifactHref(row: Artifact): string {
   const u = row.url || ''
@@ -65,8 +67,8 @@ function artifactHref(row: Artifact): string {
     <el-card>
       <template #header>
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span>上传应用包（zip）</span>
-          <small>包内需包含 start.sh 与 meta.ini(name/version)</small>
+          <span>{{ t('apps.uploadZip') }}</span>
+          <small>{{ t('apps.zipTip') }}</small>
         </div>
       </template>
       <el-upload
@@ -78,27 +80,27 @@ function artifactHref(row: Artifact): string {
         :on-error="onError"
         accept=".zip"
       >
-        <el-button type="primary">选择并上传 ZIP</el-button>
+        <el-button type="primary">{{ t('apps.buttons.selectUpload') }}</el-button>
       </el-upload>
     </el-card>
 
     <el-table v-loading="loading" :data="items" style="width:100%; margin-top:12px;">
-      <el-table-column prop="name" label="App" width="240" />
-      <el-table-column prop="version" label="Version" width="140" />
-      <el-table-column label="Artifact">
+      <el-table-column prop="name" :label="t('apps.columns.app')" width="240" />
+      <el-table-column prop="version" :label="t('apps.columns.version')" width="140" />
+      <el-table-column :label="t('apps.columns.artifact')">
         <template #default="{ row }">
           <a :href="artifactHref(row)" target="_blank">{{ artifactHref(row) }}</a>
         </template>
       </el-table-column>
-      <el-table-column prop="sizeBytes" label="Size(Bytes)" width="140" />
-      <el-table-column label="UploadedAt" width="200">
+      <el-table-column prop="sizeBytes" :label="t('apps.columns.sizeBytes')" width="140" />
+      <el-table-column :label="t('apps.columns.uploadedAt')" width="200">
         <template #default="{ row }">{{ new Date(row.createdAt*1000).toLocaleString() }}</template>
       </el-table-column>
-      <el-table-column label="Action" width="140">
+      <el-table-column :label="t('common.action')" width="140">
         <template #default="{ row }">
-          <el-popconfirm title="确认删除该包？" @confirm="del(row.artifactId)">
+          <el-popconfirm :title="t('apps.confirmDelete')" @confirm="del(row.artifactId)">
             <template #reference>
-              <el-button type="danger" size="small">删除</el-button>
+              <el-button type="danger" size="small">{{ t('common.delete') }}</el-button>
             </template>
           </el-popconfirm>
         </template>

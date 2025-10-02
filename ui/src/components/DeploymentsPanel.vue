@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 type Deployment = { deploymentId: string; name: string; labels?: Record<string,string>; instances: number }
 
@@ -33,26 +34,27 @@ async function removeDeployment(id: string) {
 }
 
 onMounted(load)
+const { t } = useI18n()
 </script>
 
 <template>
   <div>
     <div style="display:flex; gap:8px; align-items:center;">
-      <el-button type="primary" :loading="loading" @click="load">刷新</el-button>
-      <router-link to="/deployments/create"><el-button type="success">创建部署</el-button></router-link>
+      <el-button type="primary" :loading="loading" @click="load">{{ t('common.refresh') }}</el-button>
+      <router-link to="/deployments/create"><el-button type="success">{{ t('deployments.buttons.create') }}</el-button></router-link>
     </div>
     <el-table v-loading="loading" :data="items" style="width:100%; margin-top:12px;">
-      <el-table-column prop="deploymentId" label="DeploymentID" width="320" />
-      <el-table-column prop="name" label="Name" width="220" />
-      <el-table-column prop="instances" label="Instances" width="120" />
-      <el-table-column label="Action" width="260">
+      <el-table-column prop="deploymentId" :label="t('deployments.columns.deploymentId')" width="320" />
+      <el-table-column prop="name" :label="t('deployments.columns.name')" width="220" />
+      <el-table-column prop="instances" :label="t('deployments.columns.instances')" width="120" />
+      <el-table-column :label="t('common.action')" width="260">
         <template #default="{ row }">
           <div style="display:flex; gap:8px; align-items:center;">
-            <router-link :to="'/deployments/'+row.deploymentId"><el-button size="small">详情</el-button></router-link>
-            <router-link :to="'/deployments/'+row.deploymentId+'/config'"><el-button size="small">配置</el-button></router-link>
-            <el-popconfirm title="确认删除该部署？（不会级联删除实例分配）" @confirm="removeDeployment(row.deploymentId)">
+            <router-link :to="'/deployments/'+row.deploymentId"><el-button size="small">{{ t('common.details') }}</el-button></router-link>
+            <router-link :to="'/deployments/'+row.deploymentId+'/config'"><el-button size="small">{{ t('common.config') }}</el-button></router-link>
+            <el-popconfirm :title="t('deployments.confirmDelete')" @confirm="removeDeployment(row.deploymentId)">
               <template #reference>
-                <el-button type="danger" size="small">删除</el-button>
+                <el-button type="danger" size="small">{{ t('common.delete') }}</el-button>
               </template>
             </el-popconfirm>
           </div>

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
@@ -29,6 +30,7 @@ async function load() {
 }
 
 onMounted(load)
+const { t } = useI18n()
 
 async function startTask(id: string) {
   try {
@@ -60,31 +62,31 @@ async function deleteTask(id: string) {
 
 <template>
   <div>
-    <h3>TaskDefinition 详情</h3>
+    <h3>{{ t('taskDefDetail.title') }}</h3>
     <el-descriptions v-if="defn" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item label="DefID">{{ defn.defId || defn.DefID }}</el-descriptions-item>
-      <el-descriptions-item label="Name">{{ defn.name || defn.Name }}</el-descriptions-item>
-      <el-descriptions-item label="Executor">{{ defn.executor || defn.Executor }}</el-descriptions-item>
+      <el-descriptions-item :label="t('taskDefDetail.desc.defId')">{{ defn.defId || defn.DefID }}</el-descriptions-item>
+      <el-descriptions-item :label="t('taskDefDetail.desc.name')">{{ defn.name || defn.Name }}</el-descriptions-item>
+      <el-descriptions-item :label="t('taskDefDetail.desc.executor')">{{ defn.executor || defn.Executor }}</el-descriptions-item>
     </el-descriptions>
 
-    <h4>运行历史</h4>
+    <h4>{{ t('taskDefDetail.runsTitle') }}</h4>
     <el-table :data="runs" v-loading="loading" style="width:100%">
-      <el-table-column label="TaskID" width="320">
+      <el-table-column :label="t('taskDefDetail.columns.taskId')" width="320">
         <template #default="{ row }">{{ row.taskId || row.TaskID }}</template>
       </el-table-column>
-      <el-table-column label="State" width="140">
+      <el-table-column :label="t('taskDefDetail.columns.state')" width="140">
         <template #default="{ row }">{{ row.state || row.State }}</template>
       </el-table-column>
-      <el-table-column label="Created" width="160">
+      <el-table-column :label="t('taskDefDetail.columns.created')" width="160">
         <template #default="{ row }">{{ new Date(((row.createdAt||row.CreatedAt)||0)*1000).toLocaleString() }}</template>
       </el-table-column>
-      <el-table-column label="Action" width="300">
+      <el-table-column :label="t('common.action')" width="300">
         <template #default="{ row }">
-          <el-button size="small" type="primary" :disabled="(row.state||row.State)!=='Queued'" @click="startTask(row.taskId||row.TaskID)">Start</el-button>
-          <el-button size="small" type="warning" :disabled="!((row.state||row.State)==='Running' || (row.state||row.State)==='Queued')" @click="cancelTask(row.taskId||row.TaskID)">Cancel</el-button>
-          <el-popconfirm title="确认删除该任务？" @confirm="deleteTask(row.taskId||row.TaskID)">
+          <el-button size="small" type="primary" :disabled="(row.state||row.State)!=='Queued'" @click="startTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.start') }}</el-button>
+          <el-button size="small" type="warning" :disabled="!((row.state||row.State)==='Running' || (row.state||row.State)==='Queued')" @click="cancelTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.cancel') }}</el-button>
+          <el-popconfirm :title="t('taskDefDetail.confirmDelete')" @confirm="deleteTask(row.taskId||row.TaskID)">
             <template #reference>
-              <el-button size="small" type="danger">删除</el-button>
+              <el-button size="small" type="danger">{{ t('taskDefDetail.buttons.delete') }}</el-button>
             </template>
           </el-popconfirm>
         </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import * as echarts from 'echarts'
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
@@ -89,36 +90,38 @@ function renderCharts(){
 }
 
 watch([services, nodes], ()=>{ nextTick().then(renderCharts) })
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div>
-    <h3>Plum 概览</h3>
+    <h3>{{ t('home.overview') }}</h3>
     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:12px;">
       <el-card>
         <div>
-          <RouterLink to="/nodes" class="card-link"><strong>Nodes</strong></RouterLink>
+          <RouterLink to="/nodes" class="card-link"><strong>{{ t('home.cards.nodes') }}</strong></RouterLink>
           <div style="font-size:24px;">{{ nodes.length }}</div>
-          <small>Healthy {{ healthyNodes() }} / Unhealthy {{ unhealthyNodes() }}</small>
+          <small>{{ t('home.cards.healthy') }} {{ healthyNodes() }} / {{ t('home.cards.unhealthy') }} {{ unhealthyNodes() }}</small>
         </div>
       </el-card>
       <el-card>
         <div>
-          <RouterLink to="/deployments" class="card-link"><strong>Deployments</strong></RouterLink>
+          <RouterLink to="/deployments" class="card-link"><strong>{{ t('home.cards.deployments') }}</strong></RouterLink>
           <div style="font-size:24px;">{{ deployments.length }}</div>
-          <small>Instances ~ {{ runningInstances() }}</small>
+          <small>{{ t('home.cards.instances') }} ~ {{ runningInstances() }}</small>
         </div>
       </el-card>
       <el-card>
         <div>
-          <RouterLink to="/services" class="card-link"><strong>Services</strong></RouterLink>
+          <RouterLink to="/services" class="card-link"><strong>{{ t('home.cards.services') }}</strong></RouterLink>
           <div style="font-size:24px;">{{ services.length }}</div>
-          <small>Endpoints {{ endpointsCount }}</small>
+          <small>{{ t('home.cards.endpoints') }} {{ endpointsCount }}</small>
         </div>
       </el-card>
       <el-card>
         <div>
-          <RouterLink to="/apps" class="card-link"><strong>Artifacts</strong></RouterLink>
+          <RouterLink to="/apps" class="card-link"><strong>{{ t('home.cards.artifacts') }}</strong></RouterLink>
           <div style="font-size:24px;">≈ {{ (artifactsTotal/1024/1024).toFixed(1) }} MB</div>
         </div>
       </el-card>
@@ -126,24 +129,24 @@ watch([services, nodes], ()=>{ nextTick().then(renderCharts) })
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
       <el-card>
-        <template #header>节点健康</template>
+        <template #header>{{ t('home.charts.nodeHealth') }}</template>
         <div style="display:flex; gap:8px; align-items:center;">
           <div ref="chartNodesEl" style="width: 240px; height: 180px;"></div>
           <div style="display:flex; flex-direction:column; gap:6px;">
-            <el-tag type="success">Healthy {{ healthyNodes() }}</el-tag>
-            <el-tag type="danger">Unhealthy {{ unhealthyNodes() }}</el-tag>
+            <el-tag type="success">{{ t('home.cards.healthy') }} {{ healthyNodes() }}</el-tag>
+            <el-tag type="danger">{{ t('home.cards.unhealthy') }} {{ unhealthyNodes() }}</el-tag>
           </div>
         </div>
         <el-table :data="nodes" size="small" style="margin-top:8px;">
-          <el-table-column prop="nodeId" label="Node" width="240" />
-          <el-table-column label="Health" width="140">
+          <el-table-column prop="nodeId" :label="t('home.table.node')" width="240" />
+          <el-table-column :label="t('home.table.health')" width="140">
             <template #default="{ row }"><el-tag :type="row.health==='Healthy'?'success':'danger'">{{ row.health || '-' }}</el-tag></template>
           </el-table-column>
         </el-table>
       </el-card>
 
       <el-card>
-        <template #header>各服务可用端点数（Top 12）</template>
+        <template #header>{{ t('home.charts.endpointsTop') }}</template>
         <div ref="chartServicesEl" style="width:100%; height:260px;"></div>
         <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
           <el-tag v-for="s in services.slice(0,12)" :key="s" effect="plain">{{ s }}</el-tag>

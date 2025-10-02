@@ -94,12 +94,16 @@ async function cancelTask(id: string) {
 
 // 创建定义（取代创建任务）
 const showCreate = ref(false)
-const form = reactive<TaskDef>({ defId:'', name:'my.task.echo', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
+const form = reactive<TaskDef>({ defId:'', name:'', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
 
-function resetForm() { form.defId=''; form.name='my.task.echo'; form.executor='embedded'; form.targetKind=''; form.targetRef=''; form.labels={} }
+function resetForm() { form.defId=''; form.name=''; form.executor='embedded'; form.targetKind=''; form.targetRef=''; form.labels={} }
 function openCreate() { resetForm(); showCreate.value = true }
 
 async function submit() {
+  if (!form.name || !String(form.name).trim()) {
+    ElMessage.warning('请填写任务名称')
+    return
+  }
   try {
     const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: form.labels }) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -171,7 +175,7 @@ async function runDef(defId: string) {
       </el-form>
       <template #footer>
         <el-button @click="showCreate=false">取消</el-button>
-        <el-button type="primary" @click="submit">提交</el-button>
+        <el-button type="primary" :disabled="!form.name || !String(form.name).trim().length" @click="submit">提交</el-button>
       </template>
     </el-dialog>
   </div>

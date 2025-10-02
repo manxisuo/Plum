@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink, RouterView } from 'vue-router'
 
 type Assignment = {
@@ -35,23 +36,33 @@ async function fetchAssignments() {
 }
 
 fetchAssignments()
+
+const { t, locale } = useI18n()
+const lang = ref(locale.value)
+function switchLang(l: string){ locale.value = l; lang.value = l }
 </script>
 
 <template>
   <el-container style="height:100vh;">
     <el-header>
       <div style="display:flex; align-items:center; gap:16px;">
-        <strong>Plum</strong>
+        <img src="/plum.png" alt="Plum" style="height:48px;" />
         <el-menu mode="horizontal" :default-active="$route.path" :ellipsis="false" style="flex:1;">
-          <el-menu-item index="/"><RouterLink to="/">Home</RouterLink></el-menu-item>
-          <el-menu-item index="/assignments"><RouterLink to="/assignments">Assignments</RouterLink></el-menu-item>
-          <el-menu-item index="/nodes"><RouterLink to="/nodes">Nodes</RouterLink></el-menu-item>
-          <el-menu-item index="/apps"><RouterLink to="/apps">Apps</RouterLink></el-menu-item>
-        <el-menu-item index="/services"><RouterLink to="/services">Services</RouterLink></el-menu-item>
-        <el-menu-item index="/workflows"><RouterLink to="/workflows">Workflows</RouterLink></el-menu-item>
-        <el-menu-item index="/tasks"><RouterLink to="/tasks">Tasks</RouterLink></el-menu-item>
-          <el-menu-item index="/deployments"><RouterLink to="/deployments">Deployments</RouterLink></el-menu-item>
+          <el-menu-item index="/"><RouterLink to="/">{{ t('nav.home') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/nodes"><RouterLink to="/nodes">{{ t('nav.nodes') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/apps"><RouterLink to="/apps">{{ t('nav.apps') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/deployments"><RouterLink to="/deployments">{{ t('nav.deployments') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/assignments"><RouterLink to="/assignments">{{ t('nav.assignments') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/services"><RouterLink to="/services">{{ t('nav.services') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/tasks"><RouterLink to="/tasks">{{ t('nav.tasks') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/workflows"><RouterLink to="/workflows">{{ t('nav.workflows') }}</RouterLink></el-menu-item>
         </el-menu>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <el-select v-model="lang" size="small" style="width:120px;" @change="switchLang">
+            <el-option label="中文" value="zh" />
+            <el-option label="English" value="en" />
+          </el-select>
+        </div>
       </div>
     </el-header>
     <el-main>

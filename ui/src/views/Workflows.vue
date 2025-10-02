@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
@@ -71,41 +72,42 @@ async function submit() {
 }
 
 onMounted(load)
+const { t } = useI18n()
 </script>
 
 <template>
   <div>
     <div style="display:flex; gap:8px; align-items:center;">
-      <el-button type="primary" :loading="loading" @click="load">刷新</el-button>
-      <el-button type="success" @click="openCreate">创建工作流</el-button>
+      <el-button type="primary" :loading="loading" @click="load">{{ t('workflows.buttons.refresh') }}</el-button>
+      <el-button type="success" @click="openCreate">{{ t('workflows.buttons.create') }}</el-button>
     </div>
 
     <el-table :data="items" v-loading="loading" style="width:100%; margin-top:12px;">
-      <el-table-column label="WorkflowID" width="320">
+      <el-table-column :label="t('workflows.columns.workflowId')" width="320">
         <template #default="{ row }">{{ (row as any).workflowId || (row as any).WorkflowID }}</template>
       </el-table-column>
-      <el-table-column label="Name" width="200">
+      <el-table-column :label="t('workflows.columns.name')" width="200">
         <template #default="{ row }">{{ (row as any).name || (row as any).Name }}</template>
       </el-table-column>
-      <el-table-column label="Steps">
+      <el-table-column :label="t('workflows.columns.steps')">
         <template #default="{ row }">
           <code>
             {{ (()=>{ const a = (row as any).steps || (row as any).Steps || []; return Array.isArray(a) ? a.map((s:any)=> s?.name || s?.Name || s?.definitionId || s?.DefinitionID || '').join(' -> ') : '' })() }}
           </code>
         </template>
       </el-table-column>
-      <el-table-column label="Action" width="260">
+      <el-table-column :label="t('common.action')" width="260">
         <template #default="{ row }">
-          <el-button size="small" type="primary" @click="run(((row as any).workflowId||(row as any).WorkflowID))">Run</el-button>
-          <el-button size="small" @click="viewLatest(((row as any).workflowId||(row as any).WorkflowID))">查看最新运行</el-button>
+          <el-button size="small" type="primary" @click="run(((row as any).workflowId||(row as any).WorkflowID))">{{ t('workflows.buttons.run') }}</el-button>
+          <el-button size="small" @click="viewLatest(((row as any).workflowId||(row as any).WorkflowID))">{{ t('workflows.buttons.viewLatest') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showCreate" title="创建工作流" width="700px">
+    <el-dialog v-model="showCreate" :title="t('workflows.dialog.title')" width="700px">
       <el-form label-width="120px">
-        <el-form-item label="Name"><el-input v-model="form.name" placeholder="workflow 名称" /></el-form-item>
-        <el-form-item label="Steps">
+        <el-form-item :label="t('workflows.dialog.form.name')"><el-input v-model="form.name" placeholder="workflow 名称" /></el-form-item>
+        <el-form-item :label="t('workflows.dialog.form.steps')">
           <div style="display:flex; flex-direction:column; gap:8px; width:100%">
             <div v-for="(s, i) in form.steps" :key="i" style="display:flex; gap:8px; align-items:center;">
               <el-input v-model="s.name" placeholder="taskName，如 builtin.echo" style="flex:2" />
@@ -114,17 +116,17 @@ onMounted(load)
                 <el-option label="service" value="service" />
                 <el-option label="os_process" value="os_process" />
               </el-select>
-              <el-input v-model.number="s.timeoutSec" placeholder="timeoutSec" style="width:120px" />
-              <el-input v-model.number="s.maxRetries" placeholder="maxRetries" style="width:120px" />
-              <el-button size="small" type="danger" @click="removeStep(i)">删除</el-button>
+              <el-input v-model.number="s.timeoutSec" :placeholder="t('workflows.dialog.form.timeoutSec')" style="width:120px" />
+              <el-input v-model.number="s.maxRetries" :placeholder="t('workflows.dialog.form.maxRetries')" style="width:120px" />
+              <el-button size="small" type="danger" @click="removeStep(i)">{{ t('workflows.dialog.form.delete') }}</el-button>
             </div>
-            <el-button size="small" @click="addStep">添加步骤</el-button>
+            <el-button size="small" @click="addStep">{{ t('workflows.dialog.form.addStep') }}</el-button>
           </div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showCreate=false">取消</el-button>
-        <el-button type="primary" @click="submit">提交</el-button>
+        <el-button @click="showCreate=false">{{ t('workflows.dialog.footer.cancel') }}</el-button>
+        <el-button type="primary" @click="submit">{{ t('workflows.dialog.footer.submit') }}</el-button>
       </template>
     </el-dialog>
   </div>
