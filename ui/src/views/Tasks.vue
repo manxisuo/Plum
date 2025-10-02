@@ -1,47 +1,41 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, reactive, computed } from 'vue'
+import { onMounted, onBeforeUnmount, ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
+const router = useRouter()
 
-type Task = {
-  TaskID: string
-  Name: string
-  Executor: string
-  TargetKind: string
-  TargetRef: string
-  State: string
-  CreatedAt: number
-}
+type TaskDef = { defId: string; name: string; executor: string; targetKind?: string; targetRef?: string; labels?: Record<string,string>; createdAt?: number }
+type TaskRun = { TaskID: string; OriginTaskID?: string; State?: string; CreatedAt?: number }
 
-const items = ref<Task[]>([])
-const grouped = computed(() => {
-  const map = new Map<string, Task[]>()
-  const src = Array.isArray(items.value) ? items.value : []
-  for (const t of src) {
-    const key = (t as any).OriginTaskID && (t as any).OriginTaskID.length > 0 ? (t as any).OriginTaskID : t.TaskID
-    if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push(t)
-  }
-  // 排序组内按创建时间倒序
-  const out: { originId: string; runs: Task[] }[] = []
-  for (const [k, arr] of map.entries()) {
-    arr.sort((a,b)=> (b.CreatedAt||0)-(a.CreatedAt||0))
-    out.push({ originId: k, runs: arr })
-  }
-  // 组排序：按最近一次创建时间倒序
-  out.sort((a,b)=> (b.runs[0]?.CreatedAt||0)-(a.runs[0]?.CreatedAt||0))
-  return out
-})
+// 定义视图：defs 列表 + 最近一次运行
+const defs = ref<TaskDef[]>([])
+const latestByDef = ref<Record<string, { state: string; createdAt: number; taskId: string }>>({})
 const loading = ref(false)
 let es: EventSource | null = null
 
 async function load() {
   loading.value = true
   try {
-    const res = await fetch(`${API_BASE}/v1/tasks`)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    items.value = await res.json() as Task[]
+    const [dRes, tRes] = await Promise.all([
+      fetch(`${API_BASE}/v1/task-defs`),
+      fetch(`${API_BASE}/v1/tasks`)
+    ])
+    if (dRes.ok) defs.value = await dRes.json() as TaskDef[]
+    if (tRes.ok) {
+      const runs = await tRes.json() as any[]
+      const map: Record<string, { state: string; createdAt: number; taskId: string }>= {}
+      for (const r of (runs||[])) {
+        const defId = r.originTaskId || r.OriginTaskID || ''
+        if (!defId) continue
+        const created = r.createdAt || r.CreatedAt || 0
+        if (!map[defId] || created > map[defId].createdAt) {
+          map[defId] = { state: r.state || r.State || '', createdAt: created, taskId: r.taskId || r.TaskID }
+        }
+      }
+      latestByDef.value = map
+    }
   } catch (e: any) {
     ElMessage.error(e?.message || '加载失败')
   } finally {
@@ -98,50 +92,30 @@ async function cancelTask(id: string) {
   } catch (e:any) { ElMessage.error(e?.message || '操作失败') }
 }
 
-// create dialog
+// 创建定义（取代创建任务）
 const showCreate = ref(false)
-const form = reactive<{ name: string; executor: string; targetKind: string; targetRef: string; payload: string; timeoutSec: number; maxRetries: number; autoStart: boolean }>({ name: '', executor: 'service', targetKind: 'service', targetRef: '', payload: '{}', timeoutSec: 300, maxRetries: 0, autoStart: true })
+const form = reactive<TaskDef>({ defId:'', name:'my.task.echo', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
 
-function resetForm() {
-  form.name = ''
-  form.executor = 'service'
-  form.targetKind = 'service'
-  form.targetRef = ''
-  form.payload = '{}'
-  form.timeoutSec = 300
-  form.maxRetries = 0
-  form.autoStart = true
-}
-
-function openCreate() {
-  resetForm()
-  showCreate.value = true
-}
+function resetForm() { form.defId=''; form.name='my.task.echo'; form.executor='embedded'; form.targetKind=''; form.targetRef=''; form.labels={} }
+function openCreate() { resetForm(); showCreate.value = true }
 
 async function submit() {
   try {
-    const payloadObj = JSON.parse(form.payload || '{}')
-    const res = await fetch(`${API_BASE}/v1/tasks`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: form.name,
-        executor: form.executor,
-        targetKind: form.targetKind,
-        targetRef: form.targetRef,
-        payload: payloadObj,
-        timeoutSec: form.timeoutSec,
-        maxRetries: form.maxRetries,
-        autoStart: form.autoStart,
-      })
-    })
+    const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: form.labels }) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    ElMessage.success('已创建')
+    ElMessage.success('已创建定义')
     showCreate.value = false
-    resetForm()
     load()
-  } catch (e:any) {
-    ElMessage.error(e?.message || '创建失败')
-  }
+  } catch (e:any) { ElMessage.error(e?.message || '创建失败') }
+}
+
+async function runDef(defId: string) {
+  try {
+    const res = await fetch(`${API_BASE}/v1/task-defs/${encodeURIComponent(defId)}?action=run`, { method: 'POST' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    ElMessage.success('已触发运行')
+    load()
+  } catch (e:any) { ElMessage.error(e?.message || '操作失败') }
 }
 </script>
 
@@ -149,90 +123,51 @@ async function submit() {
   <div>
     <div style="display:flex; gap:8px; align-items:center;">
       <el-button type="primary" :loading="loading" @click="load">刷新</el-button>
-      <el-button type="success" @click="openCreate">创建任务</el-button>
+      <el-button type="success" @click="openCreate">创建任务定义</el-button>
     </div>
-    <!-- 分组渲染：每组显示一行头，展开看历史 -->
-    <el-table v-loading="loading" :data="grouped" style="width:100%; margin-top:12px;">
-      <el-table-column type="expand">
+    <el-table v-loading="loading" :data="defs" style="width:100%; margin-top:12px;">
+      <el-table-column label="DefID" width="320">
+        <template #default="{ row }">{{ (row as any).defId || (row as any).DefID }}</template>
+      </el-table-column>
+      <el-table-column label="Name" width="220">
+        <template #default="{ row }">{{ (row as any).name || (row as any).Name }}</template>
+      </el-table-column>
+      <el-table-column label="Executor" width="120">
+        <template #default="{ row }">{{ (row as any).executor || (row as any).Executor }}</template>
+      </el-table-column>
+      <el-table-column label="Target">
+        <template #default="{ row }">{{ ((row as any).targetKind||(row as any).TargetKind)||'' }} {{ ((row as any).targetRef||(row as any).TargetRef)||'' }}</template>
+      </el-table-column>
+      <el-table-column label="Latest State" width="140">
         <template #default="{ row }">
-          <div>
-            <el-table :data="row.runs" size="small" style="width:80%">
-              <el-table-column prop="TaskID" label="TaskID" width="300" />
-              <el-table-column prop="Name" label="Name" width="180" />
-              <el-table-column prop="Executor" label="Executor" width="100" />
-              <el-table-column prop="TargetKind" label="TargetKind" width="100" />
-              <el-table-column prop="TargetRef" label="TargetRef" />
-              <el-table-column prop="State" label="State" width="120" />
-              <el-table-column label="Created" width="160">
-                <template #default="{ row: rr }">{{ new Date((rr.CreatedAt||0)*1000).toLocaleString() }}</template>
-              </el-table-column>
-            </el-table>
-          </div>
+          {{ latestByDef[(row as any).defId || (row as any).DefID]?.state || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="Origin" width="160">
-        <template #default="{ row }">{{ row.originId }}</template>
-      </el-table-column>
-      <el-table-column label="Latest Name" width="120">
-        <template #default="{ row }">{{ row.runs[0]?.Name }}</template>
-      </el-table-column>
-      <el-table-column label="Latest TaskID" width="160">
-        <template #default="{ row }">{{ row.runs[0]?.TaskID }}</template>
-      </el-table-column>
-      <el-table-column label="Executor" width="100">
-        <template #default="{ row }">{{ row.runs[0]?.Executor }}</template>
-      </el-table-column>
-      <el-table-column label="TargetKind" width="100">
-        <template #default="{ row }">{{ row.runs[0]?.TargetKind }}</template>
-      </el-table-column>
-      <el-table-column label="TargetRef">
-        <template #default="{ row }">{{ row.runs[0]?.TargetRef }}</template>
-      </el-table-column>
-      <el-table-column label="Latest State" width="100">
-        <template #default="{ row }">{{ row.runs[0]?.State }}</template>
-      </el-table-column>
-      <el-table-column label="Created" width="150">
-        <template #default="{ row }">{{ new Date((row.runs[0]?.CreatedAt||0)*1000).toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column label="Runs" width="60">
-        <template #default="{ row }">{{ row.runs.length }}</template>
-      </el-table-column>
-      <el-table-column label="Action" width="340">
+      <el-table-column label="Latest Time" width="180">
         <template #default="{ row }">
-          <el-button size="small" type="primary" :disabled="row.runs[0]?.State!=='Queued'" @click="startTask(row.runs[0]?.TaskID)">Start</el-button>
-          <el-button size="small" @click="rerunTask(row.runs[0]?.TaskID)">Rerun</el-button>
-          <el-button size="small" type="warning" :disabled="!(row.runs[0]?.State==='Running'||row.runs[0]?.State==='Queued')" @click="cancelTask(row.runs[0]?.TaskID)">Cancel</el-button>
-          <el-popconfirm title="确认删除该任务？" @confirm="delTask(row.runs[0]?.TaskID)">
-            <template #reference>
-              <el-button type="danger" size="small">删除</el-button>
-            </template>
-          </el-popconfirm>
+          {{ new Date(((latestByDef[(row as any).defId || (row as any).DefID]?.createdAt)||0)*1000).toLocaleString() }}
+        </template>
+      </el-table-column>
+      <el-table-column label="Action" width="260">
+        <template #default="{ row }">
+          <el-button size="small" type="primary" @click="runDef((row as any).defId || (row as any).DefID)">Run</el-button>
+          <el-button size="small" @click="router.push('/tasks/defs/'+((row as any).defId || (row as any).DefID))">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showCreate" title="创建任务" width="600px">
+    <el-dialog v-model="showCreate" title="创建任务定义" width="600px">
       <el-form label-width="120px">
-        <el-form-item label="Name"><el-input v-model="form.name" placeholder="任务名称" /></el-form-item>
+        <el-form-item label="Name"><el-input v-model="form.name" placeholder="任务名称（如 my.task.echo）" /></el-form-item>
         <el-form-item label="Executor">
           <el-select v-model="form.executor" style="width:100%">
-            <el-option label="service" value="service" />
             <el-option label="embedded" value="embedded" />
+            <el-option label="service" value="service" />
             <el-option label="os_process" value="os_process" />
           </el-select>
         </el-form-item>
-        <el-form-item label="TargetKind">
-          <el-select v-model="form.targetKind" style="width:100%">
-            <el-option label="service" value="service" />
-            <el-option label="deployment" value="deployment" />
-            <el-option label="node" value="node" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="TargetRef"><el-input v-model="form.targetRef" placeholder="如 serviceName 或 deploymentId" /></el-form-item>
-        <el-form-item label="Payload(JSON)"><el-input type="textarea" v-model="form.payload" rows="4" /></el-form-item>
-        <el-form-item label="TimeoutSec"><el-input v-model.number="form.timeoutSec" /></el-form-item>
-        <el-form-item label="MaxRetries"><el-input v-model.number="form.maxRetries" /></el-form-item>
-        <el-form-item label="创建后立即执行"><el-checkbox v-model="form.autoStart">Auto Start</el-checkbox></el-form-item>
+        <el-form-item label="TargetKind"><el-input v-model="form.targetKind" placeholder="service/deployment/node（可选）" /></el-form-item>
+        <el-form-item label="TargetRef"><el-input v-model="form.targetRef" placeholder="如 serviceName（可选）" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreate=false">取消</el-button>

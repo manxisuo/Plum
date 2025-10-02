@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
+import { RouterLink } from 'vue-router'
 import * as echarts from 'echarts'
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 
@@ -94,10 +95,33 @@ watch([services, nodes], ()=>{ nextTick().then(renderCharts) })
   <div>
     <h3>Plum 概览</h3>
     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:12px;">
-      <el-card><div><strong>Nodes</strong><div style="font-size:24px;">{{ nodes.length }}</div><small>Healthy {{ healthyNodes() }} / Unhealthy {{ unhealthyNodes() }}</small></div></el-card>
-      <el-card><div><strong>Deployments</strong><div style="font-size:24px;">{{ deployments.length }}</div><small>Instances ~ {{ runningInstances() }}</small></div></el-card>
-      <el-card><div><strong>Services</strong><div style="font-size:24px;">{{ services.length }}</div><small>Endpoints {{ endpointsCount }}</small></div></el-card>
-      <el-card><div><strong>Artifacts</strong><div style="font-size:24px;">≈ {{ (artifactsTotal/1024/1024).toFixed(1) }} MB</div></div></el-card>
+      <el-card>
+        <div>
+          <RouterLink to="/nodes" class="card-link"><strong>Nodes</strong></RouterLink>
+          <div style="font-size:24px;">{{ nodes.length }}</div>
+          <small>Healthy {{ healthyNodes() }} / Unhealthy {{ unhealthyNodes() }}</small>
+        </div>
+      </el-card>
+      <el-card>
+        <div>
+          <RouterLink to="/deployments" class="card-link"><strong>Deployments</strong></RouterLink>
+          <div style="font-size:24px;">{{ deployments.length }}</div>
+          <small>Instances ~ {{ runningInstances() }}</small>
+        </div>
+      </el-card>
+      <el-card>
+        <div>
+          <RouterLink to="/services" class="card-link"><strong>Services</strong></RouterLink>
+          <div style="font-size:24px;">{{ services.length }}</div>
+          <small>Endpoints {{ endpointsCount }}</small>
+        </div>
+      </el-card>
+      <el-card>
+        <div>
+          <RouterLink to="/apps" class="card-link"><strong>Artifacts</strong></RouterLink>
+          <div style="font-size:24px;">≈ {{ (artifactsTotal/1024/1024).toFixed(1) }} MB</div>
+        </div>
+      </el-card>
     </div>
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
@@ -129,5 +153,13 @@ watch([services, nodes], ()=>{ nextTick().then(renderCharts) })
   </div>
 </template>
 
-
-
+<style scoped>
+.card-link {
+  color: var(--el-color-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.card-link:hover {
+  text-decoration: underline;
+}
+</style>

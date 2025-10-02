@@ -129,6 +129,7 @@ func migrate(db *sql.DB) error {
             timeout_sec INTEGER,
             max_retries INTEGER,
             ord INTEGER,
+            definition_id TEXT,
             PRIMARY KEY(workflow_id, step_id)
         );`,
 		// Workflow runs and step runs
@@ -150,11 +151,25 @@ func migrate(db *sql.DB) error {
             ord INTEGER,
             PRIMARY KEY(run_id, step_id)
         );`,
+		// TaskDefinitions
+		`CREATE TABLE IF NOT EXISTS task_defs (
+            def_id TEXT PRIMARY KEY,
+            name TEXT,
+            executor TEXT,
+            target_kind TEXT,
+            target_ref TEXT,
+            labels TEXT,
+            created_at INTEGER
+        );`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
 			return err
 		}
+	}
+	// ensure new columns for upgrades
+	if err := ensureColumn(db, "workflow_steps", "definition_id", "TEXT"); err != nil {
+		return err
 	}
 	// Online schema upgrades (add columns if missing)
 	if err := ensureColumn(db, "tasks", "origin_task_id", "TEXT"); err != nil {
@@ -679,8 +694,8 @@ func (s *sqliteStore) CreateWorkflow(wf store.Workflow) (string, error) {
 		return "", err
 	}
 	for _, st := range wf.Steps {
-		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, timeout_sec, max_retries, ord) VALUES(?,?,?,?,?,?,?)`,
-			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TimeoutSec, st.MaxRetries, st.Ord,
+		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, timeout_sec, max_retries, ord, definition_id) VALUES(?,?,?,?,?,?,?,?)`,
+			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TimeoutSec, st.MaxRetries, st.Ord, st.DefinitionID,
 		); err != nil {
 			tx.Rollback()
 			return "", err
@@ -771,7 +786,7 @@ func (s *sqliteStore) ListWorkflowRuns() ([]store.WorkflowRun, error) {
 }
 
 func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error) {
-	rows, err := s.db.Query(`SELECT step_id, name, executor, timeout_sec, max_retries, ord FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
+	rows, err := s.db.Query(`SELECT step_id, name, executor, timeout_sec, max_retries, ord, definition_id FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -779,7 +794,7 @@ func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error)
 	var out []store.WorkflowStep
 	for rows.Next() {
 		var st store.WorkflowStep
-		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TimeoutSec, &st.MaxRetries, &st.Ord); err != nil {
+		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TimeoutSec, &st.MaxRetries, &st.Ord, &st.DefinitionID); err != nil {
 			return nil, err
 		}
 		out = append(out, st)
@@ -828,4 +843,52 @@ func (s *sqliteStore) UpdateWorkflowRunState(runID string, state string, ts int6
 	}
 	_, err := s.db.Exec(`UPDATE workflow_runs SET state=?, `+col+`=? WHERE run_id=?`, state, ts, runID)
 	return err
+}
+
+// TaskDefinition CRUD
+func (s *sqliteStore) CreateTaskDef(td store.TaskDefinition) (string, error) {
+	if td.DefID == "" {
+		td.DefID = newID()
+	}
+	labelsJSON, _ := json.Marshal(td.Labels)
+	_, err := s.db.Exec(`INSERT INTO task_defs(def_id, name, executor, target_kind, target_ref, labels, created_at) VALUES(?,?,?,?,?,?,?)`,
+		td.DefID, td.Name, td.Executor, td.TargetKind, td.TargetRef, string(labelsJSON), time.Now().Unix(),
+	)
+	if err != nil {
+		return "", err
+	}
+	return td.DefID, nil
+}
+
+func (s *sqliteStore) GetTaskDef(id string) (store.TaskDefinition, bool, error) {
+	row := s.db.QueryRow(`SELECT def_id, name, executor, target_kind, target_ref, labels, created_at FROM task_defs WHERE def_id=?`, id)
+	var td store.TaskDefinition
+	var labelsStr string
+	if err := row.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.TaskDefinition{}, false, nil
+		}
+		return store.TaskDefinition{}, false, err
+	}
+	_ = json.Unmarshal([]byte(labelsStr), &td.Labels)
+	return td, true, nil
+}
+
+func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
+	rows, err := s.db.Query(`SELECT def_id, name, executor, target_kind, target_ref, labels, created_at FROM task_defs ORDER BY created_at DESC, def_id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.TaskDefinition
+	for rows.Next() {
+		var td store.TaskDefinition
+		var labelsStr string
+		if err := rows.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.CreatedAt); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(labelsStr), &td.Labels)
+		out = append(out, td)
+	}
+	return out, rows.Err()
 }

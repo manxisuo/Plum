@@ -531,6 +531,86 @@ func handleWorkflowRunByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"run": run, "steps": steps, "stepRuns": srs})
 }
 
+// ---- TaskDefinitions ----
+type CreateTaskDefRequest struct {
+	Name       string            `json:"name"`
+	Executor   string            `json:"executor"`
+	TargetKind string            `json:"targetKind"`
+	TargetRef  string            `json:"targetRef"`
+	Labels     map[string]string `json:"labels"`
+}
+
+func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		list, err := store.Current.ListTaskDefs()
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, list)
+	case http.MethodPost:
+		var req CreateTaskDefRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		id, err := store.Current.CreateTaskDef(store.TaskDefinition{Name: req.Name, Executor: req.Executor, TargetKind: req.TargetKind, TargetRef: req.TargetRef, Labels: req.Labels, CreatedAt: time.Now().Unix()})
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"defId": id})
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleTaskDefByID(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[len("/v1/task-defs/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		td, ok, err := store.Current.GetTaskDef(id)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, td)
+	case http.MethodPost: // action run
+		if r.URL.Query().Get("action") == "run" {
+			td, ok, err := store.Current.GetTaskDef(id)
+			if err != nil {
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
+			}
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
+			payload := "{}"
+			newID, err := store.Current.CreateTask(store.Task{Name: td.Name, Executor: td.Executor, TargetKind: td.TargetKind, TargetRef: td.TargetRef, State: "Pending", PayloadJSON: payload, CreatedAt: time.Now().Unix(), Labels: td.Labels, OriginTaskID: id})
+			if err != nil {
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
+			}
+			notify.PublishTasks()
+			writeJSON(w, map[string]any{"taskId": newID})
+			return
+		}
+		http.Error(w, "bad request", http.StatusBadRequest)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // ---- Workers (embedded) ----
 
 type RegisterWorkerRequest struct {

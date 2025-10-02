@@ -15,6 +15,10 @@ import Workflows from './views/Workflows.vue'
 import WorkflowRunDetail from './views/WorkflowRunDetail.vue'
 // @ts-ignore
 import Tasks from './views/Tasks.vue'
+// @ts-ignore
+import TaskDefs from './views/TaskDefs.vue'
+// @ts-ignore
+import TaskDefDetail from './views/TaskDefDetail.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -25,6 +29,9 @@ export const router = createRouter({
     { path: '/services', component: Services },
     { path: '/workflows', component: Workflows },
     { path: '/workflow-runs/:id', component: WorkflowRunDetail, props: true },
+    { path: '/task-defs', component: TaskDefs },
+    { path: '/task-defs/:id', component: TaskDefDetail, props: true },
+    { path: '/tasks/defs/:id', component: TaskDefDetail, props: true },
     { path: '/tasks', component: Tasks },
     { path: '/assignments', component: Assignments },
     // deployments

@@ -78,7 +78,28 @@ func tick() {
 			}
 			if nextOrd >= 0 && nextOrd < len(steps) {
 				st := steps[nextOrd]
-				newID, _ := store.Current.CreateTask(store.Task{Name: st.Name, Executor: st.Executor, State: "Pending", PayloadJSON: "{}", TimeoutSec: st.TimeoutSec, MaxRetries: st.MaxRetries, CreatedAt: now, Labels: map[string]string{"workflowId": r.WorkflowID, "runId": r.RunID, "stepId": st.StepID}})
+				name := st.Name
+				executor := st.Executor
+				targetKind := ""
+				targetRef := ""
+				labels := map[string]string{"workflowId": r.WorkflowID, "runId": r.RunID, "stepId": st.StepID}
+				if st.DefinitionID != "" {
+					if td, ok, _ := store.Current.GetTaskDef(st.DefinitionID); ok {
+						if td.Name != "" {
+							name = td.Name
+						}
+						if td.Executor != "" {
+							executor = td.Executor
+						}
+						targetKind = td.TargetKind
+						targetRef = td.TargetRef
+						for k, v := range td.Labels {
+							labels[k] = v
+						}
+						labels["defId"] = td.DefID
+					}
+				}
+				newID, _ := store.Current.CreateTask(store.Task{Name: name, Executor: executor, TargetKind: targetKind, TargetRef: targetRef, State: "Pending", PayloadJSON: "{}", TimeoutSec: st.TimeoutSec, MaxRetries: st.MaxRetries, CreatedAt: now, Labels: labels})
 				_ = store.Current.InsertStepRun(store.StepRun{RunID: r.RunID, StepID: st.StepID, TaskID: newID, State: "Pending", Ord: st.Ord})
 				notify.PublishTasks()
 			} else if nextOrd >= len(steps) {

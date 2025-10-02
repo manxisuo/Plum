@@ -89,7 +89,9 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="Steps">
         <template #default="{ row }">
-          <code>{{ ((row as any).steps || (row as any).Steps || []).map((s:any)=> (s.name||s.Name)).join(' -> ') }}</code>
+          <code>
+            {{ (()=>{ const a = (row as any).steps || (row as any).Steps || []; return Array.isArray(a) ? a.map((s:any)=> s?.name || s?.Name || s?.definitionId || s?.DefinitionID || '').join(' -> ') : '' })() }}
+          </code>
         </template>
       </el-table-column>
       <el-table-column label="Action" width="260">

@@ -99,12 +99,13 @@ type Worker struct {
 
 // Workflow (sequential MVP)
 type WorkflowStep struct {
-	StepID     string
-	Name       string // taskName
-	Executor   string // service|embedded|os_process
-	TimeoutSec int
-	MaxRetries int
-	Ord        int // sequence order
+	StepID       string
+	Name         string // taskName
+	Executor     string // service|embedded|os_process
+	TimeoutSec   int
+	MaxRetries   int
+	Ord          int    // sequence order
+	DefinitionID string // optional: reference TaskDefinition
 }
 
 type Workflow struct {
@@ -197,6 +198,22 @@ type Store interface {
 	UpdateStepRunTask(runID string, stepID string, taskID string, state string, startedAt int64) error
 	UpdateStepRunFinished(runID string, stepID string, state string, finishedAt int64) error
 	UpdateWorkflowRunState(runID string, state string, ts int64) error
+
+	// TaskDefinition (for reusable task templates)
+	CreateTaskDef(td TaskDefinition) (string, error)
+	GetTaskDef(id string) (TaskDefinition, bool, error)
+	ListTaskDefs() ([]TaskDefinition, error)
+}
+
+// TaskDefinition stores a reusable task template
+type TaskDefinition struct {
+	DefID      string
+	Name       string
+	Executor   string
+	TargetKind string
+	TargetRef  string
+	Labels     map[string]string
+	CreatedAt  int64
 }
 
 var Current Store
