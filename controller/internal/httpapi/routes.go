@@ -41,4 +41,9 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/tasks/start/", withCORS(handleTaskStart))
 	mux.HandleFunc("/v1/tasks/rerun/", withCORS(handleTaskRerun))
 	mux.HandleFunc("/v1/tasks/cancel/", withCORS(handleTaskCancel))
+	// workflows (sequential MVP)
+	mux.HandleFunc("/v1/workflows", withCORS(handleWorkflows))
+	mux.HandleFunc("/v1/workflows/", withCORS(handleWorkflowByID))
+	mux.HandleFunc("/v1/workflow-runs", withCORS(handleWorkflowRuns))
+	mux.HandleFunc("/v1/workflow-runs/", withCORS(handleWorkflowRunByID))
 }

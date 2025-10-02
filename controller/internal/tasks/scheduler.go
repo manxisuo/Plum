@@ -41,6 +41,51 @@ func tick() {
 		return
 	}
 	now := time.Now().Unix()
+	// reflect task state to workflow stepRuns
+	for _, t := range tasks {
+		if t.Labels != nil {
+			runID := t.Labels["runId"]
+			stepID := t.Labels["stepId"]
+			if runID != "" && stepID != "" {
+				switch t.State {
+				case "Running":
+					_ = store.Current.UpdateStepRunTask(runID, stepID, t.TaskID, "Running", t.StartedAt)
+				case "Succeeded", "Failed", "Timeout", "Canceled":
+					_ = store.Current.UpdateStepRunFinished(runID, stepID, t.State, t.FinishedAt)
+				}
+			}
+		}
+	}
+	// workflow sequential progression
+	if runs, err := store.Current.ListWorkflowRuns(); err == nil {
+		for _, r := range runs {
+			if r.State != "Running" {
+				continue
+			}
+			steps, _ := store.Current.ListWorkflowSteps(r.WorkflowID)
+			srs, _ := store.Current.ListStepRuns(r.RunID)
+			nextOrd := -1
+			if len(srs) == 0 {
+				nextOrd = 0
+			} else {
+				last := srs[len(srs)-1]
+				if last.State == "Succeeded" {
+					nextOrd = last.Ord + 1
+				} else if last.State == "Failed" {
+					_ = store.Current.UpdateWorkflowRunState(r.RunID, "Failed", now)
+					continue
+				}
+			}
+			if nextOrd >= 0 && nextOrd < len(steps) {
+				st := steps[nextOrd]
+				newID, _ := store.Current.CreateTask(store.Task{Name: st.Name, Executor: st.Executor, State: "Pending", PayloadJSON: "{}", TimeoutSec: st.TimeoutSec, MaxRetries: st.MaxRetries, CreatedAt: now, Labels: map[string]string{"workflowId": r.WorkflowID, "runId": r.RunID, "stepId": st.StepID}})
+				_ = store.Current.InsertStepRun(store.StepRun{RunID: r.RunID, StepID: st.StepID, TaskID: newID, State: "Pending", Ord: st.Ord})
+				notify.PublishTasks()
+			} else if nextOrd >= len(steps) {
+				_ = store.Current.UpdateWorkflowRunState(r.RunID, "Succeeded", now)
+			}
+		}
+	}
 	for _, t := range tasks {
 		if t.State == "Pending" {
 			// minimal: mark Running

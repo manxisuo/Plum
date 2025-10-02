@@ -417,6 +417,120 @@ func handleTaskCancel(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ---- Workflows (sequential MVP) ----
+
+type CreateWorkflowRequest struct {
+	Name   string               `json:"name"`
+	Labels map[string]string    `json:"labels"`
+	Steps  []store.WorkflowStep `json:"steps"`
+}
+
+func handleWorkflows(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		list, err := store.Current.ListWorkflows()
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, list)
+	case http.MethodPost:
+		var req CreateWorkflowRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		// normalize step ids / ord
+		for i := range req.Steps {
+			if req.Steps[i].StepID == "" {
+				req.Steps[i].StepID = strconv.FormatInt(time.Now().UnixNano()+int64(i), 36)
+			}
+			req.Steps[i].Ord = i
+		}
+		id, err := store.Current.CreateWorkflow(store.Workflow{WorkflowID: "", Name: req.Name, Labels: req.Labels, Steps: req.Steps})
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"workflowId": id})
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleWorkflowByID(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[len("/v1/workflows/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		wf, ok, err := store.Current.GetWorkflow(id)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, wf)
+	case http.MethodPost: // start a run
+		if r.URL.Query().Get("action") == "run" {
+			runID, err := store.Current.CreateWorkflowRun(id)
+			if err != nil {
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
+			}
+			// mark started
+			_ = store.Current.UpdateWorkflowRunState(runID, "Running", time.Now().Unix())
+			writeJSON(w, map[string]any{"runId": runID})
+			return
+		}
+		http.Error(w, "bad request", http.StatusBadRequest)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleWorkflowRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	runs, err := store.Current.ListWorkflowRuns()
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, runs)
+}
+
+func handleWorkflowRunByID(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[len("/v1/workflow-runs/"):]
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	run, ok, err := store.Current.GetWorkflowRun(id)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	steps, _ := store.Current.ListWorkflowSteps(run.WorkflowID)
+	srs, _ := store.Current.ListStepRuns(id)
+	writeJSON(w, map[string]any{"run": run, "steps": steps, "stepRuns": srs})
+}
+
 // ---- Workers (embedded) ----
 
 type RegisterWorkerRequest struct {

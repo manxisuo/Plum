@@ -10,6 +10,10 @@ import Assignments from './views/Assignments.vue'
 // @ts-ignore: vite handles .vue type
 import Services from './views/Services.vue'
 // @ts-ignore
+import Workflows from './views/Workflows.vue'
+// @ts-ignore
+import WorkflowRunDetail from './views/WorkflowRunDetail.vue'
+// @ts-ignore
 import Tasks from './views/Tasks.vue'
 
 export const router = createRouter({
@@ -19,6 +23,8 @@ export const router = createRouter({
     { path: '/nodes', component: Nodes },
     { path: '/apps', component: Apps },
     { path: '/services', component: Services },
+    { path: '/workflows', component: Workflows },
+    { path: '/workflow-runs/:id', component: WorkflowRunDetail, props: true },
     { path: '/tasks', component: Tasks },
     { path: '/assignments', component: Assignments },
     // deployments

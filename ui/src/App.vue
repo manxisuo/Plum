@@ -48,6 +48,7 @@ fetchAssignments()
           <el-menu-item index="/nodes"><RouterLink to="/nodes">Nodes</RouterLink></el-menu-item>
           <el-menu-item index="/apps"><RouterLink to="/apps">Apps</RouterLink></el-menu-item>
         <el-menu-item index="/services"><RouterLink to="/services">Services</RouterLink></el-menu-item>
+        <el-menu-item index="/workflows"><RouterLink to="/workflows">Workflows</RouterLink></el-menu-item>
         <el-menu-item index="/tasks"><RouterLink to="/tasks">Tasks</RouterLink></el-menu-item>
           <el-menu-item index="/deployments"><RouterLink to="/deployments">Deployments</RouterLink></el-menu-item>
         </el-menu>

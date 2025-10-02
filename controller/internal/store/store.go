@@ -195,6 +195,7 @@ type Store interface {
 	ListStepRuns(runID string) ([]StepRun, error)
 	InsertStepRun(sr StepRun) error
 	UpdateStepRunTask(runID string, stepID string, taskID string, state string, startedAt int64) error
+	UpdateStepRunFinished(runID string, stepID string, state string, finishedAt int64) error
 	UpdateWorkflowRunState(runID string, state string, ts int64) error
 }
 

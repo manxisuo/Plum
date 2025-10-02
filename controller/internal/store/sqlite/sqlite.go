@@ -115,6 +115,41 @@ func migrate(db *sql.DB) error {
             capacity INTEGER,
             last_seen INTEGER
         );`,
+		// Workflows (definitions)
+		`CREATE TABLE IF NOT EXISTS workflows (
+            workflow_id TEXT PRIMARY KEY,
+            name TEXT,
+            labels TEXT
+        );`,
+		`CREATE TABLE IF NOT EXISTS workflow_steps (
+            workflow_id TEXT,
+            step_id TEXT,
+            name TEXT,
+            executor TEXT,
+            timeout_sec INTEGER,
+            max_retries INTEGER,
+            ord INTEGER,
+            PRIMARY KEY(workflow_id, step_id)
+        );`,
+		// Workflow runs and step runs
+		`CREATE TABLE IF NOT EXISTS workflow_runs (
+            run_id TEXT PRIMARY KEY,
+            workflow_id TEXT,
+            state TEXT,
+            created_at INTEGER,
+            started_at INTEGER,
+            finished_at INTEGER
+        );`,
+		`CREATE TABLE IF NOT EXISTS step_runs (
+            run_id TEXT,
+            step_id TEXT,
+            task_id TEXT,
+            state TEXT,
+            started_at INTEGER,
+            finished_at INTEGER,
+            ord INTEGER,
+            PRIMARY KEY(run_id, step_id)
+        );`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -631,45 +666,166 @@ func boolToInt(b bool) int {
 
 // ---- Workflows (sequential MVP - placeholder implementations) ----
 func (s *sqliteStore) CreateWorkflow(wf store.Workflow) (string, error) {
-	return "", errors.New("not implemented")
+	if wf.WorkflowID == "" {
+		wf.WorkflowID = newID()
+	}
+	labelsJSON, _ := json.Marshal(wf.Labels)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(`INSERT INTO workflows(workflow_id, name, labels) VALUES(?,?,?)`, wf.WorkflowID, wf.Name, string(labelsJSON)); err != nil {
+		tx.Rollback()
+		return "", err
+	}
+	for _, st := range wf.Steps {
+		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, timeout_sec, max_retries, ord) VALUES(?,?,?,?,?,?,?)`,
+			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TimeoutSec, st.MaxRetries, st.Ord,
+		); err != nil {
+			tx.Rollback()
+			return "", err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return wf.WorkflowID, nil
 }
 
 func (s *sqliteStore) ListWorkflows() ([]store.Workflow, error) {
-	return []store.Workflow{}, nil
+	rows, err := s.db.Query(`SELECT workflow_id, name, labels FROM workflows ORDER BY rowid DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.Workflow
+	for rows.Next() {
+		var wf store.Workflow
+		var labelsStr string
+		if err := rows.Scan(&wf.WorkflowID, &wf.Name, &labelsStr); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(labelsStr), &wf.Labels)
+		// load steps
+		st, _ := s.ListWorkflowSteps(wf.WorkflowID)
+		wf.Steps = st
+		out = append(out, wf)
+	}
+	return out, rows.Err()
 }
 
 func (s *sqliteStore) GetWorkflow(id string) (store.Workflow, bool, error) {
-	return store.Workflow{}, false, nil
+	row := s.db.QueryRow(`SELECT workflow_id, name, labels FROM workflows WHERE workflow_id=?`, id)
+	var wf store.Workflow
+	var labelsStr string
+	if err := row.Scan(&wf.WorkflowID, &wf.Name, &labelsStr); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.Workflow{}, false, nil
+		}
+		return store.Workflow{}, false, err
+	}
+	_ = json.Unmarshal([]byte(labelsStr), &wf.Labels)
+	st, _ := s.ListWorkflowSteps(id)
+	wf.Steps = st
+	return wf, true, nil
 }
 
 func (s *sqliteStore) CreateWorkflowRun(workflowID string) (string, error) {
-	return "", errors.New("not implemented")
+	runID := newID()
+	_, err := s.db.Exec(`INSERT INTO workflow_runs(run_id, workflow_id, state, created_at, started_at, finished_at) VALUES(?,?,?,?,?,?)`,
+		runID, workflowID, "Pending", time.Now().Unix(), 0, 0,
+	)
+	if err != nil {
+		return "", err
+	}
+	return runID, nil
 }
 
 func (s *sqliteStore) GetWorkflowRun(runID string) (store.WorkflowRun, bool, error) {
-	return store.WorkflowRun{}, false, nil
+	row := s.db.QueryRow(`SELECT run_id, workflow_id, state, created_at, started_at, finished_at FROM workflow_runs WHERE run_id=?`, runID)
+	var r store.WorkflowRun
+	if err := row.Scan(&r.RunID, &r.WorkflowID, &r.State, &r.CreatedAt, &r.StartedAt, &r.FinishedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.WorkflowRun{}, false, nil
+		}
+		return store.WorkflowRun{}, false, err
+	}
+	return r, true, nil
 }
 
 func (s *sqliteStore) ListWorkflowRuns() ([]store.WorkflowRun, error) {
-	return []store.WorkflowRun{}, nil
+	rows, err := s.db.Query(`SELECT run_id, workflow_id, state, created_at, started_at, finished_at FROM workflow_runs ORDER BY created_at DESC, run_id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.WorkflowRun
+	for rows.Next() {
+		var r store.WorkflowRun
+		if err := rows.Scan(&r.RunID, &r.WorkflowID, &r.State, &r.CreatedAt, &r.StartedAt, &r.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error) {
-	return []store.WorkflowStep{}, nil
+	rows, err := s.db.Query(`SELECT step_id, name, executor, timeout_sec, max_retries, ord FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.WorkflowStep
+	for rows.Next() {
+		var st store.WorkflowStep
+		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TimeoutSec, &st.MaxRetries, &st.Ord); err != nil {
+			return nil, err
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
 }
 
 func (s *sqliteStore) ListStepRuns(runID string) ([]store.StepRun, error) {
-	return []store.StepRun{}, nil
+	rows, err := s.db.Query(`SELECT run_id, step_id, task_id, state, started_at, finished_at, ord FROM step_runs WHERE run_id=? ORDER BY ord ASC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.StepRun
+	for rows.Next() {
+		var sr store.StepRun
+		if err := rows.Scan(&sr.RunID, &sr.StepID, &sr.TaskID, &sr.State, &sr.StartedAt, &sr.FinishedAt, &sr.Ord); err != nil {
+			return nil, err
+		}
+		out = append(out, sr)
+	}
+	return out, rows.Err()
 }
 
 func (s *sqliteStore) InsertStepRun(sr store.StepRun) error {
-	return errors.New("not implemented")
+	_, err := s.db.Exec(`INSERT INTO step_runs(run_id, step_id, task_id, state, started_at, finished_at, ord) VALUES(?,?,?,?,?,?,?)`,
+		sr.RunID, sr.StepID, sr.TaskID, sr.State, sr.StartedAt, sr.FinishedAt, sr.Ord,
+	)
+	return err
 }
 
 func (s *sqliteStore) UpdateStepRunTask(runID string, stepID string, taskID string, state string, startedAt int64) error {
-	return errors.New("not implemented")
+	_, err := s.db.Exec(`UPDATE step_runs SET task_id=?, state=?, started_at=? WHERE run_id=? AND step_id=?`, taskID, state, startedAt, runID, stepID)
+	return err
+}
+
+func (s *sqliteStore) UpdateStepRunFinished(runID string, stepID string, state string, finishedAt int64) error {
+	_, err := s.db.Exec(`UPDATE step_runs SET state=?, finished_at=? WHERE run_id=? AND step_id=?`, state, finishedAt, runID, stepID)
+	return err
 }
 
 func (s *sqliteStore) UpdateWorkflowRunState(runID string, state string, ts int64) error {
-	return errors.New("not implemented")
+	col := "started_at"
+	if state == "Succeeded" || state == "Failed" || state == "Canceled" {
+		col = "finished_at"
+	}
+	_, err := s.db.Exec(`UPDATE workflow_runs SET state=?, `+col+`=? WHERE run_id=?`, state, ts, runID)
+	return err
 }
