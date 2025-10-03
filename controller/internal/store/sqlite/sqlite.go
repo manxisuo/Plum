@@ -43,17 +43,17 @@ func migrate(db *sql.DB) error {
 		// Deployments storage
 		`CREATE TABLE IF NOT EXISTS deployments (
             deployment_id TEXT PRIMARY KEY,
-            name TEXT,
-            labels TEXT
-        );`,
+			name TEXT,
+			labels TEXT
+		);`,
 		`CREATE TABLE IF NOT EXISTS assignments (
-            instance_id TEXT PRIMARY KEY,
+			instance_id TEXT PRIMARY KEY,
             deployment_id TEXT NOT NULL,
-            node_id TEXT NOT NULL,
-            desired TEXT NOT NULL,
-            artifact_url TEXT,
-            start_cmd TEXT
-        );`,
+			node_id TEXT NOT NULL,
+			desired TEXT NOT NULL,
+			artifact_url TEXT,
+			start_cmd TEXT
+		);`,
 		`CREATE TABLE IF NOT EXISTS statuses (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			instance_id TEXT NOT NULL,
@@ -152,13 +152,14 @@ func migrate(db *sql.DB) error {
             PRIMARY KEY(run_id, step_id)
         );`,
 		// TaskDefinitions
-		`CREATE TABLE IF NOT EXISTS task_defs (
+        `CREATE TABLE IF NOT EXISTS task_defs (
             def_id TEXT PRIMARY KEY,
             name TEXT,
             executor TEXT,
             target_kind TEXT,
             target_ref TEXT,
             labels TEXT,
+            default_payload_json TEXT,
             created_at INTEGER
         );`,
 	}
@@ -168,13 +169,16 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	// ensure new columns for upgrades
-	if err := ensureColumn(db, "workflow_steps", "definition_id", "TEXT"); err != nil {
+    if err := ensureColumn(db, "workflow_steps", "definition_id", "TEXT"); err != nil {
 		return err
 	}
 	// Online schema upgrades (add columns if missing)
-	if err := ensureColumn(db, "tasks", "origin_task_id", "TEXT"); err != nil {
+    if err := ensureColumn(db, "tasks", "origin_task_id", "TEXT"); err != nil {
 		return err
 	}
+    if err := ensureColumn(db, "task_defs", "default_payload_json", "TEXT"); err != nil {
+        return err
+    }
 	return nil
 }
 
@@ -851,8 +855,8 @@ func (s *sqliteStore) CreateTaskDef(td store.TaskDefinition) (string, error) {
 		td.DefID = newID()
 	}
 	labelsJSON, _ := json.Marshal(td.Labels)
-	_, err := s.db.Exec(`INSERT INTO task_defs(def_id, name, executor, target_kind, target_ref, labels, created_at) VALUES(?,?,?,?,?,?,?)`,
-		td.DefID, td.Name, td.Executor, td.TargetKind, td.TargetRef, string(labelsJSON), time.Now().Unix(),
+    _, err := s.db.Exec(`INSERT INTO task_defs(def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at) VALUES(?,?,?,?,?,?,?,?)`,
+        td.DefID, td.Name, td.Executor, td.TargetKind, td.TargetRef, string(labelsJSON), td.DefaultPayloadJSON, time.Now().Unix(),
 	)
 	if err != nil {
 		return "", err
@@ -861,10 +865,10 @@ func (s *sqliteStore) CreateTaskDef(td store.TaskDefinition) (string, error) {
 }
 
 func (s *sqliteStore) GetTaskDef(id string) (store.TaskDefinition, bool, error) {
-	row := s.db.QueryRow(`SELECT def_id, name, executor, target_kind, target_ref, labels, created_at FROM task_defs WHERE def_id=?`, id)
+    row := s.db.QueryRow(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs WHERE def_id=?`, id)
 	var td store.TaskDefinition
 	var labelsStr string
-	if err := row.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.CreatedAt); err != nil {
+    if err := row.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.TaskDefinition{}, false, nil
 		}
@@ -875,7 +879,7 @@ func (s *sqliteStore) GetTaskDef(id string) (store.TaskDefinition, bool, error) 
 }
 
 func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
-	rows, err := s.db.Query(`SELECT def_id, name, executor, target_kind, target_ref, labels, created_at FROM task_defs ORDER BY created_at DESC, def_id DESC`)
+    rows, err := s.db.Query(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs ORDER BY created_at DESC, def_id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -884,7 +888,7 @@ func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
 	for rows.Next() {
 		var td store.TaskDefinition
 		var labelsStr string
-		if err := rows.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.CreatedAt); err != nil {
+        if err := rows.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(labelsStr), &td.Labels)

@@ -1,9 +1,12 @@
 SHELL := /bin/bash
 
-.PHONY: controller agent agent-build agent-run demo ui ui-dev ui-build
+.PHONY: controller controller-run agent agent-build agent-run demo ui ui-dev ui-build sdk_cpp sdk_cpp_echo_worker sdk_cpp_echo_worker-run
 
 controller:
 	$(MAKE) -C controller build
+
+controller-run:
+	./controller/bin/controller
 
 agent:
 	cmake -S agent -B agent/build -DCMAKE_BUILD_TYPE=Release
@@ -25,5 +28,19 @@ ui-dev:
 
 ui-build:
 	cd ui && npm run build
+
+
+# SDK C++ (library and examples)
+sdk_cpp:
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake --build sdk/cpp/build --config Release -j
+
+# SDK C++ echo_worker
+sdk_cpp_echo_worker:
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake --build sdk/cpp/build --target echo_worker -j
+
+sdk_cpp_echo_worker-run:
+	./sdk/cpp/build/examples/echo_worker/echo_worker
 
 

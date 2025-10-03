@@ -217,6 +217,8 @@ type TaskDefinition struct {
 	TargetKind string
 	TargetRef  string
 	Labels     map[string]string
+    // DefaultPayloadJSON stores the default input for runs created from this definition
+    DefaultPayloadJSON string
 	CreatedAt  int64
 }
 

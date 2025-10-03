@@ -111,7 +111,7 @@ const messages = {
       title: 'TaskDefinition Detail',
       desc: { defId: 'DefID', name: 'Name', executor: 'Executor' },
       runsTitle: 'Run History',
-      columns: { taskId: 'TaskID', state: 'State', created: 'Created', action: 'Action' },
+      columns: { taskId: 'TaskID', state: 'State', created: 'Created', result: 'Result', action: 'Action' },
       buttons: { start: 'Start', cancel: 'Cancel', delete: 'Delete' },
       confirmDelete: 'Confirm delete this run?'
     }
@@ -226,7 +226,7 @@ const messages = {
       title: 'TaskDefinition 详情',
       desc: { defId: '定义ID', name: '名称', executor: '执行器' },
       runsTitle: '运行历史',
-      columns: { taskId: '任务ID', state: '状态', created: '创建时间', action: '操作' },
+      columns: { taskId: '任务ID', state: '状态', created: '创建时间', result: '结果', action: '操作' },
       buttons: { start: '开始', cancel: '取消', delete: '删除' },
       confirmDelete: '确认删除该任务？'
     }

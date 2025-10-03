@@ -533,11 +533,12 @@ func handleWorkflowRunByID(w http.ResponseWriter, r *http.Request) {
 
 // ---- TaskDefinitions ----
 type CreateTaskDefRequest struct {
-	Name       string            `json:"name"`
-	Executor   string            `json:"executor"`
-	TargetKind string            `json:"targetKind"`
-	TargetRef  string            `json:"targetRef"`
-	Labels     map[string]string `json:"labels"`
+	Name           string            `json:"name"`
+	Executor       string            `json:"executor"`
+	TargetKind     string            `json:"targetKind"`
+	TargetRef      string            `json:"targetRef"`
+	Labels         map[string]string `json:"labels"`
+	DefaultPayload map[string]any    `json:"defaultPayload"`
 }
 
 func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
@@ -555,7 +556,13 @@ func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
-		id, err := store.Current.CreateTaskDef(store.TaskDefinition{Name: req.Name, Executor: req.Executor, TargetKind: req.TargetKind, TargetRef: req.TargetRef, Labels: req.Labels, CreatedAt: time.Now().Unix()})
+		payload := ""
+		if req.DefaultPayload != nil {
+			if bs, err := json.Marshal(req.DefaultPayload); err == nil {
+				payload = string(bs)
+			}
+		}
+		id, err := store.Current.CreateTaskDef(store.TaskDefinition{Name: req.Name, Executor: req.Executor, TargetKind: req.TargetKind, TargetRef: req.TargetRef, Labels: req.Labels, DefaultPayloadJSON: payload, CreatedAt: time.Now().Unix()})
 		if err != nil {
 			http.Error(w, "db error", http.StatusInternalServerError)
 			return
@@ -622,8 +629,8 @@ func handleTaskDefByID(w http.ResponseWriter, r *http.Request) {
 				Payload map[string]any `json:"payload"`
 			}
 			_ = json.NewDecoder(r.Body).Decode(&rr)
-			payload := "{}"
-			if rr.Payload != nil {
+			payload := td.DefaultPayloadJSON
+			if rr.Payload != nil { // override if provided
 				if bs, err := json.Marshal(rr.Payload); err == nil {
 					payload = string(bs)
 				}

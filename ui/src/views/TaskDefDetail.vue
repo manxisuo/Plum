@@ -80,6 +80,11 @@ async function deleteTask(id: string) {
       <el-table-column :label="t('taskDefDetail.columns.created')" width="160">
         <template #default="{ row }">{{ new Date(((row.createdAt||row.CreatedAt)||0)*1000).toLocaleString() }}</template>
       </el-table-column>
+      <el-table-column :label="t('taskDefDetail.columns.result')">
+        <template #default="{ row }">
+          {{ (()=>{ const s = (row.resultJson||row.ResultJSON)||''; return String(s).length>200 ? String(s).slice(0,200)+'…' : String(s) })() }}
+        </template>
+      </el-table-column>
       <el-table-column :label="t('common.action')" width="300">
         <template #default="{ row }">
           <el-button size="small" type="primary" :disabled="(row.state||row.State)!=='Queued'" @click="startTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.start') }}</el-button>

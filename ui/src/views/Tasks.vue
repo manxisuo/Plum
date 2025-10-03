@@ -146,7 +146,22 @@ const runDefId = ref('')
 const runPayloadText = ref<string>('{}')
 function openRun(defId: string) {
   runDefId.value = defId
-  runPayloadText.value = '{}'
+  try {
+    const def = (defs.value||[]).find((d:any)=> (d.defId||d.DefID) === defId)
+    const raw = def?.defaultPayloadJSON || def?.DefaultPayloadJSON || ''
+    if (raw && String(raw).trim().length) {
+      try {
+        const obj = JSON.parse(String(raw))
+        runPayloadText.value = JSON.stringify(obj, null, 2)
+      } catch {
+        runPayloadText.value = String(raw)
+      }
+    } else {
+      runPayloadText.value = '{}'
+    }
+  } catch {
+    runPayloadText.value = '{}'
+  }
   showRun.value = true
 }
 async function submitRun() {

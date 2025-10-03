@@ -34,6 +34,7 @@ async function run(defId: string) {
 
 const showCreate = ref(false)
 const form = reactive<TaskDef>({ defId:'', name:'', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
+const defaultPayloadText = ref<string>('')
 
 function openCreate() {
   form.defId=''
@@ -46,14 +47,14 @@ function openCreate() {
 }
 
 // Executor ↔ TargetKind linkage
-const allKinds = ['service','deployment','node'] as const
-const allowedKinds = computed(() => {
-  if (form.executor === 'service') return ['service'] as const
-  if (form.executor === 'os_process') return ['node'] as const
-  return allKinds
+const ALL_KINDS: string[] = ['service','deployment','node']
+const allowedKinds = computed<string[]>(() => {
+  if (form.executor === 'service') return ['service']
+  if (form.executor === 'os_process') return ['node']
+  return ALL_KINDS
 })
 watch(() => form.executor, () => {
-  if (!allowedKinds.value.includes((form.targetKind||'') as any)) {
+  if (!allowedKinds.value.includes((form.targetKind||'') as string)) {
     form.targetKind = ''
   }
 })
@@ -64,7 +65,13 @@ async function submit() {
     return
   }
   try {
-    const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: form.labels }) })
+    let defaultPayload: any = undefined
+    if (defaultPayloadText.value && defaultPayloadText.value.trim()) {
+      try { defaultPayload = JSON.parse(defaultPayloadText.value) } catch { ElMessage.error('默认 Payload 不是合法 JSON'); return }
+    }
+    const body: any = { name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: form.labels }
+    if (defaultPayload !== undefined) body.defaultPayload = defaultPayload
+    const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     ElMessage.success('已创建')
     showCreate.value = false

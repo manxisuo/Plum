@@ -19,6 +19,24 @@ controller/dist/
 
 # C++ build (CMake)
 agent/build/
+sdk/cpp/build/
+sdk/cpp/cmake-build-*/
+
+# Generic CMake generator outputs
+**/CMakeCache.txt
+**/CMakeFiles/
+**/CMakeScripts/
+**/Testing/
+**/CTestTestfile.cmake
+**/cmake_install.cmake
+**/CMakeOutput.log
+**/CMakeError.log
+**/build.ninja
+**/.ninja_log
+**/.ninja_deps
+**/_deps/
+**/cmake-build-*/
+**/compile_commands.json
 
 # SQLite runtime files
 controller.db
