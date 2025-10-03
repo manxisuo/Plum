@@ -81,10 +81,21 @@ function renderCharts(){
     const unhealthy = unhealthyNodes()
     chartNodes.setOption({
       tooltip: { trigger: 'item' },
-      series: [{ type: 'pie', radius: ['40%','70%'], label: { formatter: '{b}: {c}' }, data: [
-        { name: 'Healthy', value: healthy },
-        { name: 'Unhealthy', value: unhealthy }
-      ]}]
+      series: [{
+        type: 'pie',
+        radius: ['40%','70%'],
+        label: {
+          formatter: '{b}: {c}',
+          overflow: 'break',
+          width: 120,
+          lineHeight: 18
+        },
+        labelLayout: { hideOverlap: false, moveOverlap: 'shiftY' },
+        data: [
+          { name: t('home.cards.healthy'), value: healthy },
+          { name: t('home.cards.unhealthy'), value: unhealthy }
+        ]
+      }]
     })
   }
 }
@@ -98,28 +109,28 @@ const { t } = useI18n()
   <div>
     <h3>{{ t('home.overview') }}</h3>
     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:12px;">
-      <el-card>
+      <el-card shadow="hover">
         <div>
           <RouterLink to="/nodes" class="card-link"><strong>{{ t('home.cards.nodes') }}</strong></RouterLink>
           <div style="font-size:24px;">{{ nodes.length }}</div>
           <small>{{ t('home.cards.healthy') }} {{ healthyNodes() }} / {{ t('home.cards.unhealthy') }} {{ unhealthyNodes() }}</small>
         </div>
       </el-card>
-      <el-card>
+      <el-card shadow="hover">
         <div>
           <RouterLink to="/deployments" class="card-link"><strong>{{ t('home.cards.deployments') }}</strong></RouterLink>
           <div style="font-size:24px;">{{ deployments.length }}</div>
           <small>{{ t('home.cards.instances') }} ~ {{ runningInstances() }}</small>
         </div>
       </el-card>
-      <el-card>
+      <el-card shadow="hover">
         <div>
           <RouterLink to="/services" class="card-link"><strong>{{ t('home.cards.services') }}</strong></RouterLink>
           <div style="font-size:24px;">{{ services.length }}</div>
           <small>{{ t('home.cards.endpoints') }} {{ endpointsCount }}</small>
         </div>
       </el-card>
-      <el-card>
+      <el-card shadow="hover">
         <div>
           <RouterLink to="/apps" class="card-link"><strong>{{ t('home.cards.artifacts') }}</strong></RouterLink>
           <div style="font-size:24px;">≈ {{ (artifactsTotal/1024/1024).toFixed(1) }} MB</div>
@@ -128,10 +139,10 @@ const { t } = useI18n()
     </div>
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-      <el-card>
+      <el-card shadow="hover">
         <template #header>{{ t('home.charts.nodeHealth') }}</template>
         <div style="display:flex; gap:8px; align-items:center;">
-          <div ref="chartNodesEl" style="width: 240px; height: 180px;"></div>
+          <div ref="chartNodesEl" style="width: 320px; height: 180px;"></div>
           <div style="display:flex; flex-direction:column; gap:6px;">
             <el-tag type="success">{{ t('home.cards.healthy') }} {{ healthyNodes() }}</el-tag>
             <el-tag type="danger">{{ t('home.cards.unhealthy') }} {{ unhealthyNodes() }}</el-tag>
@@ -145,7 +156,7 @@ const { t } = useI18n()
         </el-table>
       </el-card>
 
-      <el-card>
+      <el-card shadow="hover">
         <template #header>{{ t('home.charts.endpointsTop') }}</template>
         <div ref="chartServicesEl" style="width:100%; height:260px;"></div>
         <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">

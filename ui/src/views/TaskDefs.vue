@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -45,6 +45,19 @@ function openCreate() {
   showCreate.value = true
 }
 
+// Executor ↔ TargetKind linkage
+const allKinds = ['service','deployment','node'] as const
+const allowedKinds = computed(() => {
+  if (form.executor === 'service') return ['service'] as const
+  if (form.executor === 'os_process') return ['node'] as const
+  return allKinds
+})
+watch(() => form.executor, () => {
+  if (!allowedKinds.value.includes((form.targetKind||'') as any)) {
+    form.targetKind = ''
+  }
+})
+
 async function submit() {
   if (!form.name || !String(form.name).trim()) {
     ElMessage.warning('请填写任务名称')
@@ -57,6 +70,20 @@ async function submit() {
     showCreate.value = false
     load()
   } catch (e:any) { ElMessage.error(e?.message || '创建失败') }
+}
+
+async function onDel(id: string) {
+  try {
+    const res = await fetch(`${API_BASE}/v1/task-defs?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    if (res.status === 204) { ElMessage.success('已删除'); load(); return }
+    if (res.status === 409) {
+      const j = await res.json().catch(()=>({}))
+      const n = (j && (j as any).referenced) || 0
+      ElMessage.error(`有 ${n} 个任务引用该定义，无法删除`)
+      return
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  } catch (e:any) { ElMessage.error(e?.message || '删除失败') }
 }
 
 onMounted(load)
@@ -83,10 +110,15 @@ const { t } = useI18n()
       <el-table-column :label="t('taskDefs.columns.target')">
         <template #default="{ row }">{{ ((row as any).targetKind||(row as any).TargetKind)||'' }} {{ ((row as any).targetRef||(row as any).TargetRef)||'' }}</template>
       </el-table-column>
-      <el-table-column :label="t('common.action')" width="220">
+      <el-table-column :label="t('common.action')" width="300">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="run(((row as any).defId||(row as any).DefID))">{{ t('taskDefs.buttons.run') }}</el-button>
           <el-button size="small" @click="router.push('/task-defs/'+((row as any).defId||(row as any).DefID))">{{ t('taskDefs.buttons.details') }}</el-button>
+          <el-popconfirm :title="'确认删除该定义？'" @confirm="onDel(((row as any).defId||(row as any).DefID))">
+            <template #reference>
+              <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
+            </template>
+          </el-popconfirm>
         </template>
       </el-table-column>
     </el-table>
@@ -101,7 +133,11 @@ const { t } = useI18n()
             <el-option label="os_process" value="os_process" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('taskDefs.dialog.form.targetKind')"><el-input v-model="form.targetKind" placeholder="service/deployment/node" /></el-form-item>
+        <el-form-item :label="t('taskDefs.dialog.form.targetKind')">
+          <el-select v-model="form.targetKind" clearable :placeholder="allowedKinds.join(' / ')">
+            <el-option v-for="k in allowedKinds" :key="k" :label="k" :value="k" />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('taskDefs.dialog.form.targetRef')"><el-input v-model="form.targetRef" placeholder="如 serviceName" /></el-form-item>
       </el-form>
       <template #footer>

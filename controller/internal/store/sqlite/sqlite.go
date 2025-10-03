@@ -892,3 +892,17 @@ func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
 	}
 	return out, rows.Err()
 }
+
+func (s *sqliteStore) DeleteTaskDef(id string) error {
+	_, err := s.db.Exec(`DELETE FROM task_defs WHERE def_id=?`, id)
+	return err
+}
+
+func (s *sqliteStore) CountTasksByOrigin(defID string) (int, error) {
+	row := s.db.QueryRow(`SELECT COUNT(1) FROM tasks WHERE origin_task_id=?`, defID)
+	var n int
+	if err := row.Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}

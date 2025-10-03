@@ -203,6 +203,10 @@ type Store interface {
 	CreateTaskDef(td TaskDefinition) (string, error)
 	GetTaskDef(id string) (TaskDefinition, bool, error)
 	ListTaskDefs() ([]TaskDefinition, error)
+    DeleteTaskDef(id string) error
+
+    // References
+    CountTasksByOrigin(defID string) (int, error)
 }
 
 // TaskDefinition stores a reusable task template

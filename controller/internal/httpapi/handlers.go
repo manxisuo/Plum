@@ -561,6 +561,28 @@ func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"defId": id})
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "id required", http.StatusBadRequest)
+			return
+		}
+		// conflict if referenced by tasks
+		n, err := store.Current.CountTasksByOrigin(id)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if n > 0 {
+			w.WriteHeader(http.StatusConflict)
+			writeJSON(w, map[string]any{"referenced": n})
+			return
+		}
+		if err := store.Current.DeleteTaskDef(id); err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -595,7 +617,17 @@ func handleTaskDefByID(w http.ResponseWriter, r *http.Request) {
 				http.NotFound(w, r)
 				return
 			}
+			// accept optional payload from request body
+			var rr struct {
+				Payload map[string]any `json:"payload"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&rr)
 			payload := "{}"
+			if rr.Payload != nil {
+				if bs, err := json.Marshal(rr.Payload); err == nil {
+					payload = string(bs)
+				}
+			}
 			newID, err := store.Current.CreateTask(store.Task{Name: td.Name, Executor: td.Executor, TargetKind: td.TargetKind, TargetRef: td.TargetRef, State: "Pending", PayloadJSON: payload, CreatedAt: time.Now().Unix(), Labels: td.Labels, OriginTaskID: id})
 			if err != nil {
 				http.Error(w, "db error", http.StatusInternalServerError)
