@@ -56,7 +56,38 @@ const messages = {
     deployments: {
       columns: { deploymentId: 'DeploymentID', name: 'Name', instances: 'Instances' },
       buttons: { create: 'Create Deployment' },
-      confirmDelete: 'Confirm delete this deployment? (will not cascade to instances)'
+      confirmDelete: 'Confirm delete this deployment? (will not cascade to instances)',
+      create: {
+        title: 'Create Deployment',
+        form: {
+          name: 'Name',
+          entries: 'Entries',
+          labels: 'Labels',
+          selectArtifact: 'Select Artifact',
+          selectNode: 'Select Node',
+          startCmdPlaceholder: 'Start command (optional, override default ./start.sh)',
+          keyPlaceholder: 'Key',
+          valuePlaceholder: 'Value'
+        },
+        buttons: {
+          addEntry: 'Add Entry',
+          deleteEntry: 'Delete Entry',
+          addReplica: 'Add Replica',
+          addLabel: 'Add Label',
+          create: 'Create'
+        },
+        validation: {
+          nameRequired: 'Please enter Name',
+          entriesRequired: 'Please add at least one entry',
+          artifactRequired: 'Please select Artifact',
+          artifactNotFound: 'Artifact not found',
+          replicasRequired: 'Please configure replicas for entry'
+        },
+        messages: {
+          created: 'Created successfully',
+          createFailed: 'Create failed'
+        }
+      }
     },
     deploymentDetail: {
       title: 'Deployment Detail',
@@ -75,7 +106,7 @@ const messages = {
       columns: { deployment: 'Deployment', instance: 'Instance', desired: 'Desired', phase: 'Phase', healthy: 'Healthy', lastReportAt: 'LastReportAt', startCmd: 'StartCmd', artifact: 'Artifact', action: 'Action' }
     },
     nodes: {
-      columns: { nodeId: 'NodeID', ip: 'IP', lastSeen: 'LastSeen', action: 'Action' },
+      columns: { nodeId: 'NodeID', ip: 'IP', health: 'Health', lastSeen: 'LastSeen', action: 'Action' },
       confirmDelete: 'Confirm delete this node?'
     },
     apps: {
@@ -200,7 +231,7 @@ const messages = {
       workflows: '工作流',
       tasks: '任务',
       deployments: '部署',
-      resources: '资源管理',
+      resources: '资源',
       language: '语言'
     },
     home: {
@@ -228,7 +259,38 @@ const messages = {
     deployments: {
       columns: { deploymentId: '部署ID', name: '名称', instances: '实例数' },
       buttons: { create: '创建部署' },
-      confirmDelete: '确认删除该部署？（不会级联删除实例分配）'
+      confirmDelete: '确认删除该部署？（不会级联删除实例分配）',
+      create: {
+        title: '创建部署',
+        form: {
+          name: '名称',
+          entries: '条目',
+          labels: '标签',
+          selectArtifact: '选择制品',
+          selectNode: '选择节点',
+          startCmdPlaceholder: '启动命令（可选，覆盖包默认 ./start.sh）',
+          keyPlaceholder: '键',
+          valuePlaceholder: '值'
+        },
+        buttons: {
+          addEntry: '新增条目',
+          deleteEntry: '删除条目',
+          addReplica: '新增副本行',
+          addLabel: '新增标签',
+          create: '创建'
+        },
+        validation: {
+          nameRequired: '请输入名称',
+          entriesRequired: '请添加至少一条条目',
+          artifactRequired: '请选择制品',
+          artifactNotFound: '制品不存在',
+          replicasRequired: '请为条目配置副本'
+        },
+        messages: {
+          created: '创建成功',
+          createFailed: '创建失败'
+        }
+      }
     },
     deploymentDetail: {
       title: '部署详情',
@@ -247,7 +309,7 @@ const messages = {
       columns: { deployment: '部署', instance: '实例', desired: '期望', phase: '阶段', healthy: '健康', lastReportAt: '最近上报', startCmd: '启动命令', artifact: '制品', action: '操作' }
     },
     nodes: {
-      columns: { nodeId: '节点ID', ip: 'IP', lastSeen: '最近活跃', action: '操作' },
+      columns: { nodeId: '节点ID', ip: 'IP', health: '健康状态', lastSeen: '最近活跃', action: '操作' },
       confirmDelete: '确认删除该节点？'
     },
     apps: {

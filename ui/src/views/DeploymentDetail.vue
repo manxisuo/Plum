@@ -90,20 +90,28 @@ async function stopByNode() {
 
 <template>
   <div>
-    <h3>{{ t('deploymentDetail.title') }}</h3>
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-      <el-button type="warning" :loading="opLoading" @click="stopAll">{{ t('deploymentDetail.buttons.stopAll') }}</el-button>
-      <el-select v-model="selectedNode" :placeholder="t('common.selectNode')" style="width:200px;">
-        <el-option v-for="n in nodesInDeployment" :key="n" :label="n" :value="n" />
-      </el-select>
-      <el-button type="warning" :loading="opLoading" @click="stopByNode">{{ t('deploymentDetail.buttons.stopByNode') }}</el-button>
-    </div>
-    <el-descriptions v-if="deployment" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item :label="t('deploymentDetail.desc.deploymentId')">{{ deployment.deploymentId }}</el-descriptions-item>
-      <el-descriptions-item :label="t('deploymentDetail.desc.name')">{{ deployment.name || deployment.Name }}</el-descriptions-item>
-      <el-descriptions-item :label="t('deploymentDetail.desc.labels')" :span="2"><code>{{ JSON.stringify(deployment.labels || deployment.Labels || {}) }}</code></el-descriptions-item>
-    </el-descriptions>
-    <el-table :data="assigns" v-loading="loading" style="width:100%">
+    <!-- 部署详情 -->
+    <el-card class="box-card" style="margin-bottom: 16px;">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('deploymentDetail.title') }}</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <el-button type="warning" :loading="opLoading" @click="stopAll">{{ t('deploymentDetail.buttons.stopAll') }}</el-button>
+            <el-select v-model="selectedNode" :placeholder="t('common.selectNode')" style="width:200px;">
+              <el-option v-for="n in nodesInDeployment" :key="n" :label="n" :value="n" />
+            </el-select>
+            <el-button type="warning" :loading="opLoading" @click="stopByNode">{{ t('deploymentDetail.buttons.stopByNode') }}</el-button>
+          </div>
+        </div>
+      </template>
+      
+      <el-descriptions v-if="deployment" :column="2" border style="margin-bottom:16px;">
+        <el-descriptions-item :label="t('deploymentDetail.desc.deploymentId')">{{ deployment.deploymentId }}</el-descriptions-item>
+        <el-descriptions-item :label="t('deploymentDetail.desc.name')">{{ deployment.name || deployment.Name }}</el-descriptions-item>
+        <el-descriptions-item :label="t('deploymentDetail.desc.labels')" :span="2"><code>{{ JSON.stringify(deployment.labels || deployment.Labels || {}) }}</code></el-descriptions-item>
+      </el-descriptions>
+      
+      <el-table :data="assigns" v-loading="loading" style="width:100%">
       <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="300">
         <template #default="{ row }">{{ row.instanceId || row.InstanceID }}</template>
       </el-table-column>
@@ -117,18 +125,19 @@ async function stopByNode() {
       <el-table-column :label="t('deploymentDetail.columns.desired')" width="120">
         <template #default="{ row }">{{ row.desired || row.Desired }}</template>
       </el-table-column>
-      <el-table-column :label="t('deploymentDetail.columns.action')" width="220">
-        <template #default="{ row }">
-          <el-button size="small" type="primary" :disabled="(row.desired||row.Desired)==='Running'" @click="setDesired(row,'Running')">{{ t('common.start') }}</el-button>
-          <el-button size="small" type="warning" :disabled="(row.desired||row.Desired)==='Stopped'" @click="setDesired(row,'Stopped')">{{ t('common.stop') }}</el-button>
-          <el-popconfirm :title="t('common.confirmDelete')" @confirm="del(row)">
-            <template #reference>
-              <el-button type="danger" size="small">{{ t('common.delete') }}</el-button>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table-column :label="t('deploymentDetail.columns.action')" width="220">
+          <template #default="{ row }">
+            <el-button size="small" type="primary" :disabled="(row.desired||row.Desired)==='Running'" @click="setDesired(row,'Running')">{{ t('common.start') }}</el-button>
+            <el-button size="small" type="warning" :disabled="(row.desired||row.Desired)==='Stopped'" @click="setDesired(row,'Stopped')">{{ t('common.stop') }}</el-button>
+            <el-popconfirm :title="t('common.confirmDelete')" @confirm="del(row)">
+              <template #reference>
+                <el-button type="danger" size="small">{{ t('common.delete') }}</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 

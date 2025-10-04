@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
-.PHONY: controller controller-run agent agent-build agent-run demo ui ui-dev ui-build sdk_cpp sdk_cpp_echo_worker sdk_cpp_echo_worker-run
+.PHONY: controller controller-run agent agent-run% demo ui ui-dev ui-build 
+.PHONY: sdk_cpp sdk_cpp_echo_worker sdk_cpp_echo_worker-run
 
 controller:
 	$(MAKE) -C controller build
@@ -12,8 +13,9 @@ agent:
 	cmake -S agent -B agent/build -DCMAKE_BUILD_TYPE=Release
 	cmake --build agent/build --config Release -j
 
-agent-run:
-	AGENT_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./agent/build/plum_agent
+agent-run%:
+	@num=$(patsubst agent-run%,%,$@); \
+	AGENT_NODE_ID=node$$num CONTROLLER_BASE=http://127.0.0.1:8080 ./agent/build/plum_agent
 
 demo:
 	@echo "1) start controller: make controller && ./controller/bin/controller" 
@@ -50,5 +52,10 @@ sdk_cpp_radar_sensor:
 
 sdk_cpp_radar_sensor-run:
 	RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./sdk/cpp/build/examples/radar_sensor/radar_sensor
+
+# 优雅停止agent
+stop-agent:
+	@chmod +x tools/stop_agent.sh
+	@tools/stop_agent.sh
 
 

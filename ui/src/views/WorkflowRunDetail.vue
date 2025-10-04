@@ -13,7 +13,7 @@ const run = ref<any>(null)
 const steps = ref<any[]>([])
 const stepRuns = ref<any[]>([])
 const loading = ref(false)
-const refreshTimer = ref<NodeJS.Timeout | null>(null)
+const refreshTimer = ref<number | null>(null)
 
 async function load() {
   loading.value = true
@@ -89,21 +89,42 @@ const { t } = useI18n()
 
 <template>
   <div>
-    <h3>{{ t('workflowRun.title') }}</h3>
-    <el-descriptions v-if="run" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item :label="t('workflowRun.desc.runId')">{{ run.runId || run.RunID }}</el-descriptions-item>
-      <el-descriptions-item :label="t('workflowRun.desc.workflowId')">{{ run.workflowId || run.WorkflowID }}</el-descriptions-item>
-      <el-descriptions-item :label="t('workflowRun.desc.state')">{{ run.state || run.State }}</el-descriptions-item>
-      <el-descriptions-item :label="t('workflowRun.desc.created')">{{ new Date(((run.createdAt||run.CreatedAt)||0)*1000).toLocaleString() }}</el-descriptions-item>
-    </el-descriptions>
+    <!-- 工作流运行详情 -->
+    <el-card class="box-card" style="margin-bottom: 16px;">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('workflowRun.title') }}</span>
+        </div>
+      </template>
+      
+      <el-descriptions v-if="run" :column="2" border>
+        <el-descriptions-item :label="t('workflowRun.desc.runId')">{{ run.runId || run.RunID }}</el-descriptions-item>
+        <el-descriptions-item :label="t('workflowRun.desc.workflowId')">{{ run.workflowId || run.WorkflowID }}</el-descriptions-item>
+        <el-descriptions-item :label="t('workflowRun.desc.state')">{{ run.state || run.State }}</el-descriptions-item>
+        <el-descriptions-item :label="t('workflowRun.desc.created')">{{ new Date(((run.createdAt||run.CreatedAt)||0)*1000).toLocaleString() }}</el-descriptions-item>
+      </el-descriptions>
+    </el-card>
 
     <!-- 工作流DAG可视化 -->
-    <div v-if="dagSteps.length > 0" style="margin: 20px 0;">
-      <h4>工作流执行流程图</h4>
+    <el-card v-if="dagSteps.length > 0" class="box-card" style="margin-bottom: 16px;">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>工作流执行流程图</span>
+        </div>
+      </template>
+      
       <WorkflowDAG :steps="dagSteps" :workflow-state="run?.state || run?.State" />
-    </div>
+    </el-card>
 
-    <el-table v-loading="loading" :data="stepRuns" style="width:100%">
+    <!-- 步骤运行详情 -->
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>步骤运行详情</span>
+        </div>
+      </template>
+      
+      <el-table v-loading="loading" :data="stepRuns" style="width:100%">
       <el-table-column :label="t('workflowRun.columns.ord')" width="80">
         <template #default="{ row }">{{ row.ord ?? row.Ord }}</template>
       </el-table-column>
@@ -115,9 +136,10 @@ const { t } = useI18n()
       <el-table-column :label="t('workflowRun.columns.taskId')" width="320">
         <template #default="{ row }">{{ row.taskId || row.TaskID }}</template>
       </el-table-column>
-      <el-table-column :label="t('workflowRun.columns.state')" width="120">
-        <template #default="{ row }">{{ row.state || row.State }}</template>
-      </el-table-column>
-    </el-table>
+        <el-table-column :label="t('workflowRun.columns.state')" width="120">
+          <template #default="{ row }">{{ row.state || row.State }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>

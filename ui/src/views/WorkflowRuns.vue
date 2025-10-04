@@ -58,12 +58,15 @@ const { t } = useI18n()
 
 <template>
   <div>
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
-      <el-button @click="router.push('/workflows')">← 返回工作流列表</el-button>
-      <h3>工作流运行历史 ({{ workflowId }})</h3>
-    </div>
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>工作流运行历史 ({{ workflowId }})</span>
+          <el-button @click="router.push('/workflows')">← 返回工作流列表</el-button>
+        </div>
+      </template>
 
-    <el-table :data="runs" v-loading="loading" style="width:100%;">
+      <el-table :data="runs" v-loading="loading" style="width:100%;">
       <el-table-column label="运行ID" width="320">
         <template #default="{ row }">{{ (row as any).runId || (row as any).RunID }}</template>
       </el-table-column>
@@ -87,12 +90,13 @@ const { t } = useI18n()
           {{ (row as any).finishedAt || (row as any).FinishedAt ? formatTime((row as any).finishedAt || (row as any).FinishedAt) : '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200">
-        <template #default="{ row }">
-          <el-button size="small" type="primary" @click="viewRun((row as any).runId || (row as any).RunID)">查看详情</el-button>
-          <el-button size="small" type="danger" @click="deleteRun((row as any).runId || (row as any).RunID)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table-column label="操作" width="200">
+          <template #default="{ row }">
+            <el-button size="small" type="primary" @click="viewRun((row as any).runId || (row as any).RunID)">查看详情</el-button>
+            <el-button size="small" type="danger" @click="deleteRun((row as any).runId || (row as any).RunID)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>

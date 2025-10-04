@@ -534,8 +534,9 @@ func (s *sqliteStore) DeleteEndpointsForInstance(instanceID string) error {
 }
 
 func (s *sqliteStore) ListEndpointsByService(serviceName string, version string, protocol string) ([]store.Endpoint, error) {
-	sqlStr := `SELECT service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen FROM endpoints WHERE service_name=? AND healthy=1`
-	args := []any{serviceName}
+	// Add health check based on last_seen timestamp (15 seconds TTL)
+	sqlStr := `SELECT service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen FROM endpoints WHERE service_name=? AND healthy=1 AND last_seen > ?`
+	args := []any{serviceName, time.Now().Unix() - 15}
 	if version != "" {
 		sqlStr += ` AND version=?`
 		args = append(args, version)

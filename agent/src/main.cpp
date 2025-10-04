@@ -34,6 +34,7 @@ int main() {
 
     std::signal(SIGINT, handle_sigint);
     std::signal(SIGTERM, handle_sigint);
+    std::signal(SIGTSTP, handle_sigint);  // 处理 Ctrl+Z
 
     // SSE listener: notify immediate sync on server events
     std::thread sse_thr([&](){

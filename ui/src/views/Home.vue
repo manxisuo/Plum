@@ -107,7 +107,6 @@ const { t } = useI18n()
 
 <template>
   <div>
-    <h3>{{ t('home.overview') }}</h3>
     <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-bottom:12px;">
       <el-card shadow="hover">
         <div>

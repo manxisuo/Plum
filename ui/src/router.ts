@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from './views/Home.vue'
 import DeploymentsList from './views/DeploymentsList.vue'
-import TaskCreate from './views/TaskCreate.vue'
+import DeploymentCreate from './views/DeploymentCreate.vue'
 import DeploymentDetail from './views/DeploymentDetail.vue'
 import DeploymentConfig from './views/DeploymentConfig.vue'
 import Nodes from './views/Nodes.vue'
@@ -39,11 +39,10 @@ export const router = createRouter({
     { path: '/tasks/defs/:id', component: TaskDefDetail, props: true },
     { path: '/tasks', component: Tasks },
     { path: '/resources', component: Resources },
-{ path: '/resource-test', component: () => import('./views/ResourceTest.vue') },
     { path: '/assignments', component: Assignments },
     // deployments
     { path: '/deployments', component: DeploymentsList },
-    { path: '/deployments/create', component: TaskCreate },
+    { path: '/deployments/create', component: DeploymentCreate },
     { path: '/deployments/:id', component: DeploymentDetail, props: true },
     { path: '/deployments/:id/config', component: DeploymentConfig, props: true },
   ]

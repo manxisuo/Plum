@@ -260,20 +260,20 @@ const { t } = useI18n()
 
 <template>
   <div>
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:16px;">
-      <h2>{{ t('resources.title') }}</h2>
-      <el-button type="primary" :loading="loading" @click="load">{{ t('resources.buttons.refresh') }}</el-button>
-    </div>
-
-    <div style="display:flex; gap:16px; height:600px;">
+    <div style="display:flex; gap:16px; height:640px;">
       <!-- 资源列表 -->
-      <div style="flex:1; border:1px solid #eee; border-radius:4px; padding:16px;">
-        <h3>{{ t('resources.sections.resourceList') }}</h3>
+      <el-card style="flex:1.1;">
+        <template #header>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>{{ t('resources.sections.resourceList') }}</span>
+            <el-button type="primary" :loading="loading" @click="load">{{ t('resources.buttons.refresh') }}</el-button>
+          </div>
+        </template>
         <el-table :data="resources" v-loading="loading" style="width:100%;">
-          <el-table-column prop="ResourceID" :label="t('resources.columns.resourceId')" width="150" />
-          <el-table-column prop="Type" :label="t('resources.columns.type')" width="100" />
-          <el-table-column prop="NodeID" :label="t('resources.columns.nodeId')" width="100" />
-          <el-table-column :label="t('resources.columns.status')" width="80">
+          <el-table-column prop="ResourceID" :label="t('resources.columns.resourceId')" width="120" />
+          <el-table-column prop="Type" :label="t('resources.columns.type')" width="90" />
+          <el-table-column prop="NodeID" :label="t('resources.columns.nodeId')" width="90" />
+          <el-table-column :label="t('resources.columns.status')" width="70">
             <template #default="{ row }">
               <el-tag :type="getHealthStatus(row.LastSeen).type" size="small">
                 {{ getHealthStatus(row.LastSeen).text }}
@@ -289,100 +289,122 @@ const { t } = useI18n()
             </template>
           </el-table-column>
         </el-table>
-      </div>
+      </el-card>
 
       <!-- 右侧面板 -->
-      <div style="flex:1; border:1px solid #eee; border-radius:4px; padding:16px;">
-        <!-- 资源详情视图 -->
-        <div v-if="selectedResource && !showDescriptionsView">
-          <h3>{{ t('resources.sections.resourceDetail') }} - {{ selectedResource.ResourceID }}</h3>
-          <el-descriptions :column="2" border style="margin-bottom:16px;">
-            <el-descriptions-item :label="t('resources.desc.resourceId')">{{ selectedResource.ResourceID }}</el-descriptions-item>
-            <el-descriptions-item :label="t('resources.desc.type')">{{ selectedResource.Type }}</el-descriptions-item>
-            <el-descriptions-item :label="t('resources.desc.nodeId')">{{ selectedResource.NodeID }}</el-descriptions-item>
-            <el-descriptions-item :label="t('resources.desc.status')">
-              <el-tag :type="getHealthStatus(selectedResource.LastSeen).type">
-                {{ getHealthStatus(selectedResource.LastSeen).text }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item :label="t('resources.desc.createdAt')">{{ formatTimestamp(selectedResource.CreatedAt) }}</el-descriptions-item>
-            <el-descriptions-item :label="t('resources.desc.lastHeartbeat')">{{ formatTimestamp(selectedResource.LastSeen) }}</el-descriptions-item>
-          </el-descriptions>
+      <el-card style="flex:1;" v-if="selectedResource && !showDescriptionsView">
+        <template #header>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>{{ t('resources.sections.resourceDetail') }} - {{ selectedResource.ResourceID }}</span>
+          </div>
+        </template>
+        <el-descriptions :column="2" border style="margin-bottom:16px;">
+          <el-descriptions-item :label="t('resources.desc.resourceId')">{{ selectedResource.ResourceID }}</el-descriptions-item>
+          <el-descriptions-item :label="t('resources.desc.type')">{{ selectedResource.Type }}</el-descriptions-item>
+          <el-descriptions-item :label="t('resources.desc.nodeId')">{{ selectedResource.NodeID }}</el-descriptions-item>
+          <el-descriptions-item :label="t('resources.desc.status')">
+            <el-tag :type="getHealthStatus(selectedResource.LastSeen).type">
+              {{ getHealthStatus(selectedResource.LastSeen).text }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('resources.desc.createdAt')">{{ formatTimestamp(selectedResource.CreatedAt) }}</el-descriptions-item>
+          <el-descriptions-item :label="t('resources.desc.lastHeartbeat')">{{ formatTimestamp(selectedResource.LastSeen) }}</el-descriptions-item>
+        </el-descriptions>
 
-          <!-- 历史状态 -->
-          <div>
-            <h4>{{ t('resources.sections.historyStates') }}</h4>
-            <div style="height: 300px; overflow-y: auto; border: 1px solid #dcdfe6; border-radius: 4px;">
-              <el-table :data="resourceStates" size="small" style="width:100%;" :max-height="300">
-                <!-- 时间列 -->
-                <el-table-column :label="t('resources.columns.time')" width="150" fixed="left">
-                  <template #default="{ row }">
-                    {{ formatTimestamp(row.Timestamp) }}
-                  </template>
-                </el-table-column>
-                
-                <!-- 动态状态列 -->
-                <el-table-column 
-                  v-for="stateDesc in currentStateDesc" 
-                  :key="stateDesc.Name"
-                  :label="stateDesc.Unit ? `${stateDesc.Name} (${stateDesc.Unit})` : stateDesc.Name" 
-                  :width="120"
-                  :show-overflow-tooltip="true">
-                  <template #default="{ row }">
-                    {{ row.States[stateDesc.Name] || '-' }}
-                  </template>
-                </el-table-column>
-                
-                <!-- 如果没有状态描述，显示原始JSON -->
-                <el-table-column 
-                  v-if="currentStateDesc.length === 0"
-                  :label="t('resources.columns.stateData')">
-                  <template #default="{ row }">
-                    <pre style="font-size:12px; margin:0;">{{ JSON.stringify(row.States, null, 2) }}</pre>
-                  </template>
-                </el-table-column>
-              </el-table>
+        <!-- 历史状态 -->
+        <el-card class="box-card" style="margin-top: 16px;">
+          <template #header>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span>{{ t('resources.sections.historyStates') }}</span>
             </div>
-          </div>
-        </div>
-
-        <!-- 资源描述视图 -->
-        <div v-else-if="showDescriptionsView && descriptionsResource">
-          <h3>{{ t('resources.sections.resourceDescription') }} - {{ descriptionsResource.ResourceID }}</h3>
-          
-          <!-- 状态描述 -->
-          <div style="margin-bottom:16px;">
-            <h4>{{ t('resources.sections.stateDescription') }}</h4>
-            <el-table :data="descriptionsResource.StateDesc" size="small" style="width:100%;">
-              <el-table-column prop="Name" :label="t('resources.columns.name')" />
-              <el-table-column prop="Type" :label="t('resources.columns.dataType')" />
-              <el-table-column prop="Value" :label="t('resources.columns.defaultValue')" />
-              <el-table-column prop="Unit" :label="t('resources.columns.unit')" />
-            </el-table>
-          </div>
-
-          <!-- 操作描述 -->
-          <div>
-            <h4>{{ t('resources.sections.operationDescription') }}</h4>
-            <el-table :data="descriptionsResource.OpDesc" size="small" style="width:100%;">
-              <el-table-column prop="Name" :label="t('resources.columns.name')" />
-              <el-table-column prop="Type" :label="t('resources.columns.dataType')" />
-              <el-table-column prop="Value" :label="t('resources.columns.defaultValue')" />
-              <el-table-column prop="Unit" :label="t('resources.columns.unit')" />
-              <el-table-column :label="t('resources.columns.range')" width="120">
+          </template>
+          <div style="height: 290px; overflow-y: auto;">
+            <el-table :data="resourceStates" size="small" style="width:100%;" :max-height="280">
+              <!-- 时间列 -->
+              <el-table-column :label="t('resources.columns.time')" width="130" fixed="left">
                 <template #default="{ row }">
-                  {{ row.Min }} ~ {{ row.Max }}
+                  {{ formatTimestamp(row.Timestamp) }}
+                </template>
+              </el-table-column>
+              
+              <!-- 动态状态列 -->
+              <el-table-column 
+                v-for="stateDesc in currentStateDesc" 
+                :key="stateDesc.Name"
+                :label="stateDesc.Unit ? `${stateDesc.Name} (${stateDesc.Unit})` : stateDesc.Name" 
+                :width="120"
+                :show-overflow-tooltip="true">
+                <template #default="{ row }">
+                  {{ row.States[stateDesc.Name] || '-' }}
+                </template>
+              </el-table-column>
+              
+              <!-- 如果没有状态描述，显示原始JSON -->
+              <el-table-column 
+                v-if="currentStateDesc.length === 0"
+                :label="t('resources.columns.stateData')">
+                <template #default="{ row }">
+                  <pre style="font-size:12px; margin:0;">{{ JSON.stringify(row.States, null, 2) }}</pre>
                 </template>
               </el-table-column>
             </el-table>
           </div>
-        </div>
+        </el-card>
+      </el-card>
 
-        <!-- 默认提示 -->
-        <div v-else style="text-align:center; color:#999; margin-top:100px;">
+      <!-- 资源描述视图 -->
+      <el-card style="flex:1;" v-else-if="showDescriptionsView && descriptionsResource">
+        <template #header>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>{{ t('resources.sections.resourceDescription') }} - {{ descriptionsResource.ResourceID }}</span>
+          </div>
+        </template>
+          <!-- 状态描述 -->
+          <el-card class="box-card" style="height: 260px; margin-bottom: 16px;">
+            <template #header>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>{{ t('resources.sections.stateDescription') }}</span>
+              </div>
+            </template>
+            <div style="height: 200px; overflow-y: auto;">
+              <el-table :data="descriptionsResource.StateDesc" size="small" style="width:100%;">
+                <el-table-column prop="Name" :label="t('resources.columns.name')" />
+                <el-table-column prop="Type" :label="t('resources.columns.dataType')" />
+                <el-table-column prop="Value" :label="t('resources.columns.defaultValue')" />
+                <el-table-column prop="Unit" :label="t('resources.columns.unit')" />
+              </el-table>
+            </div>
+          </el-card>
+
+          <!-- 操作描述 -->
+          <el-card class="box-card" style="height: 260px;">
+            <template #header>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>{{ t('resources.sections.operationDescription') }}</span>
+              </div>
+            </template>
+            <div style="height: 200px; overflow-y: auto;">
+              <el-table :data="descriptionsResource.OpDesc" size="small" style="width:100%;">
+                <el-table-column prop="Name" :label="t('resources.columns.name')" />
+                <el-table-column prop="Type" :label="t('resources.columns.dataType')" />
+                <el-table-column prop="Value" :label="t('resources.columns.defaultValue')" />
+                <el-table-column prop="Unit" :label="t('resources.columns.unit')" />
+                <el-table-column :label="t('resources.columns.range')" width="120">
+                  <template #default="{ row }">
+                    {{ row.Min }} ~ {{ row.Max }}
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </el-card>
+      </el-card>
+
+      <!-- 默认提示 -->
+      <el-card style="flex:1;" v-else>
+        <div style="text-align:center; color:#999; margin-top:100px;">
           {{ t('resources.messages.selectResource') }}
         </div>
-      </div>
+      </el-card>
     </div>
 
     <!-- 资源操作弹窗 -->

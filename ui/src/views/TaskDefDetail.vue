@@ -62,15 +62,30 @@ async function deleteTask(id: string) {
 
 <template>
   <div>
-    <h3>{{ t('taskDefDetail.title') }}</h3>
-    <el-descriptions v-if="defn" :column="2" border style="margin-bottom:12px;">
-      <el-descriptions-item :label="t('taskDefDetail.desc.defId')">{{ defn.defId || defn.DefID }}</el-descriptions-item>
-      <el-descriptions-item :label="t('taskDefDetail.desc.name')">{{ defn.name || defn.Name }}</el-descriptions-item>
-      <el-descriptions-item :label="t('taskDefDetail.desc.executor')">{{ defn.executor || defn.Executor }}</el-descriptions-item>
-    </el-descriptions>
+    <!-- 任务定义详情 -->
+    <el-card class="box-card" style="margin-bottom: 16px;">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('taskDefDetail.title') }}</span>
+        </div>
+      </template>
+      
+      <el-descriptions v-if="defn" :column="2" border>
+        <el-descriptions-item :label="t('taskDefDetail.desc.defId')">{{ defn.defId || defn.DefID }}</el-descriptions-item>
+        <el-descriptions-item :label="t('taskDefDetail.desc.name')">{{ defn.name || defn.Name }}</el-descriptions-item>
+        <el-descriptions-item :label="t('taskDefDetail.desc.executor')">{{ defn.executor || defn.Executor }}</el-descriptions-item>
+      </el-descriptions>
+    </el-card>
 
-    <h4>{{ t('taskDefDetail.runsTitle') }}</h4>
-    <el-table :data="runs" v-loading="loading" style="width:100%">
+    <!-- 运行历史 -->
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('taskDefDetail.runsTitle') }}</span>
+        </div>
+      </template>
+      
+      <el-table :data="runs" v-loading="loading" style="width:100%">
       <el-table-column :label="t('taskDefDetail.columns.taskId')" width="320">
         <template #default="{ row }">{{ row.taskId || row.TaskID }}</template>
       </el-table-column>
@@ -85,17 +100,18 @@ async function deleteTask(id: string) {
           {{ (()=>{ const s = (row.resultJson||row.ResultJSON)||''; return String(s).length>200 ? String(s).slice(0,200)+'…' : String(s) })() }}
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.action')" width="300">
-        <template #default="{ row }">
-          <el-button size="small" type="primary" :disabled="(row.state||row.State)!=='Queued'" @click="startTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.start') }}</el-button>
-          <el-button size="small" type="warning" :disabled="!((row.state||row.State)==='Running' || (row.state||row.State)==='Queued')" @click="cancelTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.cancel') }}</el-button>
-          <el-popconfirm :title="t('taskDefDetail.confirmDelete')" @confirm="deleteTask(row.taskId||row.TaskID)">
-            <template #reference>
-              <el-button size="small" type="danger">{{ t('taskDefDetail.buttons.delete') }}</el-button>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table-column :label="t('common.action')" width="300">
+          <template #default="{ row }">
+            <el-button size="small" type="primary" :disabled="(row.state||row.State)!=='Queued'" @click="startTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.start') }}</el-button>
+            <el-button size="small" type="warning" :disabled="!((row.state||row.State)==='Running' || (row.state||row.State)==='Queued')" @click="cancelTask(row.taskId||row.TaskID)">{{ t('taskDefDetail.buttons.cancel') }}</el-button>
+            <el-popconfirm :title="t('taskDefDetail.confirmDelete')" @confirm="deleteTask(row.taskId||row.TaskID)">
+              <template #reference>
+                <el-button size="small" type="danger">{{ t('taskDefDetail.buttons.delete') }}</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
