@@ -165,6 +165,42 @@ func migrate(db *sql.DB) error {
             default_payload_json TEXT,
 			created_at INTEGER
 		);`,
+		// Resources
+		`CREATE TABLE IF NOT EXISTS resources (
+            resource_id TEXT PRIMARY KEY,
+            node_id TEXT,
+            type TEXT,
+            url TEXT,
+            last_seen INTEGER,
+            created_at INTEGER
+        );`,
+		`CREATE TABLE IF NOT EXISTS resource_state_desc (
+            resource_id TEXT,
+            type TEXT,
+            name TEXT,
+            value TEXT,
+            unit TEXT,
+            PRIMARY KEY(resource_id, name),
+            FOREIGN KEY(resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
+        );`,
+		`CREATE TABLE IF NOT EXISTS resource_op_desc (
+            resource_id TEXT,
+            type TEXT,
+            name TEXT,
+            value TEXT,
+            unit TEXT,
+            min_val TEXT,
+            max_val TEXT,
+            PRIMARY KEY(resource_id, name),
+            FOREIGN KEY(resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
+        );`,
+		`CREATE TABLE IF NOT EXISTS resource_states (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            resource_id TEXT,
+            timestamp INTEGER,
+            states_json TEXT,
+            FOREIGN KEY(resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
+        );`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

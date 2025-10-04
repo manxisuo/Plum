@@ -43,4 +43,12 @@ sdk_cpp_echo_worker:
 sdk_cpp_echo_worker-run:
 	./sdk/cpp/build/examples/echo_worker/echo_worker
 
+# SDK C++ radar_sensor
+sdk_cpp_radar_sensor:
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake --build sdk/cpp/build --target radar_sensor -j
+
+sdk_cpp_radar_sensor-run:
+	RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./sdk/cpp/build/examples/radar_sensor/radar_sensor
+
 

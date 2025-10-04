@@ -6,6 +6,7 @@ const messages = {
       refresh: 'Refresh',
       create: 'Create',
       details: 'Details',
+      descriptions: 'Descriptions',
       config: 'Config',
       delete: 'Delete',
       action: 'Action',
@@ -27,6 +28,7 @@ const messages = {
       workflows: 'Workflows',
       tasks: 'Tasks',
       deployments: 'Deployments',
+      resources: 'Resources',
       language: 'Language'
     },
     home: {
@@ -114,6 +116,61 @@ const messages = {
       columns: { taskId: 'TaskID', state: 'State', created: 'Created', result: 'Result', action: 'Action' },
       buttons: { start: 'Start', cancel: 'Cancel', delete: 'Delete' },
       confirmDelete: 'Confirm delete this run?'
+    },
+    resources: {
+      title: 'Resource Management',
+      buttons: { refresh: 'Refresh', delete: 'Delete', send: 'Send', operation: 'Operation', submit: 'Submit' },
+      columns: { 
+        resourceId: 'Resource ID', 
+        type: 'Type', 
+        nodeId: 'Node', 
+        status: 'Status',
+        action: 'Action',
+        name: 'Name',
+        dataType: 'Data Type',
+        defaultValue: 'Default Value',
+        unit: 'Unit',
+        range: 'Range',
+        time: 'Time',
+        stateData: 'State Data'
+      },
+      status: {
+        healthy: 'Healthy',
+        warning: 'Warning',
+        offline: 'Offline'
+      },
+      sections: {
+        resourceList: 'Resource List',
+        resourceDetail: 'Resource Detail',
+        resourceDescription: 'Resource Description',
+        stateDescription: 'State Description',
+        operationDescription: 'Operation Description',
+        historyStates: 'History States (Latest 20)'
+      },
+      desc: {
+        resourceId: 'Resource ID',
+        type: 'Type',
+        nodeId: 'Node',
+        status: 'Status',
+        createdAt: 'Created At',
+        lastHeartbeat: 'Last Heartbeat'
+      },
+      messages: {
+        selectResource: 'Please select a resource to view details',
+        deleteSuccess: 'Deleted successfully',
+        deleteFailed: 'Delete failed',
+        operationSent: 'Operation sent successfully',
+        operationFailed: 'Operation sending failed',
+        loadFailed: 'Load failed',
+        stateLoadFailed: 'Failed to load states'
+      },
+      dialogs: {
+        operationTitle: 'Resource Operation'
+      },
+      validation: {
+        rangeError: 'Value is out of range'
+      },
+      confirmDelete: 'Confirm delete this resource?'
     }
   },
   zh: {
@@ -121,6 +178,7 @@ const messages = {
       refresh: '刷新',
       create: '创建',
       details: '详情',
+      descriptions: '描述',
       config: '配置',
       delete: '删除',
       action: '操作',
@@ -142,6 +200,7 @@ const messages = {
       workflows: '工作流',
       tasks: '任务',
       deployments: '部署',
+      resources: '资源管理',
       language: '语言'
     },
     home: {
@@ -229,6 +288,61 @@ const messages = {
       columns: { taskId: '任务ID', state: '状态', created: '创建时间', result: '结果', action: '操作' },
       buttons: { start: '开始', cancel: '取消', delete: '删除' },
       confirmDelete: '确认删除该任务？'
+    },
+    resources: {
+      title: '资源管理',
+      buttons: { refresh: '刷新', delete: '删除', send: '发送', operation: '操作', submit: '提交' },
+      columns: { 
+        resourceId: '资源ID', 
+        type: '类型', 
+        nodeId: '节点', 
+        status: '状态',
+        action: '操作',
+        name: '名称',
+        dataType: '数据类型',
+        defaultValue: '默认值',
+        unit: '单位',
+        range: '范围',
+        time: '时间',
+        stateData: '状态数据'
+      },
+      status: {
+        healthy: '正常',
+        warning: '警告',
+        offline: '离线'
+      },
+      sections: {
+        resourceList: '资源列表',
+        resourceDetail: '资源详情',
+        resourceDescription: '资源描述',
+        stateDescription: '状态描述',
+        operationDescription: '操作描述',
+        historyStates: '历史状态（最近20条）'
+      },
+      desc: {
+        resourceId: '资源ID',
+        type: '类型',
+        nodeId: '节点',
+        status: '状态',
+        createdAt: '创建时间',
+        lastHeartbeat: '最后心跳'
+      },
+      messages: {
+        selectResource: '请选择一个资源查看详情',
+        deleteSuccess: '删除成功',
+        deleteFailed: '删除失败',
+        operationSent: '操作发送成功',
+        operationFailed: '操作发送失败',
+        loadFailed: '加载失败',
+        stateLoadFailed: '加载状态失败'
+      },
+      dialogs: {
+        operationTitle: '资源操作'
+      },
+      validation: {
+        rangeError: '数值超出范围'
+      },
+      confirmDelete: '确认删除该资源？'
     }
   }
 }

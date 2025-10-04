@@ -1,268 +1,501 @@
-# Plum
+# Plum - 分布式任务编排与调度系统
 
-分布式服务框架（MVP/Walking Skeleton）。当前包含：
-- 控制面（Go，HTTP API，SQLite 持久化）
-- 节点 Agent（C++17，libcurl，下载/解压/运行进程，上报状态，按 desired 调谐）
-- Web UI（Vite + Vue 3 + TypeScript，Element Plus，路由化页面：Home/Assignments/Nodes/Apps/Deployments/Services）
+Plum 是一个现代化的分布式任务编排与调度系统，采用微服务架构设计，支持多种任务执行方式，提供完整的Web UI管理和监控功能。
 
-## 1. 环境准备
+## 🎯 项目概述
 
-建议平台：Linux 或 WSL2（Ubuntu）。
+Plum 旨在解决分布式环境下的任务编排、调度和执行问题，支持从简单的脚本执行到复杂的业务流程编排。系统采用现代化的架构设计，提供高性能、高可靠性的任务调度服务。
 
-### 1.1 系统依赖
-```bash
-sudo apt update
-sudo apt install -y build-essential cmake libcurl4-openssl-dev jq tree curl unzip
+### 核心特性
+
+- 🚀 **多种执行器**：支持embedded、service、os_process三种任务执行方式
+- 🔄 **工作流编排**：可视化DAG流程图，支持复杂业务流程编排
+- 📊 **实时监控**：Web UI实时状态监控和历史记录管理
+- 🌐 **分布式架构**：支持多节点部署和自动故障转移
+- 🔧 **易于集成**：提供C++和Python SDK，支持多种编程语言
+- 🌍 **国际化**：支持中英文界面切换
+
+## 🏗️ 系统架构
+
+### 核心组件
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Controller    │    │     Agent       │    │   Worker SDK    │
+│   (调度中心)     │◄──►│   (节点代理)     │◄──►│   (应用集成)     │
+│                 │    │                 │    │                 │
+│ • 任务调度       │    │ • 节点管理       │    │ • 任务执行       │
+│ • 工作流编排     │    │ • 服务发现       │    │ • 结果回传       │
+│ • 状态管理       │    │ • 健康检查       │    │ • 心跳维护       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-### 1.2 安装 Go（>= 1.22）
-可用发行版包或官方二进制。以下为官方二进制方式（推荐，可复制粘贴执行）。
-```bash
-# 选择版本
-GO_VER=1.22.6
-arch=$(uname -m); case "$arch" in
-  x86_64) GO_ARCH=amd64 ;;
-  aarch64) GO_ARCH=arm64 ;;
-  *) echo "unsupported arch: $arch"; exit 1 ;;
-esac
+**Controller（控制器）**
+- 核心调度引擎，负责任务调度、工作流编排和状态管理
+- 基于Go语言开发，使用SQLite作为数据存储
+- 提供RESTful API接口和WebSocket实时通信
 
-# 下载并安装
-curl -LO https://dl.google.com/go/go${GO_VER}.linux-${GO_ARCH}.tar.gz
-sudo rm -rf /usr/local/go
-sudo tar -C /usr/local -xzf go${GO_VER}.linux-${GO_ARCH}.tar.gz
+**Agent（代理）**
+- 部署在各个节点上的轻量级代理
+- 负责与Controller通信，报告节点状态
+- 支持服务发现和健康检查
 
-# 加 PATH
-if ! grep -q "/usr/local/go/bin" ~/.bashrc; then echo 'export PATH=/usr/local/go/bin:$PATH' >> ~/.bashrc; fi
-source ~/.bashrc
+**Worker SDK**
+- 提供C++和Python SDK，供应用程序集成
+- 支持任务注册、执行和结果回传
+- 实现嵌入式任务执行模式
 
-# 可选（国内更快）
-# echo 'export GOPROXY=https://goproxy.cn,direct' >> ~/.bashrc && source ~/.bashrc
+## 🎮 任务执行引擎
 
-go version
+### 三种执行器类型
+
+#### 1. Embedded 执行器
+- **内置任务**：builtin.echo、builtin.delay、builtin.sleep、builtin.fail
+- **Worker回调**：应用程序集成SDK执行
+- **特点**：低延迟、高可靠性、支持实时任务注册
+
+#### 2. Service 执行器
+- **HTTP/gRPC调用**：调用远程服务端点
+- **服务发现**：自动发现和选择健康的服务实例
+- **配置灵活**：支持版本、协议、端口、路径配置
+- **负载均衡**：智能端点选择和健康检查
+
+#### 3. OS Process 执行器
+- **系统命令**：执行任意操作系统命令
+- **进程管理**：完整的生命周期管理和资源清理
+- **超时控制**：防止长时间运行的任务阻塞系统
+- **输入输出**：支持标准输入输出和环境变量设置
+
+### 执行器对比
+
+| 执行器类型 | 适用场景 | 优势 | 劣势 |
+|-----------|---------|------|------|
+| embedded | 实时任务、低延迟要求 | 高性能、低延迟 | 需要集成SDK |
+| service | 微服务调用、API集成 | 解耦、易扩展 | 网络依赖 |
+| os_process | 脚本执行、系统操作 | 灵活、通用 | 资源消耗较大 |
+
+## 🔄 工作流编排
+
+### 工作流特性
+
+- **可视化DAG**：直观的流程图展示，实时状态更新
+- **顺序执行**：当前支持顺序执行，DAG并行执行已预留接口
+- **状态管理**：完整的执行状态跟踪和历史记录
+- **错误处理**：自动重试和故障转移机制
+
+### 工作流管理
+
+- **模板化设计**：基于TaskDefinition的模板化工作流定义
+- **参数配置**：支持默认payload和运行时参数覆盖
+- **历史管理**：完整的运行历史查看和清理功能
+- **级联删除**：工作流删除时自动清理相关数据
+
+### DAG可视化
+
+```
+[builtin.echo] → [my.service.task] → [os_process.script]
+     ↓               ↓                   ↓
+   成功🟢           运行中🟠            等待中🔵
 ```
 
-### 1.3 安装 Node.js（UI 开发）
-需要 Node.js 18+（建议 20 LTS）与 npm。可用 nvm 安装：
+- **状态颜色**：
+  - 🔵 蓝色：Pending（等待执行）
+  - 🟠 橙色：Running（正在执行）
+  - 🟢 绿色：Succeeded（成功完成）
+  - 🔴 红色：Failed（执行失败）
+  - ⚫ 灰色：Canceled（已取消）
+
+## 📊 数据模型
+
+### 核心实体
+
+**Deployment（部署）**
+- 长期运行的服务部署
+- 支持实例数量管理和扩缩容
+- 与Node关联，支持分布式部署
+
+**TaskDefinition（任务定义）**
+- 任务执行模板
+- 支持默认payload配置
+- 可被多个工作流引用
+
+**TaskRun（任务运行）**
+- 任务执行实例
+- 记录执行状态、结果和时间信息
+- 支持重试和超时控制
+
+**Workflow（工作流）**
+- 业务流程定义
+- 包含多个步骤和执行顺序
+- 支持参数传递和条件执行
+
+**WorkflowRun（工作流运行）**
+- 工作流执行实例
+- 跟踪整体执行状态
+- 包含所有步骤的执行记录
+
+**Node（节点）**
+- 计算节点信息
+- 资源状态监控
+- 健康检查和故障检测
+
+**Service（服务）**
+- 注册的服务信息
+- 端点发现和管理
+- 健康状态监控
+
+**Worker（工作节点）**
+- 任务执行能力注册
+- 容量管理和负载均衡
+- 心跳维护和状态同步
+
+## 🛠️ 技术栈
+
+### 后端技术
+- **Go语言**：高性能、并发友好的系统编程语言
+- **SQLite**：轻量级、零配置的嵌入式数据库
+- **RESTful API**：标准化的HTTP接口设计
+- **WebSocket**：实时通信和状态更新
+- **微服务架构**：模块化、可扩展的系统设计
+
+### 前端技术
+- **Vue 3**：现代化的前端框架
+- **TypeScript**：类型安全的JavaScript超集
+- **Element Plus**：企业级UI组件库
+- **ECharts + Dagre**：专业图表和布局算法
+- **国际化**：多语言支持（中英文）
+
+### 构建系统
+- **Makefile**：统一构建脚本
+- **CMake**：C++组件构建支持
+- **Docker**：容器化部署支持
+- **Git**：版本控制和协作
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Go 1.19+
+- Node.js 16+
+- CMake 3.10+（可选，用于C++ SDK）
+- Git
+
+### 安装和运行
+
+1. **克隆项目**
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source ~/.bashrc
-nvm install --lts
-node -v && npm -v
+git clone <repository-url>
+cd Plum
 ```
 
-## 2. 构建与运行
-
-项目根目录：`/home/stone/code/Plum`。
-
-### 2.1 控制面（Go）
+2. **构建Controller**
 ```bash
-cd /home/stone/code/Plum
-make controller                 # 构建二进制到 controller/bin/controller
-./controller/bin/controller     # 启动（默认 :8080）
-# 健康检查
-curl -s http://127.0.0.1:8080/healthz
-```
-自定义监听地址/数据目录：
-```bash
-CONTROLLER_ADDR=:9090 CONTROLLER_DATA_DIR=/home/stone/code/Plum ./controller/bin/controller
+make controller
 ```
 
-### 2.1.1 Swagger UI（API 说明与测试）
-控制面启动后，访问：
-- 浏览器打开 http://127.0.0.1:8080/swagger
-- OpenAPI JSON: http://127.0.0.1:8080/swagger/openapi.json
-
-### 2.2 Agent（C++）
+3. **构建前端**
 ```bash
-cd /home/stone/code/Plum
-make agent                      # CMake 配置 + 编译（输出 agent/build/plum_agent）
-make agent-run                  # 运行（默认 AGENT_NODE_ID=nodeA，CONTROLLER_BASE=http://127.0.0.1:8080）
-```
-自定义环境变量：
-```bash
-AGENT_NODE_ID=nodeB CONTROLLER_BASE=http://127.0.0.1:8080 AGENT_DATA_DIR=/tmp/plum-agent ./agent/build/plum_agent
+make ui-build
 ```
 
-### 2.3 创建一个演示部署（用于看到分配）
-控制面运行后，新开终端执行：
+4. **运行Controller**
 ```bash
-curl -s -XPOST http://127.0.0.1:8080/v1/deployments \
-  -H 'Content-Type: application/json' \
+CONTROLLER_DATA_DIR=/path/to/data ./controller/bin/controller
+```
+
+5. **访问Web UI**
+```
+http://localhost:5173
+```
+
+### 开发环境
+
+1. **启动Controller**
+```bash
+make controller-run
+```
+
+2. **启动前端开发服务器**
+```bash
+cd ui && npm run dev
+```
+
+3. **构建C++ SDK**
+```bash
+make sdk_cpp
+```
+
+## 📖 使用指南
+
+### 创建任务定义
+
+```bash
+# 创建embedded任务
+curl -X POST "http://127.0.0.1:8080/v1/task-defs" \
+  -H "Content-Type: application/json" \
   -d '{
-    "name":"demo-deploy",
-    "entries": [
+    "name": "my-task",
+    "executor": "embedded",
+    "defaultPayload": {"message": "hello"}
+  }'
+
+# 创建service任务
+curl -X POST "http://127.0.0.1:8080/v1/task-defs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "api-call",
+    "executor": "service",
+    "targetKind": "service",
+    "targetRef": "my-service",
+    "labels": {
+      "serviceVersion": "v1",
+      "serviceProtocol": "http",
+      "servicePort": "8080",
+      "servicePath": "/api/execute"
+    }
+  }'
+
+# 创建os_process任务
+curl -X POST "http://127.0.0.1:8080/v1/task-defs" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "system-script",
+    "executor": "os_process",
+    "defaultPayload": {
+      "command": "python",
+      "args": ["script.py"],
+      "workingDir": "/path/to/scripts"
+    }
+  }'
+```
+
+### 创建工作流
+
+```bash
+curl -X POST "http://127.0.0.1:8080/v1/workflows" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-workflow",
+    "steps": [
       {
-        "artifactUrl":"/artifacts/your_app.zip",
-        "startCmd":"",
-        "replicas":{"nodeA":1, "nodeB":1}
+        "name": "step1",
+        "executor": "embedded",
+        "definitionId": "task-def-id-1",
+        "timeoutSec": 30,
+        "maxRetries": 3,
+        "ord": 0
+      },
+      {
+        "name": "step2",
+        "executor": "service",
+        "definitionId": "task-def-id-2",
+        "timeoutSec": 60,
+        "maxRetries": 1,
+        "ord": 1
       }
     ]
-  }' | jq .
+  }'
 ```
 
-### 2.4 Web UI（Vite + Vue 3 + TS）
+### 运行任务和工作流
+
 ```bash
-cd /home/stone/code/Plum
-make ui         # 安装依赖（首次）
-make ui-dev     # 开发模式（默认端口 5173，若被占用会自动递增）
-# 浏览器访问 http://127.0.0.1:5173 （或终端提示的实际端口）
-```
-主要路由：
-- /home：系统总览（KPI 卡片 + ECharts：节点健康、各服务端点数）
-- /assignments：展示期望(Desired) + 实际(Phase/Healthy/LastReportAt)，行级 Start/Stop
-- /nodes：节点列表（删除会做在用检查）
-- /apps：应用工件上传/列表/删除（在用检查，可下载 ZIP）
-- /deployments：部署列表（进入详情/配置/删除）
-- /deployments/create：创建部署（多条目/多节点副本，startCmd 可选，默认跑包内 ./start.sh）
-- /deployments/:id：部署详情（行级 Start/Stop/删除，支持“全部停止/按节点停止”批量操作）
-- /services：服务与端点视图（左侧服务列表，右侧端点明细）
+# 运行任务定义
+curl -X POST "http://127.0.0.1:8080/v1/task-defs/{id}?action=run"
 
-### 2.5 服务注册与发现（最小版）
-- 注册：Agent 启动应用后读取包内 `meta.ini` 中的 `service=` 行并注册端点；随后周期心跳。
-- 发现：`GET /v1/discovery?service=orders&version=&protocol=http&limit=20`
-- 主动健康：应用也可主动调用 `/v1/services/heartbeat` 覆盖端点健康（当前不启用探针）。
-
-`meta.ini` 示例（可多行）：
-```
-name=demo-app
-version=1.0.0
-service=orders:http:8080
-service=inventory:http:9090
+# 运行工作流
+curl -X POST "http://127.0.0.1:8080/v1/workflows/{id}?action=run"
 ```
 
-## 3. 常用环境变量
-- 控制面：
-  - `CONTROLLER_ADDR`（默认 `:8080`）
-  - `CONTROLLER_DATA_DIR`（默认 `.`，用于存放 artifacts 静态目录）
-- Agent：
-  - `AGENT_NODE_ID`（默认 `nodeA`）
-  - `CONTROLLER_BASE`（默认 `http://127.0.0.1:8080`）
-  - `AGENT_DATA_DIR`（默认 `/tmp/plum-agent`，实例工件与解压目录）
-- UI：`VITE_API_BASE`（默认 `http://127.0.0.1:8080`）
+## 🔧 API 速查
 
-## 4. 目录速览（关键路径）
-```
-Plum/
-├─ controller/                 # 控制面（Go）
-│  ├─ cmd/server/main.go       # 程序入口
-│  ├─ internal/httpapi/        # 路由/处理器（nodes/apps/deployments/assignments/services/sse）
-│  └─ internal/store/          # 存储接口与 SQLite 实现
-├─ agent/                      # 节点 Agent（C++17）
-│  ├─ CMakeLists.txt
-│  └─ src/
-│     ├─ main.cpp              # 心跳、SSE、拉取分配、调谐循环
-│     ├─ http_client.hpp/.cpp  # libcurl 封装（GET/POST/DELETE）
-│     ├─ reconciler.hpp/.cpp   # 下载/解压/进程监督/状态上报/服务注册
-│     └─ fs_utils.hpp/.cpp     # 目录/解压辅助
-├─ ui/                         # Web UI（Vite + Vue 3 + TS, Element Plus）
-│  ├─ index.html
-│  ├─ src/main.ts              # 应用入口
-│  ├─ src/router.ts            # 路由
-│  ├─ src/App.vue              # 布局+菜单
-│  └─ src/views/*              # Home/Assignments/Nodes/Apps/Deployments/Services
-├─ docs/assistant/POSTCARD.md  # AI 协作“项目明信片”
-├─ tools/make_sync_packet.sh   # 生成 sync_packet.txt（上下文同步）
-└─ Makefile                    # 顶层便捷命令
-```
+### 任务定义管理
+- `GET /v1/task-defs` - 获取所有任务定义
+- `POST /v1/task-defs` - 创建任务定义
+- `GET /v1/task-defs/{id}` - 获取特定任务定义
+- `POST /v1/task-defs/{id}?action=run` - 运行任务定义
 
-## 5. 当前进度与 Roadmap
+### 任务运行管理
+- `GET /v1/tasks` - 获取所有任务运行
+- `GET /v1/tasks/{id}` - 获取特定任务运行
+- `POST /v1/tasks/{id}?action=start` - 启动任务
+- `POST /v1/tasks/{id}?action=cancel` - 取消任务
+- `DELETE /v1/tasks/{id}` - 删除任务
 
-### 5.1 已完成（阶段性）
-- 控制面：
-  - SQLite 存储（nodes/deployments/assignments/statuses/artifacts/endpoints）
-  - Deployments：创建/列表/详情/配置（labels PATCH 不改名）/删除（级联清理 assignments/statuses）
-  - Assignments：按节点获取（含 desired 与最新 Phase/Healthy/LastReportAt）、PATCH desired（Running/Stopped）、DELETE 单条
-  - Services（注册与发现）：
-    - 注册/替换端点：POST `/v1/services/register`
-    - 端点心跳与健康覆盖：POST `/v1/services/heartbeat`
-    - 删除实例端点：DELETE `/v1/services?instanceId=`
-    - 发现：GET `/v1/discovery?service=&version=&protocol=&limit=`；服务列表：GET `/v1/services/list`
-  - SSE：节点级事件流 `/v1/stream?nodeId=`（Agent/前端使用，Start/Stop 等操作秒级生效）
-  - 故障迁移：节点不健康时，将该节点上 desired=Running 的实例随机迁移到健康节点
-  - Swagger UI：`/swagger`（OpenAPI 文档统一 Deployment 术语）
-- Agent：
-  - 周期拉取 assignments + SSE 推送唤醒（更实时）；解析 `meta.ini` 中 `service=` 行并注册端点；定期心跳
-  - 停止实例时，自动删除对应端点；SIGINT/SIGTERM 优雅退出并清理子进程
-  - 修复 JSON 解析导致 `startCmd` 丢失 `/` 的问题
-- Web UI：
-  - 导航：Home/Assignments/Nodes/Apps/Deployments/Services（不再折叠 More）
-  - Home：KPI 卡片 + ECharts（节点健康环图、各服务端点数柱状）
-  - Deployments：列表/创建/详情/配置（统一 Deployment 文案与路由）
-  - Assignments：实时刷新（SSE）与行级操作；列展示 Deployment
-  - Apps：ZIP 上传/列表/删除；Artifact 下载链接修复（支持 `VITE_API_BASE`）
+### 工作流管理
+- `GET /v1/workflows` - 获取所有工作流
+- `POST /v1/workflows` - 创建工作流
+- `GET /v1/workflows/{id}` - 获取特定工作流
+- `POST /v1/workflows/{id}?action=run` - 运行工作流
+- `DELETE /v1/workflows/{id}` - 删除工作流
 
-### 5.2 待办（下一阶段）
-- 强化健康：端点/实例健康探针（HTTP/TCP），心跳超时 Unknown/Unhealthy
-- 故障恢复策略：自动回切/再均衡控制器（稳定期与限速）
-- 单点解析接口：`/v1/resolve?service=...&strategy=random|round_robin&hashKey=...`
-- 更细化的权限与用户体系（RBAC）
-- 进程日志采集与查看（本地/集中式）
-- 更完备的错误处理与前端提示（把 409 等转换成友好文案）
-- 系统级 SSE（汇总事件），Home 实时增量刷新
-- Swagger 注释生成：接入 `swaggo/swag`（注解 → OpenAPI）
- - 新“Task（短作业）/编排”技术路线（分阶段）：
-   - 阶段A（MVP）：最小任务模型与API（/v1/tasks），Task/Attempt 状态机（Pending→Running→Succeeded/Failed），存储与查询，SSE 推送
-   - 阶段B：执行器 Service/Process 双通道（服务端点调用或 Agent 进程执行），调度（健康+标签+随机），超时/取消/重试（退避），幂等键
-   - 阶段C：编排（顺序/并行/条件/DAG），定时/事件触发，限流/优先级/配额，UI 可视化与审计
-   - 阶段D：与工作流引擎对接（如 Temporal/Conductor）或引入代码式编排 SDK
-  - Worker 选择策略（预研/规划，当前实现为“选择首个匹配的 Worker”）：
-    - 随机 / 轮询（round-robin）选择可执行该任务的 Worker
-    - 基于容量/负载（capacity-aware）选择：优先空闲度高或队列短的 Worker
-    - 基于标签/约束/亲和/反亲和：匹配 `labels`、节点属性、地理就近
-    - 粘性调度与一致性哈希（hashKey）：同源任务命中同一 Worker，提高缓存命中
-    - 广播/并发执行模式（fan-out）：对所有或前 N 个 Worker 并发调用，最先成功即返回
-    - 健康/超时/熔断/重试策略：失败退避、熔断降级、黑白名单
-    - 优先级/配额/速率限制：不同租户/任务类别的公平性与隔离
+### 工作流运行管理
+- `GET /v1/workflow-runs` - 获取所有工作流运行
+- `GET /v1/workflow-runs/{id}` - 获取特定工作流运行
+- `GET /v1/workflow-runs?workflowId={id}` - 获取特定工作流的所有运行
+- `DELETE /v1/workflow-runs/{id}` - 删除工作流运行
 
-### 5.3 设计原则
-- 声明式：控制面描述“期望状态”，Agent 对齐“实际状态”。
-- 可进化：先内存/SQLite，后迁移 etcd；先进程，后容器；先单机，后 HA。
-- 可移植：抽象 `IRuntime`/`IProcessSupervisor`/`ISystemMetrics`，避免平台绑定。
-- 可观测：默认指标/日志/事件可查询；问题可追踪、可告警。
-- 安全默认开启：mTLS、RBAC、审计日志。
+### 节点和服务管理
+- `GET /v1/nodes` - 获取所有节点
+- `GET /v1/services` - 获取所有服务
+- `GET /v1/discovery` - 获取服务端点发现信息
+- `GET /v1/workers` - 获取所有工作节点
 
-### 5.4 里程碑（摘要）
-- M1 基础部署：副本调度、进程监督、健康检查、日志
-- M2 服务注册与发现 + 基础监控/告警
-- M3 持久化与 HA：etcd/Consul、多副本、幂等控制
-- M4 调度与编排：亲和/反亲和、滚动/金丝雀/蓝绿发布
+## 📋 已完成功能
 
-### 5.5 风险与约束
-- 保持日志与大对象远离 etcd（仅存元数据/小配置）
-- 所有控制面操作需可重放/幂等；明确超时/重试策略
-- 弱网与边缘环境：优先 Pull/心跳、流量压缩与批量上报
+### ✅ 核心功能
+- [x] 分布式任务调度和执行
+- [x] 三种任务执行器（embedded、service、os_process）
+- [x] 工作流编排和顺序执行
+- [x] DAG可视化流程图
+- [x] 实时状态监控和更新
+- [x] Web UI管理和监控界面
 
-## 6. API 速查（当前实现）
-- Apps：
-  - POST `/v1/apps/upload`（multipart: file=zip）
-  - GET `/v1/apps`
-  - DELETE `/v1/apps/{id}`（若在用，409）
-- Nodes：
-  - POST `/v1/nodes/heartbeat` → `{ ttlSec }`
-  - GET `/v1/nodes`、GET `/v1/nodes/{id}`、DELETE `/v1/nodes/{id}`（若在用，409）
-- Deployments：
-  - POST `/v1/deployments`（支持 `entries[]`；`startCmd` 可选，缺省跑 `./start.sh`）
-  - GET `/v1/deployments`、GET `/v1/deployments/{id}`（含 assignments）
-  - PATCH `/v1/deployments/{id}`（更新 labels；名称不可改）
-  - DELETE `/v1/deployments/{id}`（级联清理 assignments/statuses）
-- Assignments：
-  - GET `/v1/assignments?nodeId=`（返回 desired + 最新 Phase/Healthy/LastReportAt）
-  - PATCH `/v1/assignments/{instanceId}` `{ desired: Running|Stopped }`
-  - DELETE `/v1/assignments/{instanceId}`
-- SSE：
-  - GET `/v1/stream?nodeId=` → 事件：`update`
-- Services（注册/发现）：
-  - POST `/v1/services/register`、POST `/v1/services/heartbeat`、DELETE `/v1/services?instanceId=`
-  - GET `/v1/discovery?service=&version=&protocol=&limit=`，GET `/v1/services/list`
-\- Tasks（短作业）：
-  - POST `/v1/tasks`、GET `/v1/tasks`、DELETE `/v1/tasks/{id}`、POST `/v1/tasks/start/{id}`、POST `/v1/tasks/rerun/{id}`、POST `/v1/tasks/cancel/{id}`
-  - SSE `/v1/tasks/stream`
-  - 执行器：
-    - embedded：控制面调用 Worker URL（POST，Body: `{ taskId, name, payload }`）
-    - service：从服务注册表选择健康端点并调用固定路径（默认 `/task`）
-      - 可通过任务 `labels` 覆盖：
-        - `serviceVersion`: 过滤服务版本（如 `1.0.0`）
-        - `serviceProtocol`: 指定 `http|https`
-        - `servicePort`: 覆盖端口号（如 `8080`）
-        - `servicePath`: 指定调用路径（自动补 `/`）
-    - os_process：由 Agent 启动外部进程（规划中）
+### ✅ 任务管理
+- [x] TaskDefinition模板化设计
+- [x] 任务运行实例管理
+- [x] 任务状态跟踪（Pending、Running、Succeeded、Failed、Timeout、Canceled）
+- [x] 任务重试和超时控制
+- [x] 任务结果记录和错误处理
+- [x] 内置任务支持（echo、delay、sleep、fail）
+
+### ✅ 工作流功能
+- [x] 工作流定义和管理
+- [x] 工作流运行实例跟踪
+- [x] 工作流历史记录管理
+- [x] 工作流删除和清理
+- [x] DAG可视化显示
+- [x] 实时状态更新和自动刷新
+- [x] 工作流步骤参数配置
+
+### ✅ 执行器实现
+- [x] **embedded执行器**
+  - [x] 内置任务执行
+  - [x] Worker回调执行
+  - [x] 实时任务注册
+- [x] **service执行器**
+  - [x] HTTP/gRPC服务调用
+  - [x] 服务发现和端点选择
+  - [x] 服务标签配置（版本、协议、端口、路径）
+  - [x] 健康检查和负载均衡
+- [x] **os_process执行器**
+  - [x] 外部进程执行
+  - [x] 进程生命周期管理
+  - [x] 超时控制和资源清理
+  - [x] 输入输出捕获和环境变量设置
+
+### ✅ 数据管理
+- [x] SQLite数据库存储
+- [x] 在线数据库迁移
+- [x] 数据一致性保证
+- [x] 级联删除支持
+- [x] 完整的CRUD操作
+
+### ✅ Web UI功能
+- [x] 响应式设计
+- [x] 国际化支持（中英文）
+- [x] 实时状态更新
+- [x] DAG可视化图表
+- [x] 任务和工作流管理界面
+- [x] 运行历史查看
+- [x] 错误处理和用户反馈
+
+### ✅ 开发和运维
+- [x] 统一构建系统（Makefile）
+- [x] C++ SDK构建支持
+- [x] 开发环境配置
+- [x] API文档和示例
+- [x] 错误日志和调试信息
+
+## 🚧 待办功能
+
+### 🔄 工作流增强
+- [ ] DAG并行执行支持
+- [ ] 条件分支和循环控制
+- [ ] 工作流模板和参数化
+- [ ] 工作流版本管理
+- [ ] 工作流调度（定时执行）
+- [ ] 工作流依赖管理
+
+### 🎯 执行器优化
+- [ ] **embedded执行器增强**
+  - [ ] 更多内置任务类型
+  - [ ] 动态任务注册
+  - [ ] 任务优先级管理
+- [ ] **service执行器增强**
+  - [ ] 更多负载均衡策略（随机、轮询、容量感知）
+  - [ ] 服务熔断和降级
+  - [ ] 请求重试和超时配置
+  - [ ] 服务健康检查增强
+- [ ] **os_process执行器增强**
+  - [ ] 进程组管理
+  - [ ] 资源限制（CPU、内存）
+  - [ ] 进程监控和统计
+  - [ ] 批量命令执行
+
+### 📊 监控和运维
+- [ ] 性能指标收集（Prometheus集成）
+- [ ] 分布式链路追踪
+- [ ] 告警和通知系统
+- [ ] 系统健康检查
+- [ ] 自动故障恢复
+- [ ] 容量规划和资源优化
+
+### 🔐 安全和权限
+- [ ] 用户认证和授权
+- [ ] 角色权限管理
+- [ ] API访问控制
+- [ ] 敏感信息加密
+- [ ] 审计日志记录
+
+### 🌐 分布式功能
+- [ ] 多Controller集群
+- [ ] 数据同步和一致性
+- [ ] 跨数据中心部署
+- [ ] 网络分区容错
+- [ ] 分布式锁和协调
+
+### 📈 扩展性增强
+- [ ] 插件系统支持
+- [ ] 自定义执行器开发
+- [ ] 第三方系统集成
+- [ ] 消息队列支持
+- [ ] 事件驱动架构
+
+### 🛠️ 开发工具
+- [ ] CLI命令行工具
+- [ ] 配置管理工具
+- [ ] 调试和诊断工具
+- [ ] 性能分析工具
+- [ ] 自动化测试套件
+
+## 🤝 贡献指南
+
+我们欢迎社区贡献！请遵循以下步骤：
+
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建 Pull Request
+
+### 开发规范
+
+- 使用 Conventional Commits 规范提交信息
+- 代码需要经过测试验证
+- 新功能需要添加相应的文档
+- 遵循项目的代码风格和架构设计
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 📞 联系我们
+
+- 项目主页：[GitHub Repository]
+- 问题反馈：[GitHub Issues]
+- 文档：[Project Documentation]
+
+---
+
+**Plum** - 让任务编排更简单，让分布式调度更可靠！

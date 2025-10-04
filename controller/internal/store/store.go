@@ -137,6 +137,51 @@ type StepRun struct {
 	Ord        int
 }
 
+// Resource management data models
+type ResourceStateDesc struct {
+	Type  string // INT|DOUBLE|BOOL|ENUM|STRING
+	Name  string
+	Value string
+	Unit  string
+}
+
+type ResourceOpDesc struct {
+	Type  string // INT|DOUBLE|BOOL|ENUM|STRING
+	Name  string
+	Value string
+	Unit  string
+	Min   string
+	Max   string
+}
+
+type Resource struct {
+	ResourceID string
+	NodeID     string
+	Type       string // Radar/Sonar/XXGun等
+	URL        string // 操作回调URL
+	StateDesc  []ResourceStateDesc
+	OpDesc     []ResourceOpDesc
+	LastSeen   int64
+	CreatedAt  int64
+}
+
+type ResourceState struct {
+	ResourceID string
+	Timestamp  int64
+	States     map[string]string // name -> value
+}
+
+type ResourceOp struct {
+	ResourceID string
+	Operations []ResourceOperation
+	Timestamp  int64
+}
+
+type ResourceOperation struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 type Store interface {
 	UpsertNode(id string, n Node) error
 	GetNode(id string) (Node, bool, error)
@@ -187,6 +232,15 @@ type Store interface {
 	RegisterWorker(w Worker) error
 	HeartbeatWorker(workerID string, capacity int, lastSeen int64) error
 	ListWorkers() ([]Worker, error)
+
+	// Resources
+	RegisterResource(r Resource) error
+	HeartbeatResource(resourceID string, lastSeen int64) error
+	ListResources() ([]Resource, error)
+	GetResource(id string) (Resource, bool, error)
+	DeleteResource(id string) error
+	SubmitResourceState(rs ResourceState) error
+	ListResourceStates(resourceID string, limit int) ([]ResourceState, error)
 
 	// Workflows (sequential MVP)
 	CreateWorkflow(wf Workflow) (string, error)
