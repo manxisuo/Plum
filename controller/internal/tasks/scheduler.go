@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -80,9 +81,15 @@ func tick() {
 				st := steps[nextOrd]
 				name := st.Name
 				executor := st.Executor
-				targetKind := ""
-				targetRef := ""
+				targetKind := st.TargetKind
+				targetRef := st.TargetRef
 				labels := map[string]string{"workflowId": r.WorkflowID, "runId": r.RunID, "stepId": st.StepID}
+				// Merge step labels first (workflow step labels take precedence)
+				if st.Labels != nil {
+					for k, v := range st.Labels {
+						labels[k] = v
+					}
+				}
 				if st.DefinitionID != "" {
 					if td, ok, _ := store.Current.GetTaskDef(st.DefinitionID); ok {
 						if td.Name != "" {
@@ -91,10 +98,17 @@ func tick() {
 						if td.Executor != "" {
 							executor = td.Executor
 						}
-						targetKind = td.TargetKind
-						targetRef = td.TargetRef
+						if td.TargetKind != "" {
+							targetKind = td.TargetKind
+						}
+						if td.TargetRef != "" {
+							targetRef = td.TargetRef
+						}
+						// TaskDefinition labels only override if not already set by step
 						for k, v := range td.Labels {
-							labels[k] = v
+							if _, exists := labels[k]; !exists {
+								labels[k] = v
+							}
 						}
 						labels["defId"] = td.DefID
 					}
@@ -116,6 +130,8 @@ func tick() {
 				runBuiltin(t)
 			} else if t.Executor == "embedded" {
 				runEmbedded(t)
+			} else if t.Executor == "service" {
+				runService(t)
 			}
 			notify.PublishTasks()
 		}
@@ -131,7 +147,7 @@ func tick() {
 }
 
 func runBuiltin(t store.Task) {
-	// simulate simple builtins: builtin.echo, builtin.sleep, builtin.fail
+	// simulate simple builtins: builtin.echo, builtin.sleep, builtin.delay, builtin.fail
 	var payload map[string]any
 	_ = json.Unmarshal([]byte(t.PayloadJSON), &payload)
 	switch t.Name {
@@ -149,6 +165,21 @@ func runBuiltin(t store.Task) {
 		}
 		time.Sleep(time.Duration(d*1000) * time.Millisecond)
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", "{}", "", time.Now().Unix(), t.Attempt)
+	case "builtin.delay":
+		// builtin.delay: 默认延迟3秒，可通过payload指定秒数
+		d := 3.0
+		if v, ok := payload["seconds"]; ok {
+			switch vv := v.(type) {
+			case float64:
+				d = vv
+			case int:
+				d = float64(vv)
+			}
+		}
+		time.Sleep(time.Duration(d*1000) * time.Millisecond)
+		res := map[string]any{"message": fmt.Sprintf("Delayed for %.1f seconds", d), "seconds": d}
+		b, _ := json.Marshal(res)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(b), "", time.Now().Unix(), t.Attempt)
 	case "builtin.fail":
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "builtin fail", time.Now().Unix(), t.Attempt)
 	default:
@@ -213,6 +244,81 @@ func runEmbedded(t store.Task) {
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(rb), "", time.Now().Unix(), t.Attempt)
 	} else {
 		log.Printf("tasks: worker responded %d body=%s", resp.StatusCode, string(rb))
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(rb), resp.Status, time.Now().Unix(), t.Attempt)
+	}
+}
+
+// runService dispatches task to a healthy service endpoint discovered from registry.
+// Expectation: t.TargetKind == "service" and t.TargetRef == serviceName
+func runService(t store.Task) {
+	serviceName := t.TargetRef
+	if serviceName == "" {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "missing TargetRef(serviceName)", time.Now().Unix(), t.Attempt)
+		return
+	}
+	// Optional overrides via labels
+	desiredVersion := ""
+	desiredProtocol := ""
+	desiredPort := 0
+	callPath := "/task"
+	if t.Labels != nil {
+		if v := t.Labels["serviceVersion"]; v != "" {
+			desiredVersion = v
+		}
+		if v := t.Labels["serviceProtocol"]; v != "" {
+			desiredProtocol = v
+		}
+		if v := t.Labels["servicePort"]; v != "" {
+			if p, err := strconv.Atoi(v); err == nil && p > 0 {
+				desiredPort = p
+			}
+		}
+		if v := t.Labels["servicePath"]; v != "" {
+			if v[0] != '/' {
+				v = "/" + v
+			}
+			callPath = v
+		}
+	}
+	// Discover healthy endpoints
+	eps, err := store.Current.ListEndpointsByService(serviceName, desiredVersion, desiredProtocol)
+	if err != nil || len(eps) == 0 {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no healthy endpoints", time.Now().Unix(), t.Attempt)
+		return
+	}
+	// pick first endpoint (MVP; future: random/rr/hash)
+	ep := eps[0]
+	// Build URL. For MVP we call fixed path "/task" on instance
+	scheme := "http"
+	if desiredProtocol != "" {
+		scheme = desiredProtocol
+	} else if ep.Protocol != "" {
+		scheme = ep.Protocol
+	}
+	port := ep.Port
+	if desiredPort > 0 {
+		port = desiredPort
+	}
+	url := scheme + "://" + ep.IP + ":" + strconv.Itoa(port) + callPath
+
+	var payload any
+	_ = json.Unmarshal([]byte(t.PayloadJSON), &payload)
+	body := map[string]any{"taskId": t.TaskID, "name": t.Name, "payload": payload}
+	bs, _ := json.Marshal(body)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(embeddedTimeoutMs())*time.Millisecond)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(bs))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", err.Error(), time.Now().Unix(), t.Attempt)
+		return
+	}
+	defer resp.Body.Close()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(rb), "", time.Now().Unix(), t.Attempt)
+	} else {
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(rb), resp.Status, time.Now().Unix(), t.Attempt)
 	}
 }

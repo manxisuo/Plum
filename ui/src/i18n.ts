@@ -105,7 +105,7 @@ const messages = {
     taskDefs: {
       buttons: { refresh: 'Refresh', create: 'Create Definition', run: 'Run', details: 'Details' },
       columns: { defId: 'DefID', name: 'Name', executor: 'Executor', target: 'Target', latestState: 'Latest State', latestTime: 'Latest Time', action: 'Action' },
-      dialog: { title: 'Create TaskDefinition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef' }, footer: { cancel: 'Cancel', submit: 'Submit' } }
+      dialog: { title: 'Create TaskDefinition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef', serviceVersion: 'Service Version', serviceProtocol: 'Service Protocol', servicePort: 'Service Port', servicePath: 'Service Path' }, footer: { cancel: 'Cancel', submit: 'Submit' } }
     },
     taskDefDetail: {
       title: 'TaskDefinition Detail',
@@ -220,7 +220,7 @@ const messages = {
     taskDefs: {
       buttons: { refresh: '刷新', create: '创建定义', run: '运行', details: '详情' },
       columns: { defId: '定义ID', name: '名称', executor: '执行器', target: '目标', latestState: '最新状态', latestTime: '最新时间', action: '操作' },
-      dialog: { title: '创建 TaskDefinition', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用' }, footer: { cancel: '取消', submit: '提交' } }
+      dialog: { title: '创建 TaskDefinition', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用', serviceVersion: '服务版本', serviceProtocol: '服务协议', servicePort: '服务端口', servicePath: '调用路径' }, footer: { cancel: '取消', submit: '提交' } }
     },
     taskDefDetail: {
       title: 'TaskDefinition 详情',

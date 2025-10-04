@@ -64,12 +64,27 @@ async function submit() {
     ElMessage.warning('请填写任务名称')
     return
   }
+  if (!form.targetRef || !String(form.targetRef).trim()) {
+    ElMessage.warning('请填写目标引用')
+    return
+  }
   try {
     let defaultPayload: any = undefined
     if (defaultPayloadText.value && defaultPayloadText.value.trim()) {
       try { defaultPayload = JSON.parse(defaultPayloadText.value) } catch { ElMessage.error('默认 Payload 不是合法 JSON'); return }
     }
-    const body: any = { name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: form.labels }
+    const body: any = { name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: { ...(form.labels||{}) } }
+    // optional service labels helpers
+    if (form.executor === 'service') {
+      const sv = (form as any).serviceVersion as string | undefined
+      const sp = (form as any).serviceProtocol as string | undefined
+      const port = (form as any).servicePort as string | undefined
+      const path = (form as any).servicePath as string | undefined
+      if (sv && sv.trim()) body.labels.serviceVersion = sv.trim()
+      if (sp && sp.trim()) body.labels.serviceProtocol = sp.trim()
+      if (port && port.trim()) body.labels.servicePort = port.trim()
+      if (path && path.trim()) body.labels.servicePath = path.trim()
+    }
     if (defaultPayload !== undefined) body.defaultPayload = defaultPayload
     const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -145,7 +160,16 @@ const { t } = useI18n()
             <el-option v-for="k in allowedKinds" :key="k" :label="k" :value="k" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('taskDefs.dialog.form.targetRef')"><el-input v-model="form.targetRef" placeholder="如 serviceName" /></el-form-item>
+        <el-form-item :label="t('taskDefs.dialog.form.targetRef')" required><el-input v-model="form.targetRef" placeholder="如 serviceName（必填）" /></el-form-item>
+        <template v-if="form.executor==='service'">
+          <el-form-item :label="t('taskDefs.dialog.form.serviceVersion')"><el-input v-model="(form as any).serviceVersion" placeholder="如 1.0.0（可选）" /></el-form-item>
+          <el-form-item :label="t('taskDefs.dialog.form.serviceProtocol')"><el-input v-model="(form as any).serviceProtocol" placeholder="http 或 https（可选）" /></el-form-item>
+          <el-form-item :label="t('taskDefs.dialog.form.servicePort')"><el-input v-model="(form as any).servicePort" placeholder="如 8080（可选）" /></el-form-item>
+          <el-form-item :label="t('taskDefs.dialog.form.servicePath')"><el-input v-model="(form as any).servicePath" placeholder="如 /task 或 /tasks/execute（可选）" /></el-form-item>
+        </template>
+        <el-form-item label="默认Payload(JSON，可选)">
+          <el-input type="textarea" v-model="defaultPayloadText" :rows="6" placeholder="{}" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreate=false">取消</el-button>

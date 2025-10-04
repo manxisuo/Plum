@@ -14,6 +14,8 @@ import Workflows from './views/Workflows.vue'
 // @ts-ignore
 import WorkflowRunDetail from './views/WorkflowRunDetail.vue'
 // @ts-ignore
+import WorkflowRuns from './views/WorkflowRuns.vue'
+// @ts-ignore
 import Tasks from './views/Tasks.vue'
 // @ts-ignore
 import TaskDefs from './views/TaskDefs.vue'
@@ -28,6 +30,7 @@ export const router = createRouter({
     { path: '/apps', component: Apps },
     { path: '/services', component: Services },
     { path: '/workflows', component: Workflows },
+    { path: '/workflows/:workflowId/runs', component: WorkflowRuns, props: true },
     { path: '/workflow-runs/:id', component: WorkflowRunDetail, props: true },
     { path: '/task-defs', component: TaskDefs },
     { path: '/task-defs/:id', component: TaskDefDetail, props: true },

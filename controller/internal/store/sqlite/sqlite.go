@@ -126,6 +126,9 @@ func migrate(db *sql.DB) error {
             step_id TEXT,
             name TEXT,
             executor TEXT,
+            target_kind TEXT,
+            target_ref TEXT,
+            labels TEXT,
             timeout_sec INTEGER,
             max_retries INTEGER,
             ord INTEGER,
@@ -152,7 +155,7 @@ func migrate(db *sql.DB) error {
             PRIMARY KEY(run_id, step_id)
         );`,
 		// TaskDefinitions
-        `CREATE TABLE IF NOT EXISTS task_defs (
+		`CREATE TABLE IF NOT EXISTS task_defs (
             def_id TEXT PRIMARY KEY,
             name TEXT,
             executor TEXT,
@@ -160,8 +163,8 @@ func migrate(db *sql.DB) error {
             target_ref TEXT,
             labels TEXT,
             default_payload_json TEXT,
-            created_at INTEGER
-        );`,
+			created_at INTEGER
+		);`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
@@ -169,16 +172,26 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	// ensure new columns for upgrades
-    if err := ensureColumn(db, "workflow_steps", "definition_id", "TEXT"); err != nil {
+	if err := ensureColumn(db, "workflow_steps", "definition_id", "TEXT"); err != nil {
 		return err
 	}
 	// Online schema upgrades (add columns if missing)
-    if err := ensureColumn(db, "tasks", "origin_task_id", "TEXT"); err != nil {
+	if err := ensureColumn(db, "tasks", "origin_task_id", "TEXT"); err != nil {
 		return err
 	}
-    if err := ensureColumn(db, "task_defs", "default_payload_json", "TEXT"); err != nil {
-        return err
-    }
+	if err := ensureColumn(db, "task_defs", "default_payload_json", "TEXT"); err != nil {
+		return err
+	}
+	// Add target_kind and target_ref columns to workflow_steps if not exists (online schema upgrade)
+	if err := ensureColumn(db, "workflow_steps", "target_kind", "TEXT"); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "workflow_steps", "target_ref", "TEXT"); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "workflow_steps", "labels", "TEXT"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -698,8 +711,9 @@ func (s *sqliteStore) CreateWorkflow(wf store.Workflow) (string, error) {
 		return "", err
 	}
 	for _, st := range wf.Steps {
-		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, timeout_sec, max_retries, ord, definition_id) VALUES(?,?,?,?,?,?,?,?)`,
-			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TimeoutSec, st.MaxRetries, st.Ord, st.DefinitionID,
+		labelsJSON, _ := json.Marshal(st.Labels)
+		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, target_kind, target_ref, labels, timeout_sec, max_retries, ord, definition_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TargetKind, st.TargetRef, string(labelsJSON), st.TimeoutSec, st.MaxRetries, st.Ord, st.DefinitionID,
 		); err != nil {
 			tx.Rollback()
 			return "", err
@@ -749,6 +763,49 @@ func (s *sqliteStore) GetWorkflow(id string) (store.Workflow, bool, error) {
 	return wf, true, nil
 }
 
+func (s *sqliteStore) DeleteWorkflow(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete workflow steps
+	if _, err := tx.Exec(`DELETE FROM workflow_steps WHERE workflow_id=?`, id); err != nil {
+		return err
+	}
+
+	// Delete workflow runs and step runs
+	runRows, err := tx.Query(`SELECT run_id FROM workflow_runs WHERE workflow_id=?`, id)
+	if err != nil {
+		return err
+	}
+	defer runRows.Close()
+
+	for runRows.Next() {
+		var runID string
+		if err := runRows.Scan(&runID); err != nil {
+			return err
+		}
+		// Delete step runs
+		if _, err := tx.Exec(`DELETE FROM step_runs WHERE run_id=?`, runID); err != nil {
+			return err
+		}
+	}
+
+	// Delete workflow runs
+	if _, err := tx.Exec(`DELETE FROM workflow_runs WHERE workflow_id=?`, id); err != nil {
+		return err
+	}
+
+	// Delete workflow
+	if _, err := tx.Exec(`DELETE FROM workflows WHERE workflow_id=?`, id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (s *sqliteStore) CreateWorkflowRun(workflowID string) (string, error) {
 	runID := newID()
 	_, err := s.db.Exec(`INSERT INTO workflow_runs(run_id, workflow_id, state, created_at, started_at, finished_at) VALUES(?,?,?,?,?,?)`,
@@ -789,8 +846,25 @@ func (s *sqliteStore) ListWorkflowRuns() ([]store.WorkflowRun, error) {
 	return out, rows.Err()
 }
 
+func (s *sqliteStore) ListWorkflowRunsByWorkflow(workflowID string) ([]store.WorkflowRun, error) {
+	rows, err := s.db.Query(`SELECT run_id, workflow_id, state, created_at, started_at, finished_at FROM workflow_runs WHERE workflow_id=? ORDER BY created_at DESC`, workflowID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.WorkflowRun
+	for rows.Next() {
+		var r store.WorkflowRun
+		if err := rows.Scan(&r.RunID, &r.WorkflowID, &r.State, &r.CreatedAt, &r.StartedAt, &r.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error) {
-	rows, err := s.db.Query(`SELECT step_id, name, executor, timeout_sec, max_retries, ord, definition_id FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
+	rows, err := s.db.Query(`SELECT step_id, name, executor, target_kind, target_ref, labels, timeout_sec, max_retries, ord, definition_id FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -798,9 +872,11 @@ func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error)
 	var out []store.WorkflowStep
 	for rows.Next() {
 		var st store.WorkflowStep
-		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TimeoutSec, &st.MaxRetries, &st.Ord, &st.DefinitionID); err != nil {
+		var labelsStr string
+		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TargetKind, &st.TargetRef, &labelsStr, &st.TimeoutSec, &st.MaxRetries, &st.Ord, &st.DefinitionID); err != nil {
 			return nil, err
 		}
+		_ = json.Unmarshal([]byte(labelsStr), &st.Labels)
 		out = append(out, st)
 	}
 	return out, rows.Err()
@@ -849,14 +925,34 @@ func (s *sqliteStore) UpdateWorkflowRunState(runID string, state string, ts int6
 	return err
 }
 
+func (s *sqliteStore) DeleteWorkflowRun(runID string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete step runs first
+	if _, err := tx.Exec(`DELETE FROM step_runs WHERE run_id=?`, runID); err != nil {
+		return err
+	}
+
+	// Delete workflow run
+	if _, err := tx.Exec(`DELETE FROM workflow_runs WHERE run_id=?`, runID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // TaskDefinition CRUD
 func (s *sqliteStore) CreateTaskDef(td store.TaskDefinition) (string, error) {
 	if td.DefID == "" {
 		td.DefID = newID()
 	}
 	labelsJSON, _ := json.Marshal(td.Labels)
-    _, err := s.db.Exec(`INSERT INTO task_defs(def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at) VALUES(?,?,?,?,?,?,?,?)`,
-        td.DefID, td.Name, td.Executor, td.TargetKind, td.TargetRef, string(labelsJSON), td.DefaultPayloadJSON, time.Now().Unix(),
+	_, err := s.db.Exec(`INSERT INTO task_defs(def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at) VALUES(?,?,?,?,?,?,?,?)`,
+		td.DefID, td.Name, td.Executor, td.TargetKind, td.TargetRef, string(labelsJSON), td.DefaultPayloadJSON, time.Now().Unix(),
 	)
 	if err != nil {
 		return "", err
@@ -865,10 +961,10 @@ func (s *sqliteStore) CreateTaskDef(td store.TaskDefinition) (string, error) {
 }
 
 func (s *sqliteStore) GetTaskDef(id string) (store.TaskDefinition, bool, error) {
-    row := s.db.QueryRow(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs WHERE def_id=?`, id)
+	row := s.db.QueryRow(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs WHERE def_id=?`, id)
 	var td store.TaskDefinition
 	var labelsStr string
-    if err := row.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
+	if err := row.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.TaskDefinition{}, false, nil
 		}
@@ -879,7 +975,7 @@ func (s *sqliteStore) GetTaskDef(id string) (store.TaskDefinition, bool, error) 
 }
 
 func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
-    rows, err := s.db.Query(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs ORDER BY created_at DESC, def_id DESC`)
+	rows, err := s.db.Query(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs ORDER BY created_at DESC, def_id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -888,7 +984,7 @@ func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
 	for rows.Next() {
 		var td store.TaskDefinition
 		var labelsStr string
-        if err := rows.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
+		if err := rows.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(labelsStr), &td.Labels)

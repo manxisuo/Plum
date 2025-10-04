@@ -100,8 +100,11 @@ type Worker struct {
 // Workflow (sequential MVP)
 type WorkflowStep struct {
 	StepID       string
-	Name         string // taskName
-	Executor     string // service|embedded|os_process
+	Name         string            // taskName
+	Executor     string            // service|embedded|os_process
+	TargetKind   string            // service|deployment|node (for service executor)
+	TargetRef    string            // serviceName for service executor
+	Labels       map[string]string // service executor labels (servicePath, servicePort, etc.)
 	TimeoutSec   int
 	MaxRetries   int
 	Ord          int    // sequence order
@@ -189,24 +192,27 @@ type Store interface {
 	CreateWorkflow(wf Workflow) (string, error)
 	ListWorkflows() ([]Workflow, error)
 	GetWorkflow(id string) (Workflow, bool, error)
+	DeleteWorkflow(id string) error
 	CreateWorkflowRun(workflowID string) (string, error)
 	GetWorkflowRun(runID string) (WorkflowRun, bool, error)
 	ListWorkflowRuns() ([]WorkflowRun, error)
+	ListWorkflowRunsByWorkflow(workflowID string) ([]WorkflowRun, error)
 	ListWorkflowSteps(id string) ([]WorkflowStep, error)
 	ListStepRuns(runID string) ([]StepRun, error)
 	InsertStepRun(sr StepRun) error
 	UpdateStepRunTask(runID string, stepID string, taskID string, state string, startedAt int64) error
 	UpdateStepRunFinished(runID string, stepID string, state string, finishedAt int64) error
 	UpdateWorkflowRunState(runID string, state string, ts int64) error
+	DeleteWorkflowRun(runID string) error
 
 	// TaskDefinition (for reusable task templates)
 	CreateTaskDef(td TaskDefinition) (string, error)
 	GetTaskDef(id string) (TaskDefinition, bool, error)
 	ListTaskDefs() ([]TaskDefinition, error)
-    DeleteTaskDef(id string) error
+	DeleteTaskDef(id string) error
 
-    // References
-    CountTasksByOrigin(defID string) (int, error)
+	// References
+	CountTasksByOrigin(defID string) (int, error)
 }
 
 // TaskDefinition stores a reusable task template
@@ -217,9 +223,9 @@ type TaskDefinition struct {
 	TargetKind string
 	TargetRef  string
 	Labels     map[string]string
-    // DefaultPayloadJSON stores the default input for runs created from this definition
-    DefaultPayloadJSON string
-	CreatedAt  int64
+	// DefaultPayloadJSON stores the default input for runs created from this definition
+	DefaultPayloadJSON string
+	CreatedAt          int64
 }
 
 var Current Store

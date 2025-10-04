@@ -254,3 +254,15 @@ Plum/
 - Services（注册/发现）：
   - POST `/v1/services/register`、POST `/v1/services/heartbeat`、DELETE `/v1/services?instanceId=`
   - GET `/v1/discovery?service=&version=&protocol=&limit=`，GET `/v1/services/list`
+\- Tasks（短作业）：
+  - POST `/v1/tasks`、GET `/v1/tasks`、DELETE `/v1/tasks/{id}`、POST `/v1/tasks/start/{id}`、POST `/v1/tasks/rerun/{id}`、POST `/v1/tasks/cancel/{id}`
+  - SSE `/v1/tasks/stream`
+  - 执行器：
+    - embedded：控制面调用 Worker URL（POST，Body: `{ taskId, name, payload }`）
+    - service：从服务注册表选择健康端点并调用固定路径（默认 `/task`）
+      - 可通过任务 `labels` 覆盖：
+        - `serviceVersion`: 过滤服务版本（如 `1.0.0`）
+        - `serviceProtocol`: 指定 `http|https`
+        - `servicePort`: 覆盖端口号（如 `8080`）
+        - `servicePath`: 指定调用路径（自动补 `/`）
+    - os_process：由 Agent 启动外部进程（规划中）
