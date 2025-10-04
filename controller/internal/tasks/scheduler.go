@@ -9,7 +9,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"plum/controller/internal/notify"
@@ -90,6 +92,7 @@ func tick() {
 						labels[k] = v
 					}
 				}
+				payloadJSON := "{}"
 				if st.DefinitionID != "" {
 					if td, ok, _ := store.Current.GetTaskDef(st.DefinitionID); ok {
 						if td.Name != "" {
@@ -104,6 +107,10 @@ func tick() {
 						if td.TargetRef != "" {
 							targetRef = td.TargetRef
 						}
+						// Use TaskDefinition's default payload if available
+						if td.DefaultPayloadJSON != "" {
+							payloadJSON = td.DefaultPayloadJSON
+						}
 						// TaskDefinition labels only override if not already set by step
 						for k, v := range td.Labels {
 							if _, exists := labels[k]; !exists {
@@ -113,7 +120,7 @@ func tick() {
 						labels["defId"] = td.DefID
 					}
 				}
-				newID, _ := store.Current.CreateTask(store.Task{Name: name, Executor: executor, TargetKind: targetKind, TargetRef: targetRef, State: "Pending", PayloadJSON: "{}", TimeoutSec: st.TimeoutSec, MaxRetries: st.MaxRetries, CreatedAt: now, Labels: labels})
+				newID, _ := store.Current.CreateTask(store.Task{Name: name, Executor: executor, TargetKind: targetKind, TargetRef: targetRef, State: "Pending", PayloadJSON: payloadJSON, TimeoutSec: st.TimeoutSec, MaxRetries: st.MaxRetries, CreatedAt: now, Labels: labels})
 				_ = store.Current.InsertStepRun(store.StepRun{RunID: r.RunID, StepID: st.StepID, TaskID: newID, State: "Pending", Ord: st.Ord})
 				notify.PublishTasks()
 			} else if nextOrd >= len(steps) {
@@ -132,6 +139,8 @@ func tick() {
 				runEmbedded(t)
 			} else if t.Executor == "service" {
 				runService(t)
+			} else if t.Executor == "os_process" {
+				runOSProcess(t)
 			}
 			notify.PublishTasks()
 		}
@@ -320,5 +329,106 @@ func runService(t store.Task) {
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(rb), "", time.Now().Unix(), t.Attempt)
 	} else {
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(rb), resp.Status, time.Now().Unix(), t.Attempt)
+	}
+}
+
+// runOSProcess executes a task by launching an external OS process
+func runOSProcess(t store.Task) {
+	var payload map[string]any
+	_ = json.Unmarshal([]byte(t.PayloadJSON), &payload)
+
+	// Parse command and arguments from payload
+	// Expected payload format: {"command": "ls", "args": ["-la", "/tmp"], "workingDir": "/tmp"}
+	command, ok := payload["command"].(string)
+	if !ok || command == "" {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "command is required in payload", time.Now().Unix(), t.Attempt)
+		return
+	}
+
+	var args []string
+	if argsInterface, exists := payload["args"]; exists {
+		if argsList, ok := argsInterface.([]interface{}); ok {
+			for _, arg := range argsList {
+				if argStr, ok := arg.(string); ok {
+					args = append(args, argStr)
+				}
+			}
+		}
+	}
+
+	// Get working directory
+	workingDir := ""
+	if wd, exists := payload["workingDir"]; exists {
+		if wdStr, ok := wd.(string); ok {
+			workingDir = wdStr
+		}
+	}
+
+	// Create context with timeout
+	timeoutSec := t.TimeoutSec
+	if timeoutSec <= 0 {
+		timeoutSec = 300 // default 5 minutes
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+
+	// Create command
+	cmd := exec.CommandContext(ctx, command, args...)
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
+
+	// Set up input/output
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// Add input from payload if provided
+	if input, exists := payload["input"]; exists {
+		if inputStr, ok := input.(string); ok {
+			cmd.Stdin = strings.NewReader(inputStr)
+		}
+	}
+
+	// Set environment variables if provided
+	if env, exists := payload["env"]; exists {
+		if envMap, ok := env.(map[string]interface{}); ok {
+			envVars := os.Environ() // inherit current environment
+			for key, value := range envMap {
+				if valueStr, ok := value.(string); ok {
+					envVars = append(envVars, fmt.Sprintf("%s=%s", key, valueStr))
+				}
+			}
+			cmd.Env = envVars
+		}
+	}
+
+	// Execute the command
+	startTime := time.Now()
+	err := cmd.Run()
+	finishTime := time.Now()
+
+	// Prepare result
+	result := map[string]interface{}{
+		"command":    command,
+		"args":       args,
+		"workingDir": workingDir,
+		"exitCode":   cmd.ProcessState.ExitCode(),
+		"durationMs": finishTime.Sub(startTime).Milliseconds(),
+		"stdout":     stdout.String(),
+		"stderr":     stderr.String(),
+	}
+
+	resultJSON, _ := json.Marshal(result)
+
+	// Determine task result based on exit code and context
+	if ctx.Err() == context.DeadlineExceeded {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Timeout", string(resultJSON), "process timeout", finishTime.Unix(), t.Attempt)
+	} else if err != nil {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(resultJSON), err.Error(), finishTime.Unix(), t.Attempt)
+	} else if cmd.ProcessState.ExitCode() == 0 {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(resultJSON), "", finishTime.Unix(), t.Attempt)
+	} else {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(resultJSON), fmt.Sprintf("process exited with code %d", cmd.ProcessState.ExitCode()), finishTime.Unix(), t.Attempt)
 	}
 }

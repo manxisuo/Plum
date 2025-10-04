@@ -647,9 +647,11 @@ func handleTaskDefByID(w http.ResponseWriter, r *http.Request) {
 				http.NotFound(w, r)
 				return
 			}
-			// accept optional payload from request body
+			// accept optional payload and timeout from request body
 			var rr struct {
-				Payload map[string]any `json:"payload"`
+				Payload   map[string]any `json:"payload"`
+				TimeoutSec int           `json:"timeoutSec"`
+				MaxRetries int           `json:"maxRetries"`
 			}
 			_ = json.NewDecoder(r.Body).Decode(&rr)
 			payload := td.DefaultPayloadJSON
@@ -658,7 +660,15 @@ func handleTaskDefByID(w http.ResponseWriter, r *http.Request) {
 					payload = string(bs)
 				}
 			}
-			newID, err := store.Current.CreateTask(store.Task{Name: td.Name, Executor: td.Executor, TargetKind: td.TargetKind, TargetRef: td.TargetRef, State: "Pending", PayloadJSON: payload, CreatedAt: time.Now().Unix(), Labels: td.Labels, OriginTaskID: id})
+			timeoutSec := rr.TimeoutSec
+			if timeoutSec <= 0 {
+				timeoutSec = 300 // default 5 minutes
+			}
+			maxRetries := rr.MaxRetries
+			if maxRetries < 0 {
+				maxRetries = 0
+			}
+			newID, err := store.Current.CreateTask(store.Task{Name: td.Name, Executor: td.Executor, TargetKind: td.TargetKind, TargetRef: td.TargetRef, State: "Pending", PayloadJSON: payload, TimeoutSec: timeoutSec, MaxRetries: maxRetries, CreatedAt: time.Now().Unix(), Labels: td.Labels, OriginTaskID: id})
 			if err != nil {
 				http.Error(w, "db error", http.StatusInternalServerError)
 				return
