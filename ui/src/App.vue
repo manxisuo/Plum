@@ -68,7 +68,7 @@ function switchLang(l: string){ locale.value = l; lang.value = l }
     </el-header>
     <el-main>
       <RouterView />
-      <div style="padding:12px 16px 0 16px; color:#888; font-size:12px;">API_BASE: {{ API_BASE || '[proxy /v1 → :8080]' }}</div>
+      <!-- <div style="padding:12px 16px 0 16px; color:#888; font-size:12px;">API_BASE: {{ API_BASE || '[proxy /v1 → :8080]' }}</div> -->
     </el-main>
   </el-container>
 </template>

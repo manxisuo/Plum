@@ -32,7 +32,14 @@ const messages = {
       language: 'Language'
     },
     home: {
-      overview: 'Plum Overview',
+      welcome: {
+        title: 'Welcome to Plum',
+        subtitle: 'Distributed Task Orchestration Platform'
+      },
+      buttons: {
+        refresh: 'Refresh Data',
+        createDeployment: 'Create Deployment'
+      },
       cards: {
         nodes: 'Nodes',
         deployments: 'Deployments',
@@ -41,17 +48,28 @@ const messages = {
         healthy: 'Healthy',
         unhealthy: 'Unhealthy',
         instances: 'Instances',
-        endpoints: 'Endpoints'
+        endpoints: 'Endpoints',
+        totalSize: 'Total Size'
       },
       charts: {
-        nodeHealth: 'Node Health',
-        endpointsTop: 'Endpoints per Service (Top 12)'
+        nodeHealth: 'Node Health Status',
+        endpointsTop: 'Service Endpoints Distribution (Top 12)'
       },
+      health: {
+        healthy: 'Healthy Rate'
+      },
+      quickActions: {
+        title: 'Quick Actions',
+        createDeployment: 'Create Deployment',
+        runTask: 'Run Task',
+        manageResources: 'Manage Resources',
+        viewWorkflows: 'View Workflows'
+      },
+      more: 'more',
       table: {
         node: 'Node',
         health: 'Health'
-      },
-      footerApiBase: 'API_BASE'
+      }
     },
     deployments: {
       columns: { deploymentId: 'DeploymentID', name: 'Name', instances: 'Instances' },
@@ -136,9 +154,16 @@ const messages = {
       columns: { ord: '#', step: 'Step', taskId: 'TaskID', state: 'State' }
     },
     taskDefs: {
+      title: 'Task Definitions',
       buttons: { refresh: 'Refresh', create: 'Create Definition', run: 'Run', details: 'Details' },
       columns: { defId: 'DefID', name: 'Name', executor: 'Executor', target: 'Target', latestState: 'Latest State', latestTime: 'Latest Time', action: 'Action' },
-      dialog: { title: 'Create TaskDefinition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef', serviceVersion: 'Service Version', serviceProtocol: 'Service Protocol', servicePort: 'Service Port', servicePath: 'Service Path' }, footer: { cancel: 'Cancel', submit: 'Submit' } }
+      dialog: { title: 'Create TaskDefinition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef', serviceVersion: 'Service Version', serviceProtocol: 'Service Protocol', servicePort: 'Service Port', servicePath: 'Service Path' }, footer: { cancel: 'Cancel', submit: 'Submit' } },
+      stats: { total: 'Total', running: 'Running', completed: 'Completed', failed: 'Failed' },
+      search: { placeholder: 'Search by name, ID, or executor...' },
+      filter: { executor: 'Executor', state: 'State', all: 'All' },
+      table: { title: 'Task Definitions', items: 'items' },
+      status: { neverRun: 'Never Run' },
+      confirm: { delete: 'Confirm delete this definition?' }
     },
     taskDefDetail: {
       title: 'TaskDefinition Detail',
@@ -235,7 +260,14 @@ const messages = {
       language: '语言'
     },
     home: {
-      overview: 'Plum 概览',
+      welcome: {
+        title: '欢迎使用 Plum',
+        subtitle: '分布式任务编排平台'
+      },
+      buttons: {
+        refresh: '刷新数据',
+        createDeployment: '创建部署'
+      },
       cards: {
         nodes: '节点',
         deployments: '部署',
@@ -244,17 +276,28 @@ const messages = {
         healthy: '健康',
         unhealthy: '不健康',
         instances: '实例',
-        endpoints: '端点'
+        endpoints: '端点',
+        totalSize: '总大小'
       },
       charts: {
-        nodeHealth: '节点健康',
-        endpointsTop: '各服务可用端点数（Top 12）'
+        nodeHealth: '节点健康状态',
+        endpointsTop: '服务端点分布（Top 12）'
       },
+      health: {
+        healthy: '健康率'
+      },
+      quickActions: {
+        title: '快速操作',
+        createDeployment: '创建部署',
+        runTask: '运行任务',
+        manageResources: '管理资源',
+        viewWorkflows: '查看工作流'
+      },
+      more: '更多',
       table: {
         node: '节点',
         health: '健康状态'
-      },
-      footerApiBase: 'API 基础地址'
+      }
     },
     deployments: {
       columns: { deploymentId: '部署ID', name: '名称', instances: '实例数' },
@@ -339,9 +382,16 @@ const messages = {
       columns: { ord: '#', step: '步骤', taskId: '任务ID', state: '状态' }
     },
     taskDefs: {
+      title: '任务定义',
       buttons: { refresh: '刷新', create: '创建定义', run: '运行', details: '详情' },
       columns: { defId: '定义ID', name: '名称', executor: '执行器', target: '目标', latestState: '最新状态', latestTime: '最新时间', action: '操作' },
-      dialog: { title: '创建 TaskDefinition', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用', serviceVersion: '服务版本', serviceProtocol: '服务协议', servicePort: '服务端口', servicePath: '调用路径' }, footer: { cancel: '取消', submit: '提交' } }
+      dialog: { title: '创建 TaskDefinition', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用', serviceVersion: '服务版本', serviceProtocol: '服务协议', servicePort: '服务端口', servicePath: '调用路径' }, footer: { cancel: '取消', submit: '提交' } },
+      stats: { total: '总数', running: '运行中', completed: '已完成', failed: '失败' },
+      search: { placeholder: '按名称、ID或执行器搜索...' },
+      filter: { executor: '执行器', state: '状态', all: '全部' },
+      table: { title: '任务定义列表', items: '项' },
+      status: { neverRun: '从未运行' },
+      confirm: { delete: '确认删除该定义？' }
     },
     taskDefDetail: {
       title: 'TaskDefinition 详情',

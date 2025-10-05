@@ -3,11 +3,21 @@ import { onMounted, onBeforeUnmount, ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Refresh, Plus, List, Loading, Check, Close, Search, VideoPlay, View, Delete, Warning, Clock, InfoFilled } from '@element-plus/icons-vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
 
-type TaskDef = { defId: string; name: string; executor: string; targetKind?: string; targetRef?: string; labels?: Record<string,string>; createdAt?: number; defaultPayloadJSON?: string; DefaultPayloadJSON?: string }
+type TaskDef = { 
+  defId?: string; DefID?: string; 
+  name?: string; Name?: string; 
+  executor?: string; Executor?: string; 
+  targetKind?: string; TargetKind?: string; 
+  targetRef?: string; TargetRef?: string; 
+  labels?: Record<string,string>; 
+  createdAt?: number; 
+  defaultPayloadJSON?: string; DefaultPayloadJSON?: string 
+}
 type TaskRun = { TaskID: string; OriginTaskID?: string; State?: string; CreatedAt?: number }
 
 // 定义视图：defs 列表 + 最近一次运行
@@ -55,6 +65,81 @@ function connectSSE() {
 onMounted(() => { load(); connectSSE() })
 onBeforeUnmount(() => { try { es?.close() } catch {} })
 const { t } = useI18n()
+
+// 搜索和筛选
+const searchText = ref('')
+const selectedExecutor = ref('')
+const selectedState = ref('')
+
+// 计算属性：过滤后的任务定义
+const filteredDefs = computed(() => {
+  let result = defs.value
+  
+  // 按搜索文本过滤
+  if (searchText.value.trim()) {
+    const search = searchText.value.toLowerCase()
+    result = result.filter(def => {
+      const name = (def.name || def.Name || '').toLowerCase()
+      const defId = (def.defId || def.DefID || '').toLowerCase()
+      const executor = (def.executor || def.Executor || '').toLowerCase()
+      return name.includes(search) || defId.includes(search) || executor.includes(search)
+    })
+  }
+  
+  // 按执行器过滤
+  if (selectedExecutor.value) {
+    result = result.filter(def => (def.executor || def.Executor) === selectedExecutor.value)
+  }
+  
+  // 按状态过滤
+  if (selectedState.value) {
+    result = result.filter(def => {
+      const defId = def.defId || def.DefID
+      if (!defId) return false
+      const state = latestByDef.value[defId]?.state
+      return state === selectedState.value
+    })
+  }
+  
+  return result
+})
+
+// 统计计算
+const runningCount = computed(() => {
+  return Object.values(latestByDef.value).filter(item => item.state === 'Running').length
+})
+
+const completedCount = computed(() => {
+  return Object.values(latestByDef.value).filter(item => item.state === 'Completed').length
+})
+
+const failedCount = computed(() => {
+  return Object.values(latestByDef.value).filter(item => item.state === 'Failed').length
+})
+
+// 状态标签类型
+function getStateTagType(state: string) {
+  switch (state) {
+    case 'Running': return 'warning'
+    case 'Completed': return 'success'
+    case 'Succeeded': return 'success'
+    case 'Failed': return 'danger'
+    case 'Cancelled': return 'info'
+    case 'Pending': return 'info'
+    default: return ''
+  }
+}
+
+// 时间格式化
+function formatTime(timestamp: number) {
+  if (!timestamp) return ''
+  return new Date(timestamp * 1000).toLocaleTimeString()
+}
+
+function formatDate(timestamp: number) {
+  if (!timestamp) return ''
+  return new Date(timestamp * 1000).toLocaleDateString()
+}
 
 async function delTask(id: string) {
   try {
@@ -218,15 +303,98 @@ async function onDel(id: string) {
 
 <template>
   <div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <el-button type="primary" :loading="loading" @click="load">{{ t('taskDefs.buttons.refresh') }}</el-button>
-      <el-button type="success" @click="openCreate">{{ t('taskDefs.buttons.create') }}</el-button>
+    <!-- 页面标题、统计和操作 -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
+      <h2 style="margin:0; font-size:20px; flex-shrink:0;">{{ t('taskDefs.title') }}</h2>
+      
+      <!-- 统计信息 -->
+      <div style="display:flex; gap:20px; align-items:center; flex:1; justify-content:center;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #409EFF, #67C23A); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><List /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ defs.length }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('taskDefs.stats.total') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #E6A23C, #F56C6C); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><Loading /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ runningCount }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('taskDefs.stats.running') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #67C23A, #85CE61); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><Check /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ completedCount }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('taskDefs.stats.completed') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #F56C6C, #F78989); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><Close /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ failedCount }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('taskDefs.stats.failed') }}</span>
+        </div>
+      </div>
+      
+      <!-- 操作按钮 -->
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <el-button type="primary" :loading="loading" @click="load">
+          <el-icon><Refresh /></el-icon>
+          {{ t('taskDefs.buttons.refresh') }}
+        </el-button>
+        <el-button type="success" @click="openCreate">
+          <el-icon><Plus /></el-icon>
+          {{ t('taskDefs.buttons.create') }}
+        </el-button>
+      </div>
     </div>
-    <el-table v-loading="loading" :data="defs" style="width:100%; margin-top:12px;">
+
+    <!-- 搜索和筛选 -->
+    <div style="display:flex; gap:12px; align-items:center; margin-bottom:16px;">
+      <el-input
+        v-model="searchText"
+        :placeholder="t('taskDefs.search.placeholder')"
+        style="width:300px;"
+        clearable>
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-select v-model="selectedExecutor" :placeholder="t('taskDefs.filter.executor')" clearable style="width:150px;">
+        <el-option :label="t('taskDefs.filter.all')" value="" />
+        <el-option label="embedded" value="embedded" />
+        <el-option label="service" value="service" />
+        <el-option label="os_process" value="os_process" />
+      </el-select>
+      <el-select v-model="selectedState" :placeholder="t('taskDefs.filter.state')" clearable style="width:150px;">
+        <el-option :label="t('taskDefs.filter.all')" value="" />
+        <el-option label="Running" value="Running" />
+        <el-option label="Completed" value="Completed" />
+        <el-option label="Failed" value="Failed" />
+        <el-option label="Cancelled" value="Cancelled" />
+      </el-select>
+    </div>
+
+    <!-- 任务定义表格 -->
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('taskDefs.table.title') }}</span>
+          <span style="font-size:14px; color:#909399;">{{ filteredDefs.length }} {{ t('taskDefs.table.items') }}</span>
+        </div>
+      </template>
+      
+      <el-table v-loading="loading" :data="filteredDefs" style="width:100%;" stripe>
       <el-table-column :label="t('taskDefs.columns.defId')" width="280">
         <template #default="{ row }">{{ (row as any).defId || (row as any).DefID }}</template>
       </el-table-column>
-      <el-table-column :label="t('taskDefs.columns.name')" width="220">
+      <el-table-column :label="t('taskDefs.columns.name')" width="200">
         <template #default="{ row }">{{ (row as any).name || (row as any).Name }}</template>
       </el-table-column>
       <el-table-column :label="t('taskDefs.columns.executor')" width="120">
@@ -235,28 +403,55 @@ async function onDel(id: string) {
       <el-table-column :label="t('taskDefs.columns.target')">
         <template #default="{ row }">{{ ((row as any).targetKind||(row as any).TargetKind)||'' }} {{ ((row as any).targetRef||(row as any).TargetRef)||'' }}</template>
       </el-table-column>
-      <el-table-column :label="t('taskDefs.columns.latestState')" width="120">
+      <el-table-column :label="t('taskDefs.columns.latestState')" width="140">
         <template #default="{ row }">
-          {{ latestByDef[(row as any).defId || (row as any).DefID]?.state || '-' }}
+          <el-tag :type="getStateTagType(latestByDef[(row as any).defId || (row as any).DefID]?.state)" size="small">
+            <el-icon style="margin-right:4px;">
+              <Loading v-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Running'" />
+              <Check v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Completed'" />
+              <Check v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Succeeded'" />
+              <Close v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Failed'" />
+              <Warning v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Cancelled'" />
+              <Clock v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Pending'" />
+              <InfoFilled v-else />
+            </el-icon>
+            {{ latestByDef[(row as any).defId || (row as any).DefID]?.state || t('taskDefs.status.neverRun') }}
+          </el-tag>
         </template>
       </el-table-column>
-      <el-table-column :label="t('taskDefs.columns.latestTime')" width="170">
+      <el-table-column :label="t('taskDefs.columns.latestTime')" width="120">
         <template #default="{ row }">
-          {{ new Date(((latestByDef[(row as any).defId || (row as any).DefID]?.createdAt)||0)*1000).toLocaleString() }}
+          <div v-if="latestByDef[(row as any).defId || (row as any).DefID]?.createdAt">
+            <div style="font-size:13px;">{{ formatTime(latestByDef[(row as any).defId || (row as any).DefID]?.createdAt) }}</div>
+            <div style="font-size:12px; color:#909399;">{{ formatDate(latestByDef[(row as any).defId || (row as any).DefID]?.createdAt) }}</div>
+          </div>
+          <span v-else style="color:#C0C4CC;">{{ t('taskDefs.status.neverRun') }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.action')" width="340">
+      <el-table-column :label="t('common.action')" width="240" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" type="primary" @click="runDef((row as any).defId || (row as any).DefID)">{{ t('taskDefs.buttons.run') }}</el-button>
-          <el-button size="small" @click="router.push('/tasks/defs/'+((row as any).defId || (row as any).DefID))">{{ t('taskDefs.buttons.details') }}</el-button>
-          <el-popconfirm title="确认删除该定义？" @confirm="onDel(((row as any).defId || (row as any).DefID))">
-            <template #reference>
-              <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
-            </template>
-          </el-popconfirm>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <el-button size="small" type="primary" @click="runDef((row as any).defId || (row as any).DefID)">
+              <el-icon><VideoPlay /></el-icon>
+              {{ t('taskDefs.buttons.run') }}
+            </el-button>
+            <el-button size="small" @click="router.push('/tasks/defs/'+((row as any).defId || (row as any).DefID))">
+              <el-icon><View /></el-icon>
+              {{ t('taskDefs.buttons.details') }}
+            </el-button>
+            <el-popconfirm :title="t('taskDefs.confirm.delete')" @confirm="onDel(((row as any).defId || (row as any).DefID))">
+              <template #reference>
+                <el-button size="small" type="danger">
+                  <el-icon><Delete /></el-icon>
+                  {{ t('common.delete') }}
+                </el-button>
+              </template>
+            </el-popconfirm>
+          </div>
         </template>
       </el-table-column>
     </el-table>
+    </el-card>
 
     <el-dialog v-model="showCreate" :title="t('taskDefs.dialog.title')" width="600px">
       <el-form label-width="120px">
