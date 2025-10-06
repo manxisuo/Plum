@@ -24,6 +24,8 @@ type Assignment struct {
 	Desired      DesiredState
 	ArtifactURL  string
 	StartCmd     string
+	AppName      string // 应用名称
+	AppVersion   string // 应用版本
 }
 
 type InstanceStatus struct {
@@ -205,6 +207,7 @@ type Store interface {
 	SaveArtifact(a Artifact) (string, error)
 	ListArtifacts() ([]Artifact, error)
 	GetArtifact(id string) (Artifact, bool, error)
+	GetArtifactByPath(path string) (Artifact, bool, error)
 	DeleteArtifact(id string) error
 
 	ListDeployments() ([]Deployment, error)

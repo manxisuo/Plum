@@ -77,7 +77,7 @@ int main() {
 			// very simple parse: not introducing json lib, search tokens
             std::vector<AssignmentItem> items;
 			std::string s = asg.body;
-			// naive parsing: find instanceId, artifactUrl, startCmd occurrences
+			// naive parsing: find instanceId, artifactUrl, startCmd, appName, appVersion occurrences
 			size_t pos = 0;
             while (true) {
                 size_t i1 = s.find("\"instanceId\":\"", pos); if (i1 == std::string::npos) break; i1 += 14; size_t e1 = s.find("\"", i1);
@@ -92,13 +92,26 @@ int main() {
                 size_t i3 = s.find("\"startCmd\":\"", e2);
                 if (i3 != std::string::npos) { i3 += 12; size_t e3 = s.find("\"", i3); cmd = s.substr(i3, e3-i3); pos = e3 + 1; }
                 else { cmd.clear(); pos = e2 + 1; }
+                
+                // appName 可选
+                std::string appName;
+                size_t i4 = s.find("\"appName\":\"", pos);
+                if (i4 != std::string::npos) { i4 += 11; size_t e4 = s.find("\"", i4); appName = s.substr(i4, e4-i4); pos = e4 + 1; }
+                else { pos = e2 + 1; }
+                
+                // appVersion 可选
+                std::string appVersion;
+                size_t i5 = s.find("\"appVersion\":\"", pos);
+                if (i5 != std::string::npos) { i5 += 14; size_t e5 = s.find("\"", i5); appVersion = s.substr(i5, e5-i5); pos = e5 + 1; }
+                else { pos = e2 + 1; }
+                
             // Normalize artifact URL: support absolute, /relative, and bare paths
             if (!(art.rfind("http://", 0) == 0 || art.rfind("https://", 0) == 0)) {
                 if (!art.empty() && art[0] == '/') art = controller + art;
                 else art = controller + "/" + art;
             }
                 if (desired == "Running") {
-                    AssignmentItem it{ inst, art, cmd };
+                    AssignmentItem it{ inst, art, cmd, appName, appVersion };
                     items.push_back(it);
                 }
 			}

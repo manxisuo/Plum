@@ -83,6 +83,16 @@ void Reconciler::ensure_running(const AssignmentItem& it) {
 		// child
         // 新建会话/进程组，便于组信号终止
         (void)setsid();
+        
+        // 设置应用相关的环境变量
+        if (!it.appName.empty()) {
+            setenv("PLUM_APP_NAME", it.appName.c_str(), 1);
+        }
+        if (!it.appVersion.empty()) {
+            setenv("PLUM_APP_VERSION", it.appVersion.c_str(), 1);
+        }
+        setenv("PLUM_INSTANCE_ID", it.instanceId.c_str(), 1);
+        
         execl("/bin/sh", "sh", "-c", full_cmd.c_str(), (char*)nullptr);
 		std::perror("exec");
 		_Exit(127);

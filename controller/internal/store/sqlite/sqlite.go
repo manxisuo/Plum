@@ -228,6 +228,13 @@ func migrate(db *sql.DB) error {
 	if err := ensureColumn(db, "workflow_steps", "labels", "TEXT"); err != nil {
 		return err
 	}
+	// Add app_name and app_version columns to assignments table
+	if err := ensureColumn(db, "assignments", "app_name", "TEXT"); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "assignments", "app_version", "TEXT"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -312,7 +319,7 @@ func (s *sqliteStore) DeleteNode(id string) error {
 }
 
 func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment, error) {
-	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE node_id=?`, nodeID)
+	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd, app_name, app_version FROM assignments WHERE node_id=?`, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +327,7 @@ func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment,
 	var out []store.Assignment
 	for rows.Next() {
 		var a store.Assignment
-		if err := rows.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
+		if err := rows.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd, &a.AppName, &a.AppVersion); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -329,9 +336,9 @@ func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment,
 }
 
 func (s *sqliteStore) GetAssignment(instanceID string) (store.Assignment, bool, error) {
-	row := s.db.QueryRow(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE instance_id=?`, instanceID)
+	row := s.db.QueryRow(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd, app_name, app_version FROM assignments WHERE instance_id=?`, instanceID)
 	var a store.Assignment
-	if err := row.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
+	if err := row.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd, &a.AppName, &a.AppVersion); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.Assignment{}, false, nil
 		}
@@ -344,8 +351,8 @@ func (s *sqliteStore) AddAssignment(nodeID string, a store.Assignment) error {
 	if nodeID == "" {
 		return errors.New("nodeID required")
 	}
-	_, err := s.db.Exec(`INSERT INTO assignments(instance_id, deployment_id, node_id, desired, artifact_url, start_cmd) VALUES(?,?,?,?,?,?)`,
-		a.InstanceID, a.DeploymentID, nodeID, a.Desired, a.ArtifactURL, a.StartCmd,
+	_, err := s.db.Exec(`INSERT INTO assignments(instance_id, deployment_id, node_id, desired, artifact_url, start_cmd, app_name, app_version) VALUES(?,?,?,?,?,?,?,?)`,
+		a.InstanceID, a.DeploymentID, nodeID, a.Desired, a.ArtifactURL, a.StartCmd, a.AppName, a.AppVersion,
 	)
 	return err
 }
@@ -424,7 +431,7 @@ func (s *sqliteStore) DeleteDeployment(id string) error {
 }
 
 func (s *sqliteStore) ListAssignmentsForDeployment(deploymentID string) ([]store.Assignment, error) {
-	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd FROM assignments WHERE deployment_id=?`, deploymentID)
+	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd, app_name, app_version FROM assignments WHERE deployment_id=?`, deploymentID)
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +439,7 @@ func (s *sqliteStore) ListAssignmentsForDeployment(deploymentID string) ([]store
 	var out []store.Assignment
 	for rows.Next() {
 		var a store.Assignment
-		if err := rows.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd); err != nil {
+		if err := rows.Scan(&a.InstanceID, &a.DeploymentID, &a.NodeID, &a.Desired, &a.ArtifactURL, &a.StartCmd, &a.AppName, &a.AppVersion); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -601,6 +608,18 @@ func (s *sqliteStore) ListArtifacts() ([]store.Artifact, error) {
 
 func (s *sqliteStore) GetArtifact(id string) (store.Artifact, bool, error) {
 	row := s.db.QueryRow(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at FROM artifacts WHERE artifact_id=?`, id)
+	var a store.Artifact
+	if err := row.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.Artifact{}, false, nil
+		}
+		return store.Artifact{}, false, err
+	}
+	return a, true, nil
+}
+
+func (s *sqliteStore) GetArtifactByPath(path string) (store.Artifact, bool, error) {
+	row := s.db.QueryRow(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at FROM artifacts WHERE path=?`, path)
 	var a store.Artifact
 	if err := row.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

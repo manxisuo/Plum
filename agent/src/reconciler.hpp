@@ -9,6 +9,8 @@ struct AssignmentItem {
 	std::string instanceId;
 	std::string artifactUrl;
 	std::string startCmd;
+	std::string appName;      // 应用名称
+	std::string appVersion;   // 应用版本
 };
 
 class Reconciler {
