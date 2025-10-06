@@ -23,6 +23,7 @@ import TaskDefs from './views/TaskDefs.vue'
 import TaskDefDetail from './views/TaskDefDetail.vue'
 // @ts-ignore
 import Resources from './views/Resources.vue'
+import Workers from './views/Workers.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -39,6 +40,7 @@ export const router = createRouter({
     { path: '/tasks/defs/:id', component: TaskDefDetail, props: true },
     { path: '/tasks', component: Tasks },
     { path: '/resources', component: Resources },
+    { path: '/workers', component: Workers },
     { path: '/assignments', component: Assignments },
     // deployments
     { path: '/deployments', component: DeploymentsList },

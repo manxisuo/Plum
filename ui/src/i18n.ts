@@ -29,6 +29,7 @@ const messages = {
       tasks: 'Tasks',
       deployments: 'Deployments',
       resources: 'Resources',
+      workers: 'Workers',
       language: 'Language'
     },
     home: {
@@ -149,6 +150,65 @@ const messages = {
       table: { title: 'Application Packages', items: 'items' },
       columns: { app: 'App', version: 'Version', artifact: 'Artifact', sizeBytes: 'Size(Bytes)', uploadedAt: 'UploadedAt', action: 'Action' },
       confirmDelete: 'Confirm delete this artifact?'
+    },
+    workers: {
+      title: 'Worker Management',
+      subtitle: 'Manage embedded workers and HTTP workers',
+      stats: {
+        totalWorkers: 'Total Workers',
+        activeApps: 'Active Apps',
+        supportedServices: 'Supported Services',
+        healthRate: 'Health Rate'
+      },
+      tabs: {
+        embedded: 'Embedded Workers',
+        http: 'HTTP Workers'
+      },
+      filters: {
+        appName: 'App Name',
+        node: 'Node',
+        status: 'Status',
+        search: 'Search...'
+      },
+      status: {
+        healthy: 'Healthy',
+        warning: 'Warning',
+        offline: 'Offline'
+      },
+      columns: {
+        appInfo: 'App Info',
+        node: 'Node',
+        supportedTasks: 'Supported Tasks',
+        status: 'Status',
+        lastSeen: 'Last Seen',
+        actions: 'Actions'
+      },
+      buttons: {
+        refresh: 'Refresh',
+        details: 'Details',
+        delete: 'Delete'
+      },
+      details: {
+        title: 'Worker Details',
+        basicInfo: 'Basic Info',
+        supportedTasks: 'Supported Tasks',
+        labels: 'Labels',
+        workerId: 'Worker ID',
+        appName: 'App Name',
+        version: 'Version',
+        instanceId: 'Instance ID',
+        node: 'Node',
+        grpcAddress: 'gRPC Address',
+        httpUrl: 'HTTP URL',
+        lastHeartbeat: 'Last Heartbeat',
+        capacity: 'Capacity'
+      },
+      messages: {
+        loadFailed: 'Load failed',
+        deleteSuccess: 'Delete successful',
+        deleteFailed: 'Delete failed'
+      },
+      confirmDelete: 'Confirm delete this worker?'
     },
     services: {
       title: 'Services',
@@ -303,6 +363,7 @@ const messages = {
       tasks: '任务',
       deployments: '部署',
       resources: '资源',
+      workers: '工作器',
       language: '语言'
     },
     home: {
@@ -423,6 +484,65 @@ const messages = {
       table: { title: '应用包列表', items: '项' },
       columns: { app: '应用', version: '版本', artifact: '制品', sizeBytes: '大小(字节)', uploadedAt: '上传时间', action: '操作' },
       confirmDelete: '确认删除该包？'
+    },
+    workers: {
+      title: '工作器管理',
+      subtitle: '管理嵌入式工作器和HTTP工作器',
+      stats: {
+        totalWorkers: '总工作器',
+        activeApps: '活跃应用',
+        supportedServices: '支持服务',
+        healthRate: '健康率'
+      },
+      tabs: {
+        embedded: '嵌入式工作器',
+        http: 'HTTP工作器'
+      },
+      filters: {
+        appName: '应用名称',
+        node: '节点',
+        status: '状态',
+        search: '搜索...'
+      },
+      status: {
+        healthy: '健康',
+        warning: '警告',
+        offline: '离线'
+      },
+      columns: {
+        appInfo: '应用信息',
+        node: '节点',
+        supportedTasks: '支持的任务',
+        status: '状态',
+        lastSeen: '最后心跳',
+        actions: '操作'
+      },
+      buttons: {
+        refresh: '刷新',
+        details: '详情',
+        delete: '删除'
+      },
+      details: {
+        title: '工作器详情',
+        basicInfo: '基本信息',
+        supportedTasks: '支持的任务',
+        labels: '标签信息',
+        workerId: '工作器ID',
+        appName: '应用名称',
+        version: '版本',
+        instanceId: '实例ID',
+        node: '节点',
+        grpcAddress: 'gRPC地址',
+        httpUrl: 'HTTP地址',
+        lastHeartbeat: '最后心跳',
+        capacity: '容量'
+      },
+      messages: {
+        loadFailed: '加载失败',
+        deleteSuccess: '删除成功',
+        deleteFailed: '删除失败'
+      },
+      confirmDelete: '确认删除该工作器？'
     },
     services: {
       title: '服务',

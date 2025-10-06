@@ -26,6 +26,11 @@ const latestByDef = ref<Record<string, { state: string; createdAt: number; taskI
 const loading = ref(false)
 let es: EventSource | null = null
 
+// 下拉框数据源
+const availableNodes = ref<string[]>([])
+const availableApps = ref<string[]>([])
+const availableServices = ref<string[]>([])
+
 // 分页相关
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -62,6 +67,47 @@ async function load() {
     latestByDef.value = {}
   } finally {
     loading.value = false
+  }
+}
+
+// 加载下拉框数据
+async function loadDropdownData() {
+  try {
+    // 加载节点列表
+    const nodesRes = await fetch(`${API_BASE}/v1/nodes`)
+    if (nodesRes.ok) {
+      const nodes = await nodesRes.json()
+      availableNodes.value = nodes.map((n: any) => n.nodeId).filter(Boolean)
+    }
+
+    // 加载应用列表
+    const [embeddedRes, httpRes] = await Promise.all([
+      fetch(`${API_BASE}/v1/embedded-workers`),
+      fetch(`${API_BASE}/v1/workers`)
+    ])
+    
+    const apps = new Set<string>()
+    if (embeddedRes.ok) {
+      const embedded = await embeddedRes.json()
+      embedded.forEach((w: any) => {
+        if (w.AppName) apps.add(w.AppName)
+      })
+    }
+    if (httpRes.ok) {
+      const http = await httpRes.json()
+      http.forEach((w: any) => {
+        if (w.Labels?.appName) apps.add(w.Labels.appName)
+      })
+    }
+    availableApps.value = Array.from(apps).sort()
+
+    // 加载服务列表
+    const servicesRes = await fetch(`${API_BASE}/v1/services/list`)
+    if (servicesRes.ok) {
+      availableServices.value = await servicesRes.json()
+    }
+  } catch (e) {
+    console.warn('Failed to load dropdown data:', e)
   }
 }
 
@@ -271,7 +317,7 @@ const command = ref<string>('')
 const envVars = ref<Record<string, string>>({})
 
 function resetForm() { form.defId=''; form.name=''; form.executor='embedded'; form.targetKind='node'; form.targetRef=''; form.labels={}; defaultPayloadText.value=''; command.value=''; envVars.value={} }
-function openCreate() { resetForm(); showCreate.value = true }
+function openCreate() { resetForm(); showCreate.value = true; loadDropdownData() }
 
 // Executor ↔ TargetKind 约束
 const ALL_KINDS: string[] = ['service','deployment','node','app']
@@ -285,6 +331,20 @@ watch(() => form.executor, () => {
   if (!allowedKinds.value.includes((form.targetKind||'') as string)) {
     form.targetKind = ''
   }
+})
+
+// 计算目标引用的选项
+const targetRefOptions = computed(() => {
+  if (form.executor === 'service' && form.targetKind === 'service') {
+    return availableServices.value
+  } else if (form.executor === 'embedded' && form.targetKind === 'node') {
+    return availableNodes.value
+  } else if (form.executor === 'embedded' && form.targetKind === 'app') {
+    return availableApps.value
+  } else if (form.executor === 'os_process' && form.targetKind === 'node') {
+    return availableNodes.value
+  }
+  return []
 })
 
 async function submit() {
@@ -586,12 +646,42 @@ async function onDel(id: string) {
           </div>
         </el-form-item>
         <el-form-item :label="t('taskDefs.dialog.form.targetRef')" :required="form.executor === 'service'">
-          <el-input v-model="form.targetRef" :placeholder="getTargetRefPlaceholder()" />
+          <el-select 
+            v-model="form.targetRef" 
+            :placeholder="getTargetRefPlaceholder()"
+            clearable
+            filterable
+            allow-create
+            style="width: 100%"
+          >
+            <el-option
+              v-for="option in targetRefOptions"
+              :key="option"
+              :label="option"
+              :value="option"
+            />
+          </el-select>
         </el-form-item>
         <template v-if="form.executor==='service'">
           <el-form-item :label="t('taskDefs.dialog.form.serviceVersion')"><el-input v-model="(form as any).serviceVersion" placeholder="如 1.0.0（可选）" /></el-form-item>
-          <el-form-item :label="t('taskDefs.dialog.form.serviceProtocol')"><el-input v-model="(form as any).serviceProtocol" placeholder="http 或 https（可选）" /></el-form-item>
-          <el-form-item :label="t('taskDefs.dialog.form.servicePort')"><el-input v-model="(form as any).servicePort" placeholder="如 8080（可选）" /></el-form-item>
+          <el-form-item :label="t('taskDefs.dialog.form.serviceProtocol')">
+            <el-select v-model="(form as any).serviceProtocol" placeholder="选择协议（可选）" clearable style="width: 100%">
+              <el-option label="http" value="http" />
+              <el-option label="https" value="https" />
+            </el-select>
+          </el-form-item>
+          <el-form-item :label="t('taskDefs.dialog.form.servicePort')">
+            <el-select v-model="(form as any).servicePort" placeholder="选择端口（可选）" clearable filterable allow-create style="width: 100%">
+              <el-option label="80" value="80" />
+              <el-option label="443" value="443" />
+              <el-option label="8080" value="8080" />
+              <el-option label="8443" value="8443" />
+              <el-option label="3000" value="3000" />
+              <el-option label="5000" value="5000" />
+              <el-option label="8000" value="8000" />
+              <el-option label="9000" value="9000" />
+            </el-select>
+          </el-form-item>
           <el-form-item :label="t('taskDefs.dialog.form.servicePath')"><el-input v-model="(form as any).servicePath" placeholder="如 /task 或 /tasks/execute（可选）" /></el-form-item>
         </template>
         <template v-if="form.executor==='os_process'">
