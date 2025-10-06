@@ -105,7 +105,7 @@ func migrate(db *sql.DB) error {
             labels TEXT,
             origin_task_id TEXT
         );`,
-		// Workers for embedded executor
+		// Workers for embedded executor (legacy HTTP-based)
 		`CREATE TABLE IF NOT EXISTS workers (
             worker_id TEXT PRIMARY KEY,
             node_id TEXT,
@@ -113,6 +113,18 @@ func migrate(db *sql.DB) error {
             tasks TEXT,
             labels TEXT,
             capacity INTEGER,
+            last_seen INTEGER
+        );`,
+		// Embedded Workers (new gRPC-based)
+		`CREATE TABLE IF NOT EXISTS embedded_workers (
+            worker_id TEXT PRIMARY KEY,
+            node_id TEXT,
+            instance_id TEXT,
+            app_name TEXT,
+            app_version TEXT,
+            grpc_address TEXT,
+            tasks TEXT,
+            labels TEXT,
             last_seen INTEGER
         );`,
 		// Workflows (definitions)
@@ -750,6 +762,62 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// Embedded Workers (new gRPC-based)
+func (s *sqliteStore) RegisterEmbeddedWorker(w store.EmbeddedWorker) error {
+	tasksJSON, _ := json.Marshal(w.Tasks)
+	labelsJSON, _ := json.Marshal(w.Labels)
+	_, err := s.db.Exec(`INSERT INTO embedded_workers(worker_id, node_id, instance_id, app_name, app_version, grpc_address, tasks, labels, last_seen) VALUES(?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(worker_id) DO UPDATE SET node_id=excluded.node_id, instance_id=excluded.instance_id, app_name=excluded.app_name, app_version=excluded.app_version, grpc_address=excluded.grpc_address, tasks=excluded.tasks, labels=excluded.labels, last_seen=excluded.last_seen`,
+		w.WorkerID, w.NodeID, w.InstanceID, w.AppName, w.AppVersion, w.GRPCAddress, string(tasksJSON), string(labelsJSON), w.LastSeen,
+	)
+	return err
+}
+
+func (s *sqliteStore) HeartbeatEmbeddedWorker(workerID string, lastSeen int64) error {
+	_, err := s.db.Exec(`UPDATE embedded_workers SET last_seen=? WHERE worker_id=?`, lastSeen, workerID)
+	return err
+}
+
+func (s *sqliteStore) ListEmbeddedWorkers() ([]store.EmbeddedWorker, error) {
+	rows, err := s.db.Query(`SELECT worker_id, node_id, instance_id, app_name, app_version, grpc_address, tasks, labels, last_seen FROM embedded_workers ORDER BY last_seen DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.EmbeddedWorker
+	for rows.Next() {
+		var w store.EmbeddedWorker
+		var tasksStr, labelsStr string
+		if err := rows.Scan(&w.WorkerID, &w.NodeID, &w.InstanceID, &w.AppName, &w.AppVersion, &w.GRPCAddress, &tasksStr, &labelsStr, &w.LastSeen); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(tasksStr), &w.Tasks)
+		_ = json.Unmarshal([]byte(labelsStr), &w.Labels)
+		out = append(out, w)
+	}
+	return out, nil
+}
+
+func (s *sqliteStore) GetEmbeddedWorker(workerID string) (store.EmbeddedWorker, bool, error) {
+	row := s.db.QueryRow(`SELECT worker_id, node_id, instance_id, app_name, app_version, grpc_address, tasks, labels, last_seen FROM embedded_workers WHERE worker_id=?`, workerID)
+	var w store.EmbeddedWorker
+	var tasksStr, labelsStr string
+	if err := row.Scan(&w.WorkerID, &w.NodeID, &w.InstanceID, &w.AppName, &w.AppVersion, &w.GRPCAddress, &tasksStr, &labelsStr, &w.LastSeen); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.EmbeddedWorker{}, false, nil
+		}
+		return store.EmbeddedWorker{}, false, err
+	}
+	_ = json.Unmarshal([]byte(tasksStr), &w.Tasks)
+	_ = json.Unmarshal([]byte(labelsStr), &w.Labels)
+	return w, true, nil
+}
+
+func (s *sqliteStore) DeleteEmbeddedWorker(workerID string) error {
+	_, err := s.db.Exec(`DELETE FROM embedded_workers WHERE worker_id=?`, workerID)
+	return err
 }
 
 // ---- Workflows (sequential MVP - placeholder implementations) ----

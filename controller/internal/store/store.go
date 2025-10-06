@@ -88,7 +88,7 @@ type Endpoint struct {
 	LastSeen    int64
 }
 
-// Embedded Worker capability (executor=embedded)
+// Embedded Worker capability (executor=embedded) - Legacy HTTP-based
 type Worker struct {
 	WorkerID string
 	NodeID   string
@@ -97,6 +97,19 @@ type Worker struct {
 	Labels   map[string]string
 	Capacity int
 	LastSeen int64
+}
+
+// Embedded Worker capability (executor=embedded) - New gRPC-based
+type EmbeddedWorker struct {
+	WorkerID    string
+	NodeID      string
+	InstanceID  string   // app instance ID
+	AppName     string   // app name from environment
+	AppVersion  string   // app version from environment
+	GRPCAddress string   // gRPC server address (host:port)
+	Tasks       []string // supported task names
+	Labels      map[string]string
+	LastSeen    int64
 }
 
 // Workflow (sequential MVP)
@@ -235,6 +248,13 @@ type Store interface {
 	RegisterWorker(w Worker) error
 	HeartbeatWorker(workerID string, capacity int, lastSeen int64) error
 	ListWorkers() ([]Worker, error)
+
+	// Embedded Workers (new gRPC-based)
+	RegisterEmbeddedWorker(w EmbeddedWorker) error
+	HeartbeatEmbeddedWorker(workerID string, lastSeen int64) error
+	ListEmbeddedWorkers() ([]EmbeddedWorker, error)
+	GetEmbeddedWorker(workerID string) (EmbeddedWorker, bool, error)
+	DeleteEmbeddedWorker(workerID string) error
 
 	// Resources
 	RegisterResource(r Resource) error

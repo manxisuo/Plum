@@ -53,6 +53,14 @@ sdk_cpp_radar_sensor:
 sdk_cpp_radar_sensor-run:
 	RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./sdk/cpp/build/examples/radar_sensor/radar_sensor
 
+# SDK C++ grpc_echo_worker
+sdk_cpp_grpc_echo_worker:
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake --build sdk/cpp/build --target grpc_echo_worker -j
+
+sdk_cpp_grpc_echo_worker-run:
+	PLUM_INSTANCE_ID=grpc-instance-001 PLUM_APP_NAME=grpc-echo-app PLUM_APP_VERSION=v2.0.0 WORKER_ID=grpc-echo-1 WORKER_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 GRPC_ADDRESS=0.0.0.0:18082 ./sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker
+
 # 优雅停止agent
 stop-agent:
 	@chmod +x tools/stop_agent.sh

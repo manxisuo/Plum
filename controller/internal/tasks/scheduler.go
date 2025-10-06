@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"plum/controller/internal/grpc"
 	"plum/controller/internal/notify"
 	"plum/controller/internal/store"
 )
@@ -208,12 +209,97 @@ func embeddedTimeoutMs() int {
 }
 
 func runEmbedded(t store.Task) {
+	// First try new gRPC-based embedded workers
+	embeddedWorkers, err := store.Current.ListEmbeddedWorkers()
+	if err == nil && len(embeddedWorkers) > 0 {
+		if runEmbeddedGRPC(t, embeddedWorkers) {
+			return
+		}
+	}
+
+	// Fallback to legacy HTTP-based workers
 	workers, err := store.Current.ListWorkers()
 	if err != nil || len(workers) == 0 {
-		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no workers", time.Now().Unix(), t.Attempt)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no workers available", time.Now().Unix(), t.Attempt)
 		return
 	}
 
+	if runEmbeddedHTTP(t, workers) {
+		return
+	}
+
+	// If both fail, mark task as failed
+	_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no suitable worker found", time.Now().Unix(), t.Attempt)
+}
+
+func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool {
+	var candidates []*store.EmbeddedWorker
+	// First, find all workers that support this task name
+	for i := range embeddedWorkers {
+		w := &embeddedWorkers[i]
+		for _, name := range w.Tasks {
+			if name == t.Name {
+				candidates = append(candidates, w)
+				break
+			}
+		}
+	}
+
+	if len(candidates) == 0 {
+		return false
+	}
+
+	// Filter by target type if specified
+	var candidate *store.EmbeddedWorker
+	if t.TargetKind == "node" && t.TargetRef != "" {
+		// Find worker on specific node
+		for _, w := range candidates {
+			if w.NodeID == t.TargetRef {
+				candidate = w
+				break
+			}
+		}
+	} else if t.TargetKind == "app" && t.TargetRef != "" {
+		// For app, find workers that match the app name
+		for _, w := range candidates {
+			if w.AppName == t.TargetRef {
+				candidate = w
+				break
+			}
+		}
+	} else {
+		// No specific target, pick first available
+		candidate = candidates[0]
+	}
+
+	if candidate == nil {
+		return false
+	}
+
+	// Create gRPC client and execute task
+	client, err := grpc.NewTaskClient(candidate.GRPCAddress)
+	if err != nil {
+		log.Printf("Failed to create gRPC client for worker %s: %v", candidate.WorkerID, err)
+		return false
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(embeddedTimeoutMs())*time.Millisecond)
+	defer cancel()
+
+	log.Printf("tasks: dispatch %s to gRPC worker %s address=%s", t.Name, candidate.WorkerID, candidate.GRPCAddress)
+	result, err := client.ExecuteTask(ctx, t.TaskID, t.Name, t.PayloadJSON)
+	if err != nil {
+		log.Printf("tasks: gRPC call error: %v", err)
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", err.Error(), time.Now().Unix(), t.Attempt)
+		return true
+	}
+
+	_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", result, "", time.Now().Unix(), t.Attempt)
+	return true
+}
+
+func runEmbeddedHTTP(t store.Task, workers []store.Worker) bool {
 	var candidates []*store.Worker
 	// First, find all workers that support this task name
 	for i := range workers {
@@ -227,8 +313,7 @@ func runEmbedded(t store.Task) {
 	}
 
 	if len(candidates) == 0 {
-		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no worker supports task name", time.Now().Unix(), t.Attempt)
-		return
+		return false
 	}
 
 	// Filter by target type if specified
@@ -241,22 +326,13 @@ func runEmbedded(t store.Task) {
 				break
 			}
 		}
-		if candidate == nil {
-			_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("no worker on node %s supports task %s", t.TargetRef, t.Name), time.Now().Unix(), t.Attempt)
-			return
-		}
 	} else if t.TargetKind == "deployment" && t.TargetRef != "" {
 		// For deployment, we need to find workers that are part of this deployment
-		// This is a simplified implementation - in practice you might need more complex logic
 		for _, w := range candidates {
 			if w.Labels != nil && w.Labels["deploymentId"] == t.TargetRef {
 				candidate = w
 				break
 			}
-		}
-		if candidate == nil {
-			_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("no worker in deployment %s supports task %s", t.TargetRef, t.Name), time.Now().Unix(), t.Attempt)
-			return
 		}
 	} else if t.TargetKind == "app" && t.TargetRef != "" {
 		// For app, find workers that are part of this application/service group
@@ -267,20 +343,16 @@ func runEmbedded(t store.Task) {
 				break
 			}
 		}
-		if candidate == nil {
-			_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("no worker for application %s supports task %s", t.TargetRef, t.Name), time.Now().Unix(), t.Attempt)
-			return
-		}
 	} else {
 		// No target specified or unsupported target type, use first available worker
 		candidate = candidates[0]
 	}
 
 	if candidate == nil || candidate.URL == "" {
-		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no matching worker or URL", time.Now().Unix(), t.Attempt)
-		return
+		return false
 	}
-	log.Printf("tasks: dispatch %s to worker %s url=%s", t.Name, candidate.WorkerID, candidate.URL)
+
+	log.Printf("tasks: dispatch %s to HTTP worker %s url=%s", t.Name, candidate.WorkerID, candidate.URL)
 	// synchronous POST to worker URL with task payload
 	m := map[string]any{"taskId": t.TaskID, "name": t.Name}
 	var payload any
@@ -295,7 +367,7 @@ func runEmbedded(t store.Task) {
 	if err != nil {
 		log.Printf("tasks: call worker error: %v", err)
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", err.Error(), time.Now().Unix(), t.Attempt)
-		return
+		return true
 	}
 	defer resp.Body.Close()
 	rb, _ := io.ReadAll(resp.Body)
@@ -305,6 +377,7 @@ func runEmbedded(t store.Task) {
 		log.Printf("tasks: worker responded %d body=%s", resp.StatusCode, string(rb))
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", string(rb), resp.Status, time.Now().Unix(), t.Attempt)
 	}
+	return true
 }
 
 // runService dispatches task to a healthy service endpoint discovered from registry.

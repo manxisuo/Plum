@@ -22,6 +22,14 @@ agent/build/
 sdk/cpp/build/
 sdk/cpp/cmake-build-*/
 
+# gRPC generated files (keep proto files, ignore generated code)
+sdk/cpp/grpc/proto/*.pb.cc
+sdk/cpp/grpc/proto/*.pb.h
+sdk/cpp/grpc/proto/*.grpc.pb.cc
+sdk/cpp/grpc/proto/*.grpc.pb.h
+controller/plum/proto/*.pb.go
+controller/plum/proto/*_grpc.pb.go
+
 # Generic CMake generator outputs
 **/CMakeCache.txt
 **/CMakeFiles/
@@ -51,3 +59,12 @@ artifacts/
 *.log
 *.tmp
 *.bak
+
+# Runtime logs from testing
+controller.log
+worker.log
+agent.log
+
+# Temporary test files
+test_*.html
+test_*.sh

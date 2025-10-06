@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package plum.task;
+
+option go_package = "plum/proto";
+
+service TaskService {
+    rpc ExecuteTask(TaskRequest) returns (TaskResponse);
+    rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+message TaskRequest {
+    string task_id = 1;
+    string name = 2;
+    string payload = 3;
+}
+
+message TaskResponse {
+    string result = 1;
+    string error = 2;
+}
+
+message HealthRequest {
+    string worker_id = 1;
+}
+
+message HealthResponse {
+    bool healthy = 1;
+    string message = 2;
+}
