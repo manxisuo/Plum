@@ -8,6 +8,11 @@
 #include <atomic>
 #include <memory>
 
+// Forward declarations
+namespace httplib {
+    class Server;
+}
+
 namespace plumresource {
 
 // 资源数据类型
@@ -118,6 +123,10 @@ private:
     std::string httpURL_;
     ResourceOpCallback opCallback_;
     std::map<std::string, ResourceDesc> registeredResources_;
+    
+    // HTTP服务器相关
+    httplib::Server* httpServer_{nullptr};
+    std::thread httpServerThread_;
     
     void heartbeatLoop();
     bool doRegister();

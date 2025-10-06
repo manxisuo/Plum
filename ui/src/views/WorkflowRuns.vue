@@ -13,6 +13,11 @@ const workflowId = route.params.workflowId as string
 const runs = ref<any[]>([])
 const loading = ref(false)
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 // 计算属性：统计信息
 const totalRuns = computed(() => runs.value.length)
 const succeededCount = computed(() => {
@@ -23,6 +28,18 @@ const failedCount = computed(() => {
 })
 const runningCount = computed(() => {
   return runs.value.filter(run => (run.state || run.State) === 'Running').length
+})
+
+// 计算属性：分页后的数据
+const paginatedRuns = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return runs.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(runs.value.length / pageSize.value)
 })
 
 async function load() {
@@ -72,6 +89,16 @@ function getStateTagType(state: string) {
     case 'Running': return 'warning'
     default: return 'info'
   }
+}
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
 }
 
 onMounted(load)
@@ -142,7 +169,7 @@ const { t } = useI18n()
         </div>
       </template>
 
-      <el-table :data="runs" v-loading="loading" style="width:100%;" stripe>
+      <el-table :data="paginatedRuns" v-loading="loading" style="width:100%;" stripe>
         <el-table-column :label="t('workflowRuns.columns.runId')" width="320">
           <template #default="{ row }">{{ (row as any).runId || (row as any).RunID }}</template>
         </el-table-column>
@@ -187,6 +214,19 @@ const { t } = useI18n()
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="runs.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>

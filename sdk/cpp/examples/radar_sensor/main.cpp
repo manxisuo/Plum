@@ -40,10 +40,10 @@ public:
             currentAngle_ = angleDist_(gen_);
         }
         
-        states.emplace_back("range", std::to_string(currentRange_));
-        states.emplace_back("angle", std::to_string(currentAngle_));
-        states.emplace_back("active", isActive_ ? "true" : "false");
-        states.emplace_back("power", isActive_ ? "100" : "0");
+        states.emplace_back("范围", std::to_string(currentRange_));
+        states.emplace_back("角度", std::to_string(currentAngle_));
+        states.emplace_back("激活", isActive_ ? "true" : "false");
+        states.emplace_back("能量", isActive_ ? "100" : "0");
         
         return states;
     }
@@ -53,7 +53,7 @@ public:
         std::cout << "[RadarSensor] Received " << operations.size() << " operations:" << std::endl;
         for (const auto& op : operations) {
             std::cout << "[RadarSensor] Processing operation: " << op.name << " = " << op.value << std::endl;
-            if (op.name == "power") {
+            if (op.name == "能量") {
                 if (op.value == "on" || op.value == "true" || op.value == "1") {
                     isActive_ = true;
                     std::cout << "[RadarSensor] Power ON" << std::endl;
@@ -61,7 +61,7 @@ public:
                     isActive_ = false;
                     std::cout << "[RadarSensor] Power OFF" << std::endl;
                 }
-            } else if (op.name == "range") {
+            } else if (op.name == "范围") {
                 try {
                     double range = std::stod(op.value);
                     if (range >= 100.0 && range <= 5000.0) {
@@ -73,7 +73,7 @@ public:
                 } catch (const std::exception& e) {
                     std::cout << "[RadarSensor] Invalid range value: " << op.value << " (exception: " << e.what() << ")" << std::endl;
                 }
-            } else if (op.name == "angle") {
+            } else if (op.name == "角度") {
                 std::cout << "[RadarSensor] Received angle operation with value: " << op.value << std::endl;
                 try {
                     double angle = std::stod(op.value);
@@ -118,15 +118,15 @@ int main() {
     ResourceDesc radarDesc(opt.nodeId, opt.resourceId, "Radar");
     
     // 添加状态描述
-    radarDesc.stateDescList.emplace_back(DataType::DOUBLE, "range", "0.0", "meters");
-    radarDesc.stateDescList.emplace_back(DataType::DOUBLE, "angle", "0.0", "degrees");
-    radarDesc.stateDescList.emplace_back(DataType::BOOL, "active", "false");
-    radarDesc.stateDescList.emplace_back(DataType::INT, "power", "0", "percent");
+    radarDesc.stateDescList.emplace_back(DataType::DOUBLE, "范围", "0.0", "米");
+    radarDesc.stateDescList.emplace_back(DataType::DOUBLE, "角度", "0.0", "度");
+    radarDesc.stateDescList.emplace_back(DataType::BOOL, "激活", "false");
+    radarDesc.stateDescList.emplace_back(DataType::INT, "能量", "0", "%");
     
     // 添加操作描述
-    radarDesc.opDescList.emplace_back(DataType::BOOL, "power", "false", "", "false", "true");
-    radarDesc.opDescList.emplace_back(DataType::DOUBLE, "range", "1000.0", "meters", "100.0", "5000.0");
-    radarDesc.opDescList.emplace_back(DataType::DOUBLE, "angle", "0.0", "degrees", "0.0", "360.0");
+    radarDesc.opDescList.emplace_back(DataType::BOOL, "能量", "false", "", "false", "true");
+    radarDesc.opDescList.emplace_back(DataType::DOUBLE, "范围", "1000.0", "米", "100.0", "5000.0");
+    radarDesc.opDescList.emplace_back(DataType::DOUBLE, "角度", "0.0", "度", "0.0", "360.0");
     
     // 注册资源
     if (!resourceManager.registerResource(radarDesc)) {

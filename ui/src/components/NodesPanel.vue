@@ -10,6 +10,11 @@ const nodes = ref<NodeDTO[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 // 计算属性：统计信息
 const totalNodes = computed(() => nodes.value.length)
 const healthyNodes = computed(() => {
@@ -20,6 +25,18 @@ const unhealthyNodes = computed(() => {
 })
 const unknownNodes = computed(() => {
   return nodes.value.filter(node => node.health === 'Unknown').length
+})
+
+// 计算属性：分页后的数据
+const paginatedNodes = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return nodes.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(nodes.value.length / pageSize.value)
 })
 
 async function refresh() {
@@ -71,6 +88,16 @@ async function remove(id: string) {
     error.value = e?.message || `删除节点 ${id} 失败`
     ElMessage.error(e?.message || `删除节点 ${id} 失败`)
   }
+}
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
 }
 
 onMounted(refresh)
@@ -143,7 +170,7 @@ const { t } = useI18n()
         </div>
       </template>
       
-      <el-table v-loading="loading" :data="nodes" style="width:100%;" stripe>
+      <el-table v-loading="loading" :data="paginatedNodes" style="width:100%;" stripe>
         <el-table-column prop="nodeId" :label="t('nodes.columns.nodeId')" width="200" />
         <el-table-column prop="ip" :label="t('nodes.columns.ip')" width="140" />
         <el-table-column :label="t('nodes.columns.health')" width="120">
@@ -174,6 +201,19 @@ const { t } = useI18n()
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="nodes.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>

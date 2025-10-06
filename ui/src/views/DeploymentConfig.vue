@@ -19,6 +19,11 @@ const nodes = ref<NodeDTO[]>([])
 const entries = ref<any[]>([])
 const labels = ref<Record<string,string>>({})
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 // 计算属性：统计信息
 const totalEntries = computed(() => entries.value.length)
 const totalLabels = computed(() => Object.keys(labels.value).length)
@@ -27,6 +32,28 @@ const totalReplicas = computed(() => {
     return sum + Object.values(entry.replicas || {}).reduce((entrySum: number, count: any) => entrySum + (count || 0), 0)
   }, 0)
 })
+
+// 计算属性：分页后的数据
+const paginatedEntries = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return entries.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(entries.value.length / pageSize.value)
+})
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
 
 async function load() {
   loading.value = true
@@ -130,7 +157,7 @@ const { t } = useI18n()
         </div>
       </template>
       
-      <el-table :data="entries" v-loading="loading" style="width:100%;" stripe>
+      <el-table :data="paginatedEntries" v-loading="loading" style="width:100%;" stripe>
         <el-table-column prop="artifactUrl" :label="t('deploymentConfig.columns.artifact')" />
         <el-table-column prop="startCmd" :label="t('deploymentConfig.columns.startCmd')" />
         <el-table-column :label="t('deploymentConfig.columns.replicas')">
@@ -139,6 +166,19 @@ const { t } = useI18n()
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="entries.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 标签配置 -->

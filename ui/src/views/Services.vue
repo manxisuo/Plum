@@ -9,6 +9,11 @@ const active = ref<string>('')
 const loading = ref(false)
 const eps = ref<Endpoint[]>([])
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 async function loadServices(){
   try { const res = await fetch(`${API_BASE}/v1/services/list`); if (res.ok) services.value = await res.json() as string[]; if (!active.value && services.value.length) { active.value = services.value[0]; loadEndpoints() } } catch {}
 }
@@ -24,6 +29,28 @@ const { t } = useI18n()
 const totalServices = computed(() => services.value.length)
 const totalEndpoints = computed(() => eps.value.length)
 const healthyEndpoints = computed(() => eps.value.filter(ep => ep.healthy).length)
+
+// 计算属性：分页后的数据
+const paginatedEndpoints = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return eps.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(eps.value.length / pageSize.value)
+})
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
 </script>
 
 <template>
@@ -78,7 +105,7 @@ const healthyEndpoints = computed(() => eps.value.filter(ep => ep.healthy).lengt
       </el-card>
       <el-card style="flex:1;">
         <template #header>{{ t('services.endpointsTitle', { name: active || '-' }) }}</template>
-        <el-table :data="eps" v-loading="loading" style="width:100%" stripe>
+            <el-table :data="paginatedEndpoints" v-loading="loading" style="width:100%" stripe>
         <el-table-column prop="instanceId" :label="t('services.columns.instance')" width="320" />
         <el-table-column prop="nodeId" :label="t('services.columns.node')" width="160" />
         <el-table-column :label="t('services.columns.address')">
@@ -90,7 +117,20 @@ const healthyEndpoints = computed(() => eps.value.filter(ep => ep.healthy).lengt
         <el-table-column :label="t('services.columns.lastSeen')" width="200">
           <template #default="{ row }">{{ new Date(row.lastSeen*1000).toLocaleString() }}</template>
         </el-table-column>
-        </el-table>
+            </el-table>
+            
+            <!-- 分页组件 -->
+            <div style="margin-top: 16px; display: flex; justify-content: center;">
+              <el-pagination
+                v-model:current-page="currentPage"
+                v-model:page-size="pageSize"
+                :page-sizes="pageSizes"
+                :total="eps.length"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+              />
+            </div>
       </el-card>
     </div>
   </div>

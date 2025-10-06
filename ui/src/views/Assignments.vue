@@ -15,6 +15,11 @@ const data = ref<Assignments>({ items: [] })
 const nodes = ref<NodeDTO[]>([])
 const url = computed(() => `${API_BASE}/v1/assignments?nodeId=${encodeURIComponent(nodeId.value)}`)
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 // 计算属性：统计信息
 const runningCount = computed(() => {
   return data.value.items.filter(item => item.desired === 'Running').length
@@ -26,6 +31,18 @@ const stoppedCount = computed(() => {
 
 const healthyCount = computed(() => {
   return data.value.items.filter(item => item.healthy).length
+})
+
+// 计算属性：分页后的数据
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return data.value.items.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(data.value.items.length / pageSize.value)
 })
 
 async function fetchAssignments(){
@@ -81,6 +98,16 @@ function openSSE(){
 function closeSSE(){
   if (es) { es.close(); es = null }
 }
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
+
 watch(nodeId, () => { openSSE(); fetchAssignments() })
 onMounted(() => { openSSE() })
 onBeforeUnmount(() => { closeSSE() })
@@ -156,9 +183,9 @@ const { t } = useI18n()
         </div>
       </template>
       
-      <el-table v-loading="loading" :data="data.items" style="width:100%;" stripe>
-        <el-table-column prop="deploymentId" :label="t('assignments.columns.deployment')" width="200" />
-        <el-table-column prop="instanceId" :label="t('assignments.columns.instance')" width="200" />
+      <el-table v-loading="loading" :data="paginatedItems" style="width:100%;" stripe>
+        <el-table-column prop="deploymentId" :label="t('assignments.columns.deployment')" width="160" />
+        <el-table-column prop="instanceId" :label="t('assignments.columns.instance')" width="160" />
         <el-table-column :label="t('assignments.columns.desired')" width="100">
           <template #default="{ row }">
             <el-tag :type="row.desired === 'Running' ? 'success' : 'warning'" size="small">
@@ -185,9 +212,9 @@ const { t } = useI18n()
         <el-table-column :label="t('assignments.columns.lastReportAt')" width="160">
           <template #default="{ row }">{{ row.lastReportAt ? new Date(row.lastReportAt*1000).toLocaleString() : '-' }}</template>
         </el-table-column>
-        <el-table-column prop="startCmd" :label="t('assignments.columns.startCmd')" />
+        <el-table-column prop="startCmd" :label="t('assignments.columns.startCmd')"  width="80" />
         <el-table-column prop="artifactUrl" :label="t('assignments.columns.artifact')" />
-        <el-table-column :label="t('common.action')" width="200" fixed="right">
+        <el-table-column :label="t('common.action')" width="180" fixed="right">
           <template #default="{ row }">
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
               <el-button size="small" type="success" :disabled="row.desired==='Running'" @click="setDesired(row.instanceId, 'Running')">
@@ -202,6 +229,19 @@ const { t } = useI18n()
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="data.items.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>

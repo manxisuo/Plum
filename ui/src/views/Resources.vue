@@ -38,6 +38,11 @@ const showOperationDialog = ref(false)
 const operationResource = ref<Resource | null>(null)
 const operationForm = ref<Record<string, string>>({})
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 let es: EventSource | null = null
 
 // 计算属性：获取当前选中资源的状态描述列表
@@ -46,6 +51,28 @@ const currentStateDesc = computed(() => {
   return selectedResource.value.StateDesc || []
 })
 
+// 计算属性：分页后的数据
+const paginatedResources = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return (resources.value || []).slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil((resources.value || []).length / pageSize.value)
+})
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
+
 async function load() {
   loading.value = true
   try {
@@ -53,10 +80,12 @@ async function load() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json() as Resource[]
     console.log('Loaded resources:', data) // 调试日志
-    resources.value = data
+    resources.value = Array.isArray(data) ? data : []
   } catch (e: any) {
     console.error('Load error:', e) // 调试日志
     ElMessage.error(e?.message || t('resources.messages.loadFailed'))
+    // 确保在错误情况下也重置为安全值
+    resources.value = []
   } finally {
     loading.value = false
   }
@@ -67,9 +96,11 @@ async function loadResourceStates(ResourceID: string) {
     const res = await fetch(`${API_BASE}/v1/resources/states?resourceId=${encodeURIComponent(ResourceID)}&limit=20`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json() as any[]
-    resourceStates.value = data
+    resourceStates.value = Array.isArray(data) ? data : []
   } catch (e: any) {
     ElMessage.error(e?.message || t('resources.messages.stateLoadFailed'))
+    // 确保在错误情况下也重置为安全值
+    resourceStates.value = []
   }
 }
 
@@ -262,14 +293,14 @@ const { t } = useI18n()
   <div>
     <div style="display:flex; gap:16px; height:640px;">
       <!-- 资源列表 -->
-      <el-card style="flex:1.1;">
+      <el-card style="flex:1.2;">
         <template #header>
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span>{{ t('resources.sections.resourceList') }}</span>
             <el-button type="primary" :loading="loading" @click="load">{{ t('resources.buttons.refresh') }}</el-button>
           </div>
         </template>
-        <el-table :data="resources" v-loading="loading" style="width:100%;">
+        <el-table :data="paginatedResources" v-loading="loading" style="width:100%;">
           <el-table-column prop="ResourceID" :label="t('resources.columns.resourceId')" width="120" />
           <el-table-column prop="Type" :label="t('resources.columns.type')" width="90" />
           <el-table-column prop="NodeID" :label="t('resources.columns.nodeId')" width="90" />
@@ -289,6 +320,19 @@ const { t } = useI18n()
             </template>
           </el-table-column>
         </el-table>
+        
+        <!-- 分页组件 -->
+        <div style="margin-top: 16px; display: flex; justify-content: center;">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="pageSizes"
+            :total="(resources || []).length"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
       </el-card>
 
       <!-- 右侧面板 -->

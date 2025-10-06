@@ -14,6 +14,11 @@ type Workflow = { workflowId: string; name: string; labels?: Record<string,strin
 const items = ref<Workflow[]>([])
 const loading = ref(false)
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 async function load() {
   loading.value = true
   try {
@@ -199,12 +204,34 @@ async function submit() {
   } catch (e:any) { ElMessage.error(e?.message || '创建失败') }
 }
 
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
+
 onMounted(load)
 const { t } = useI18n()
 
 // 统计计算
 const totalWorkflows = computed(() => items.value.length)
 const totalSteps = computed(() => items.value.reduce((sum, wf) => sum + (wf.steps?.length || 0), 0))
+
+// 计算属性：分页后的数据
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return items.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(items.value.length / pageSize.value)
+})
 </script>
 
 <template>
@@ -255,7 +282,7 @@ const totalSteps = computed(() => items.value.reduce((sum, wf) => sum + (wf.step
         </div>
       </template>
       
-      <el-table :data="items" v-loading="loading" style="width:100%;" stripe>
+      <el-table :data="paginatedItems" v-loading="loading" style="width:100%;" stripe>
       <el-table-column :label="t('workflows.columns.workflowId')" width="320">
         <template #default="{ row }">{{ (row as any).workflowId || (row as any).WorkflowID }}</template>
       </el-table-column>
@@ -276,6 +303,19 @@ const totalSteps = computed(() => items.value.reduce((sum, wf) => sum + (wf.step
         </template>
       </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="items.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="showCreate" :title="t('workflows.dialog.title')" width="700px">

@@ -1043,3 +1043,11 @@ func (s *sqliteStore) CountTasksByOrigin(defID string) (int, error) {
 	}
 	return n, nil
 }
+
+// Close 关闭数据库连接
+func (s *sqliteStore) Close() error {
+	if s.db != nil {
+		return s.db.Close()
+	}
+	return nil
+}

@@ -14,6 +14,11 @@ const assigns = ref<any[]>([])
 const opLoading = ref(false)
 const selectedNode = ref<string>('')
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 const nodesInDeployment = computed(() => {
   const seen = new Set<string>()
   const out: string[] = []
@@ -35,6 +40,28 @@ const stoppedCount = computed(() => {
 const healthyCount = computed(() => {
   return assigns.value.filter(item => item.healthy).length
 })
+
+// 计算属性：分页后的数据
+const paginatedAssigns = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return assigns.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(assigns.value.length / pageSize.value)
+})
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
 
 async function load() {
   loading.value = true
@@ -187,7 +214,7 @@ async function stopByNode() {
         </div>
       </template>
       
-      <el-table :data="assigns" v-loading="loading" style="width:100%" stripe>
+      <el-table :data="paginatedAssigns" v-loading="loading" style="width:100%" stripe>
         <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="300">
           <template #default="{ row }">{{ row.instanceId || row.InstanceID }}</template>
         </el-table-column>
@@ -232,6 +259,19 @@ async function stopByNode() {
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="assigns.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>

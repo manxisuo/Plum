@@ -7,3 +7,18 @@ body {
   height: 100%;
   margin-top: 0;
 }
+
+/* 全局隐藏文本光标，但保留文本选择功能 */
+* {
+  caret-color: transparent;
+}
+
+/* 输入框和可编辑元素显示正常的文本光标 */
+input, textarea, [contenteditable="true"], .el-input__inner, .el-textarea__inner {
+  caret-color: auto !important;
+}
+
+/* 按钮等交互元素显示手型光标 */
+button, .el-button, .el-menu-item, a, [role="button"] {
+  cursor: pointer !important;
+}

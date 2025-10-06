@@ -62,7 +62,17 @@ bool ResourceManager::start() {
 
 void ResourceManager::stop() {
     stop_.store(true);
+    
+    // Stop HTTP server
+    if (httpServer_) {
+        httpServer_->stop();
+        delete httpServer_;
+        httpServer_ = nullptr;
+    }
+    
+    // Wait for threads to finish
     if (hbThread_.joinable()) hbThread_.join();
+    if (httpServerThread_.joinable()) httpServerThread_.join();
 }
 
 bool ResourceManager::startHttp() {
@@ -143,6 +153,9 @@ bool ResourceManager::startHttp() {
     cli.set_read_timeout(0, 100000);       // 100ms
     cli.set_write_timeout(0, 100000);      // 100ms
     
+    // Store server instance for cleanup
+    httpServer_ = svr;
+    
     std::thread server_thread([this, svr, p, &server_failed, &error_message]{
         try {
             if (!svr->is_valid()) {
@@ -167,7 +180,9 @@ bool ResourceManager::startHttp() {
             server_failed.store(true);
         }
     });
-    server_thread.detach();
+    
+    // Move thread to member variable for proper lifecycle management
+    httpServerThread_ = std::move(server_thread);
     
     // Wait for server to start (up to 5 seconds)
     bool server_ready = false;

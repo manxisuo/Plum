@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 
@@ -17,6 +17,11 @@ const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const loading = ref(false)
 const items = ref<Artifact[]>([])
 const uploadUrl = `${API_BASE}/v1/apps/upload`
+
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
 
 async function load() {
 	loading.value = true
@@ -49,6 +54,28 @@ async function del(id: string) {
   } catch (e:any) {
     ElMessage.error(e?.message || '删除失败')
   }
+}
+
+// 计算属性：分页后的数据
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return items.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(items.value.length / pageSize.value)
+})
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
 }
 
 onMounted(load)
@@ -84,19 +111,19 @@ function artifactHref(row: Artifact): string {
       </el-upload>
     </el-card>
 
-    <el-table v-loading="loading" :data="items" style="width:100%; margin-top:12px;">
-      <el-table-column prop="name" :label="t('apps.columns.app')" width="240" />
-      <el-table-column prop="version" :label="t('apps.columns.version')" width="140" />
+    <el-table v-loading="loading" :data="paginatedItems" style="width:100%; margin-top:12px;">
+      <el-table-column prop="name" :label="t('apps.columns.app')" width="200" />
+      <el-table-column prop="version" :label="t('apps.columns.version')" width="100" />
       <el-table-column :label="t('apps.columns.artifact')">
         <template #default="{ row }">
           <a :href="artifactHref(row)" target="_blank">{{ artifactHref(row) }}</a>
         </template>
       </el-table-column>
       <el-table-column prop="sizeBytes" :label="t('apps.columns.sizeBytes')" width="140" />
-      <el-table-column :label="t('apps.columns.uploadedAt')" width="200">
+      <el-table-column :label="t('apps.columns.uploadedAt')" width="180">
         <template #default="{ row }">{{ new Date(row.createdAt*1000).toLocaleString() }}</template>
       </el-table-column>
-      <el-table-column :label="t('common.action')" width="140">
+      <el-table-column :label="t('common.action')" width="160">
         <template #default="{ row }">
           <el-popconfirm :title="t('apps.confirmDelete')" @confirm="del(row.artifactId)">
             <template #reference>
@@ -106,6 +133,19 @@ function artifactHref(row: Artifact): string {
         </template>
       </el-table-column>
     </el-table>
+    
+    <!-- 分页组件 -->
+    <div style="margin-top: 16px; display: flex; justify-content: center;">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="pageSizes"
+        :total="items.length"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
   </div>
   
 </template>

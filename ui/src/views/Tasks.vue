@@ -26,6 +26,11 @@ const latestByDef = ref<Record<string, { state: string; createdAt: number; taskI
 const loading = ref(false)
 let es: EventSource | null = null
 
+// 分页相关
+const currentPage = ref(1)
+const pageSize = ref(10)
+const pageSizes = [10, 20, 50, 100]
+
 async function load() {
   loading.value = true
   try {
@@ -33,7 +38,10 @@ async function load() {
       fetch(`${API_BASE}/v1/task-defs`),
       fetch(`${API_BASE}/v1/tasks`)
     ])
-    if (dRes.ok) defs.value = await dRes.json() as TaskDef[]
+    if (dRes.ok) {
+      const data = await dRes.json()
+      defs.value = Array.isArray(data) ? data : []
+    }
     if (tRes.ok) {
       const runs = await tRes.json() as any[]
       const map: Record<string, { state: string; createdAt: number; taskId: string }>= {}
@@ -49,6 +57,9 @@ async function load() {
     }
   } catch (e: any) {
     ElMessage.error(e?.message || '加载失败')
+    // 确保在错误情况下也重置为安全值
+    defs.value = []
+    latestByDef.value = {}
   } finally {
     loading.value = false
   }
@@ -73,7 +84,7 @@ const selectedState = ref('')
 
 // 计算属性：过滤后的任务定义
 const filteredDefs = computed(() => {
-  let result = defs.value
+  let result = defs.value || []
   
   // 按搜索文本过滤
   if (searchText.value.trim()) {
@@ -102,6 +113,18 @@ const filteredDefs = computed(() => {
   }
   
   return result
+})
+
+// 计算属性：分页后的数据
+const paginatedDefs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredDefs.value.slice(start, end)
+})
+
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(filteredDefs.value.length / pageSize.value)
 })
 
 // 统计计算
@@ -139,6 +162,38 @@ function formatTime(timestamp: number) {
 function formatDate(timestamp: number) {
   if (!timestamp) return ''
   return new Date(timestamp * 1000).toLocaleDateString()
+}
+
+// 状态翻译函数
+function getStateText(state: string) {
+  if (!state) return t('taskDefs.status.neverRun')
+  switch (state) {
+    case 'Running': return t('taskDefs.status.running')
+    case 'Completed': return t('taskDefs.status.completed')
+    case 'Succeeded': return t('taskDefs.status.succeeded')
+    case 'Failed': return t('taskDefs.status.failed')
+    case 'Cancelled': return t('taskDefs.status.cancelled')
+    case 'Pending': return t('taskDefs.status.pending')
+    default: return state
+  }
+}
+
+// 分页事件处理
+function handleSizeChange(val: number) {
+  pageSize.value = val
+  currentPage.value = 1 // 重置到第一页
+}
+
+function handleCurrentChange(val: number) {
+  currentPage.value = val
+}
+
+// 更新环境变量名
+function updateEnvKey(oldKey: string, newKey: string) {
+  if (oldKey === newKey) return
+  const value = envVars.value[oldKey]
+  delete envVars.value[oldKey]
+  envVars.value[newKey] = value
 }
 
 async function delTask(id: string) {
@@ -183,8 +238,10 @@ async function cancelTask(id: string) {
 const showCreate = ref(false)
 const form = reactive<TaskDef>({ defId:'', name:'', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
 const defaultPayloadText = ref<string>('')
+const command = ref<string>('')
+const envVars = ref<Record<string, string>>({})
 
-function resetForm() { form.defId=''; form.name=''; form.executor='embedded'; form.targetKind=''; form.targetRef=''; form.labels={}; defaultPayloadText.value='' }
+function resetForm() { form.defId=''; form.name=''; form.executor='embedded'; form.targetKind=''; form.targetRef=''; form.labels={}; defaultPayloadText.value=''; command.value=''; envVars.value={} }
 function openCreate() { resetForm(); showCreate.value = true }
 
 // Executor ↔ TargetKind 约束
@@ -206,13 +263,22 @@ async function submit() {
     ElMessage.warning('请填写任务名称')
     return
   }
-  if (!form.targetRef || !String(form.targetRef).trim()) {
-    ElMessage.warning('请填写目标引用')
+  if (form.executor === 'service' && (!form.targetRef || !String(form.targetRef).trim())) {
+    ElMessage.warning('请填写目标引用（服务名称）')
     return
   }
   try {
     let defaultPayload: any = undefined
-    if (defaultPayloadText.value && defaultPayloadText.value.trim()) {
+    if (form.executor === 'os_process' && command.value.trim()) {
+      // 为 os_process 自动生成 payload
+      defaultPayload = {
+        command: command.value.trim()
+      }
+      // 添加环境变量
+      if (Object.keys(envVars.value).length > 0) {
+        defaultPayload.env = { ...envVars.value }
+      }
+    } else if (defaultPayloadText.value && defaultPayloadText.value.trim()) {
       try { defaultPayload = JSON.parse(defaultPayloadText.value) } catch { ElMessage.error('默认 Payload 不是合法 JSON'); return }
     }
     const body: any = { name: form.name, executor: form.executor, targetKind: form.targetKind, targetRef: form.targetRef, labels: { ...(form.labels||{}) } }
@@ -225,6 +291,11 @@ async function submit() {
       if (sp && sp.trim()) body.labels.serviceProtocol = sp.trim()
       if (port && port.trim()) body.labels.servicePort = port.trim()
       if (path && path.trim()) body.labels.servicePath = path.trim()
+    }
+    if (form.executor === 'os_process') {
+      if (command.value && command.value.trim()) {
+        body.labels.command = command.value.trim()
+      }
     }
     if (defaultPayload !== undefined) body.defaultPayload = defaultPayload
     const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
@@ -391,7 +462,7 @@ async function onDel(id: string) {
         </div>
       </template>
       
-      <el-table v-loading="loading" :data="filteredDefs" style="width:100%;" stripe>
+      <el-table v-loading="loading" :data="paginatedDefs" style="width:100%;" stripe>
       <el-table-column :label="t('taskDefs.columns.defId')" width="280">
         <template #default="{ row }">{{ (row as any).defId || (row as any).DefID }}</template>
       </el-table-column>
@@ -416,7 +487,7 @@ async function onDel(id: string) {
               <Clock v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Pending'" />
               <InfoFilled v-else />
             </el-icon>
-            {{ latestByDef[(row as any).defId || (row as any).DefID]?.state || t('taskDefs.status.neverRun') }}
+            {{ getStateText(latestByDef[(row as any).defId || (row as any).DefID]?.state) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -451,7 +522,20 @@ async function onDel(id: string) {
           </div>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
+      
+      <!-- 分页组件 -->
+      <div style="margin-top: 16px; display: flex; justify-content: center;">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="pageSizes"
+          :total="filteredDefs.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="showCreate" :title="t('taskDefs.dialog.title')" width="600px">
@@ -469,20 +553,41 @@ async function onDel(id: string) {
             <el-option v-for="k in allowedKinds" :key="k" :label="k" :value="k" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('taskDefs.dialog.form.targetRef')" required><el-input v-model="form.targetRef" placeholder="如 serviceName（必填）" /></el-form-item>
+        <el-form-item :label="t('taskDefs.dialog.form.targetRef')" :required="form.executor === 'service'">
+          <el-input v-model="form.targetRef" :placeholder="form.executor === 'service' ? '如 serviceName（必填）' : (form.executor === 'os_process' ? '节点ID（可选，留空则在controller本地执行）' : '目标引用（可选）')" />
+        </el-form-item>
         <template v-if="form.executor==='service'">
           <el-form-item :label="t('taskDefs.dialog.form.serviceVersion')"><el-input v-model="(form as any).serviceVersion" placeholder="如 1.0.0（可选）" /></el-form-item>
           <el-form-item :label="t('taskDefs.dialog.form.serviceProtocol')"><el-input v-model="(form as any).serviceProtocol" placeholder="http 或 https（可选）" /></el-form-item>
           <el-form-item :label="t('taskDefs.dialog.form.servicePort')"><el-input v-model="(form as any).servicePort" placeholder="如 8080（可选）" /></el-form-item>
           <el-form-item :label="t('taskDefs.dialog.form.servicePath')"><el-input v-model="(form as any).servicePath" placeholder="如 /task 或 /tasks/execute（可选）" /></el-form-item>
         </template>
-        <el-form-item label="默认Payload(JSON，可选)">
+        <template v-if="form.executor==='os_process'">
+          <el-form-item :label="t('taskDefs.dialog.form.command')" required>
+            <el-input v-model="command" placeholder="如 ls -la（必填）" />
+          </el-form-item>
+          <el-form-item label="环境变量（可选）">
+            <div style="width:100%;">
+              <div v-for="(envKey, index) in Object.keys(envVars)" :key="index" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                <el-input :model-value="envKey" @update:model-value="(newKey: string) => updateEnvKey(envKey, newKey)" placeholder="变量名" style="flex:1" />
+                <span>=</span>
+                <el-input v-model="envVars[envKey]" placeholder="变量值" style="flex:1" />
+                <el-button size="small" type="danger" @click="delete envVars[envKey]">删除</el-button>
+              </div>
+              <el-button size="small" type="primary" @click="envVars[`VAR${Object.keys(envVars).length + 1}`] = ''">添加环境变量</el-button>
+            </div>
+            <div style="font-size:12px; color:#909399; margin-top:8px;">
+              提示：GUI 程序需要设置 DISPLAY=:0 环境变量
+            </div>
+          </el-form-item>
+        </template>
+        <el-form-item label="默认Payload(JSON)">
           <el-input type="textarea" v-model="defaultPayloadText" :rows="6" placeholder="{}" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreate=false">{{ t('taskDefs.dialog.footer.cancel') }}</el-button>
-        <el-button type="primary" :disabled="!form.name || !String(form.name).trim().length" @click="submit">{{ t('taskDefs.dialog.footer.submit') }}</el-button>
+        <el-button type="primary" :disabled="!form.name || !String(form.name).trim().length || (form.executor === 'os_process' && !command.trim()) || (form.executor === 'service' && (!form.targetRef || !String(form.targetRef).trim()))" @click="submit">{{ t('taskDefs.dialog.footer.submit') }}</el-button>
       </template>
     </el-dialog>
 

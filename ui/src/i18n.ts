@@ -180,12 +180,12 @@ const messages = {
       title: 'Task Definitions',
       buttons: { refresh: 'Refresh', create: 'Create Definition', run: 'Run', details: 'Details' },
       columns: { defId: 'DefID', name: 'Name', executor: 'Executor', target: 'Target', latestState: 'Latest State', latestTime: 'Latest Time', action: 'Action' },
-      dialog: { title: 'Create TaskDefinition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef', serviceVersion: 'Service Version', serviceProtocol: 'Service Protocol', servicePort: 'Service Port', servicePath: 'Service Path' }, footer: { cancel: 'Cancel', submit: 'Submit' } },
+      dialog: { title: 'Create Task Definition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef', serviceVersion: 'Service Version', serviceProtocol: 'Service Protocol', servicePort: 'Service Port', servicePath: 'Service Path', command: 'Command' }, footer: { cancel: 'Cancel', submit: 'Submit' } },
       stats: { total: 'Total', running: 'Running', completed: 'Completed', failed: 'Failed' },
       search: { placeholder: 'Search by name, ID, or executor...' },
       filter: { executor: 'Executor', state: 'State', all: 'All' },
       table: { title: 'Task Definitions', items: 'items' },
-      status: { neverRun: 'Never Run' },
+      status: { neverRun: 'Never Run', running: 'Running', completed: 'Completed', succeeded: 'Succeeded', failed: 'Failed', cancelled: 'Cancelled', pending: 'Pending' },
       confirm: { delete: 'Confirm delete this definition?' }
     },
     taskDefDetail: {
@@ -431,12 +431,12 @@ const messages = {
       title: '任务定义',
       buttons: { refresh: '刷新', create: '创建定义', run: '运行', details: '详情' },
       columns: { defId: '定义ID', name: '名称', executor: '执行器', target: '目标', latestState: '最新状态', latestTime: '最新时间', action: '操作' },
-      dialog: { title: '创建 TaskDefinition', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用', serviceVersion: '服务版本', serviceProtocol: '服务协议', servicePort: '服务端口', servicePath: '调用路径' }, footer: { cancel: '取消', submit: '提交' } },
+      dialog: { title: '创建任务定义', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用', serviceVersion: '服务版本', serviceProtocol: '服务协议', servicePort: '服务端口', servicePath: '调用路径', command: '命令' }, footer: { cancel: '取消', submit: '提交' } },
       stats: { total: '总数', running: '运行中', completed: '已完成', failed: '失败' },
       search: { placeholder: '按名称、ID或执行器搜索...' },
       filter: { executor: '执行器', state: '状态', all: '全部' },
       table: { title: '任务定义列表', items: '项' },
-      status: { neverRun: '从未运行' },
+      status: { neverRun: '从未运行', running: '运行中', completed: '已完成', succeeded: '成功', failed: '失败', cancelled: '已取消', pending: '等待中' },
       confirm: { delete: '确认删除该定义？' }
     },
     taskDefDetail: {
