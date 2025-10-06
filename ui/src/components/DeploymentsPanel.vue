@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { Refresh, Plus, DataBoard, List } from '@element-plus/icons-vue'
 
 type Deployment = { deploymentId: string; name: string; labels?: Record<string,string>; instances: number }
 
@@ -35,15 +36,63 @@ async function removeDeployment(id: string) {
 
 onMounted(load)
 const { t } = useI18n()
+
+// 统计计算
+const totalDeployments = computed(() => items.value.length)
+const totalInstances = computed(() => items.value.reduce((sum, item) => sum + item.instances, 0))
 </script>
 
 <template>
   <div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <el-button type="primary" :loading="loading" @click="load">{{ t('common.refresh') }}</el-button>
-      <router-link to="/deployments/create"><el-button type="success">{{ t('deployments.buttons.create') }}</el-button></router-link>
+    <!-- 操作按钮和统计信息 -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
+      <!-- 操作按钮 -->
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <el-button type="primary" :loading="loading" @click="load">
+          <el-icon><Refresh /></el-icon>
+          {{ t('common.refresh') }}
+        </el-button>
+        <router-link to="/deployments/create">
+          <el-button type="success">
+            <el-icon><Plus /></el-icon>
+            {{ t('deployments.buttons.create') }}
+          </el-button>
+        </router-link>
+      </div>
+      
+      <!-- 统计信息 -->
+      <div style="display:flex; gap:20px; align-items:center; flex:1; justify-content:center;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #409EFF, #67C23A); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><DataBoard /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ totalDeployments }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('deployments.stats.deployments') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #E6A23C, #F56C6C); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><List /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ totalInstances }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('deployments.stats.instances') }}</span>
+        </div>
+      </div>
+      
+      <!-- 占位空间保持居中 -->
+      <div style="flex-shrink:0; width:120px;"></div>
     </div>
-    <el-table v-loading="loading" :data="items" style="width:100%; margin-top:12px;">
+
+    <!-- 部署列表表格 -->
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('deployments.table.title') }}</span>
+          <span style="font-size:14px; color:#909399;">{{ items.length }} {{ t('deployments.table.items') }}</span>
+        </div>
+      </template>
+      
+      <el-table v-loading="loading" :data="items" style="width:100%;" stripe>
       <el-table-column prop="deploymentId" :label="t('deployments.columns.deploymentId')" width="320" />
       <el-table-column prop="name" :label="t('deployments.columns.name')" width="220" />
       <el-table-column prop="instances" :label="t('deployments.columns.instances')" width="120" />
@@ -61,6 +110,7 @@ const { t } = useI18n()
         </template>
       </el-table-column>
     </el-table>
+    </el-card>
   </div>
 </template>
 

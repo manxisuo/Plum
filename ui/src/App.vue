@@ -75,3 +75,29 @@ function switchLang(l: string){ locale.value = l; lang.value = l }
 
 <style scoped>
 </style>
+
+<style>
+/* 完全隐藏Element Plus的loading图标和动画，保留静态图标 */
+.el-button.is-loading::before {
+  display: none !important;
+}
+.el-button.is-loading .el-icon--loading {
+  display: none !important;
+}
+.el-button.is-loading .el-icon:not(.el-icon--loading) {
+  display: inline-flex !important;
+}
+
+/* 调整所有卡片头部的高度 */
+.el-card__header {
+  padding: 12px 12px 12px 12px !important;
+  min-height: 48px !important;
+  /* display: flex !important; */
+  align-items: center !important;
+}
+
+/* 调整卡片主体的内边距 */
+.el-card__body {
+  padding: 16px 20px !important;
+}
+</style>

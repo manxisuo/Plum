@@ -74,6 +74,8 @@ const messages = {
     deployments: {
       columns: { deploymentId: 'DeploymentID', name: 'Name', instances: 'Instances' },
       buttons: { create: 'Create Deployment' },
+      stats: { deployments: 'Deployments', instances: 'Instances' },
+      table: { title: 'Deployment List', items: 'items' },
       confirmDelete: 'Confirm delete this deployment? (will not cascade to instances)',
       create: {
         title: 'Create Deployment',
@@ -111,20 +113,31 @@ const messages = {
       title: 'Deployment Detail',
       buttons: { stopAll: 'Stop All', stopByNode: 'Stop By Node' },
       desc: { deploymentId: 'DeploymentID', name: 'Name', labels: 'Labels' },
-      columns: { instanceId: 'InstanceID', nodeId: 'NodeID', artifact: 'Artifact', startCmd: 'StartCmd', desired: 'Desired', action: 'Action' }
+      columns: { instanceId: 'InstanceID', nodeId: 'NodeID', artifact: 'Artifact', startCmd: 'StartCmd', desired: 'Desired', action: 'Action' },
+      stats: { instances: 'Instances', running: 'Running', stopped: 'Stopped', healthy: 'Healthy' },
+      table: { title: 'Instance List', items: 'items' }
     },
     deploymentConfig: {
       title: 'Deployment Config',
       entriesTitle: 'Entries (derived from assignments)',
       columns: { artifact: 'Artifact', startCmd: 'StartCmd', replicas: 'Replicas' },
-      labelsTitle: 'Labels'
+      labelsTitle: 'Labels',
+      stats: { entries: 'Entries', replicas: 'Replicas', labels: 'Labels' },
+      table: { items: 'items', labels: 'labels' },
+      noLabels: 'No labels configured'
     },
     assignments: {
       form: { nodeId: 'Node ID' },
-      columns: { deployment: 'Deployment', instance: 'Instance', desired: 'Desired', phase: 'Phase', healthy: 'Healthy', lastReportAt: 'LastReportAt', startCmd: 'StartCmd', artifact: 'Artifact', action: 'Action' }
+      columns: { deployment: 'Deployment', instance: 'Instance', desired: 'Desired', phase: 'Phase', healthy: 'Healthy', lastReportAt: 'LastReportAt', startCmd: 'StartCmd', artifact: 'Artifact', action: 'Action' },
+      stats: { total: 'Total', running: 'Running', stopped: 'Stopped', healthy: 'Healthy' },
+      table: { title: 'Instance Assignments', items: 'items' },
+      error: { title: 'Error' }
     },
     nodes: {
       columns: { nodeId: 'NodeID', ip: 'IP', health: 'Health', lastSeen: 'LastSeen', action: 'Action' },
+      stats: { total: 'Total', healthy: 'Healthy', unhealthy: 'Unhealthy', unknown: 'Unknown' },
+      table: { title: 'Node List', items: 'items' },
+      error: { title: 'Error' },
       confirmDelete: 'Confirm delete this node?'
     },
     apps: {
@@ -137,16 +150,26 @@ const messages = {
     services: {
       title: 'Services',
       endpointsTitle: 'Endpoints - {name}',
+      stats: { services: 'Services', endpoints: 'Endpoints', healthy: 'Healthy' },
       columns: { instance: 'Instance', node: 'Node', address: 'Address', healthy: 'Healthy', lastSeen: 'LastSeen' }
     },
     workflows: {
       buttons: { refresh: 'Refresh', create: 'Create Workflow', run: 'Run', viewLatest: 'View Latest Run' },
+      stats: { workflows: 'Workflows', steps: 'Steps' },
+      table: { title: 'Workflow List', items: 'items' },
       columns: { workflowId: 'WorkflowID', name: 'Name', steps: 'Steps', action: 'Action' },
       dialog: {
         title: 'Create Workflow',
         form: { name: 'Name', steps: 'Steps', executor: 'Executor', timeoutSec: 'timeoutSec', maxRetries: 'maxRetries', addStep: 'Add Step', delete: 'Delete' },
         footer: { cancel: 'Cancel', submit: 'Submit' }
       }
+    },
+    workflowRuns: {
+      title: 'Workflow Run History ({workflowId})',
+      buttons: { back: '← Back to Workflows', view: 'View Details' },
+      stats: { total: 'Total', succeeded: 'Succeeded', running: 'Running', failed: 'Failed' },
+      table: { items: 'items' },
+      columns: { runId: 'Run ID', state: 'State', createdAt: 'Created', startedAt: 'Started', finishedAt: 'Finished' }
     },
     workflowRun: {
       title: 'Workflow Run Detail',
@@ -302,6 +325,8 @@ const messages = {
     deployments: {
       columns: { deploymentId: '部署ID', name: '名称', instances: '实例数' },
       buttons: { create: '创建部署' },
+      stats: { deployments: '部署', instances: '实例' },
+      table: { title: '部署列表', items: '项' },
       confirmDelete: '确认删除该部署？（不会级联删除实例分配）',
       create: {
         title: '创建部署',
@@ -339,20 +364,31 @@ const messages = {
       title: '部署详情',
       buttons: { stopAll: '全部停止', stopByNode: '按节点停止' },
       desc: { deploymentId: '部署ID', name: '名称', labels: '标签' },
-      columns: { instanceId: '实例ID', nodeId: '节点ID', artifact: '制品', startCmd: '启动命令', desired: '期望状态', action: '操作' }
+      columns: { instanceId: '实例ID', nodeId: '节点ID', artifact: '制品', startCmd: '启动命令', desired: '期望状态', action: '操作' },
+      stats: { instances: '实例', running: '运行中', stopped: '已停止', healthy: '健康' },
+      table: { title: '实例列表', items: '项' }
     },
     deploymentConfig: {
       title: '部署配置',
       entriesTitle: '条目（根据当前 assignments 推导）',
       columns: { artifact: '制品', startCmd: '启动命令', replicas: '副本数' },
-      labelsTitle: '标签'
+      labelsTitle: '标签',
+      stats: { entries: '条目', replicas: '副本', labels: '标签' },
+      table: { items: '项', labels: '个标签' },
+      noLabels: '暂无标签配置'
     },
     assignments: {
       form: { nodeId: '节点 ID' },
-      columns: { deployment: '部署', instance: '实例', desired: '期望', phase: '阶段', healthy: '健康', lastReportAt: '最近上报', startCmd: '启动命令', artifact: '制品', action: '操作' }
+      columns: { deployment: '部署', instance: '实例', desired: '期望', phase: '阶段', healthy: '健康', lastReportAt: '最近上报', startCmd: '启动命令', artifact: '制品', action: '操作' },
+      stats: { total: '总计', running: '运行中', stopped: '已停止', healthy: '健康' },
+      table: { title: '实例分配', items: '项' },
+      error: { title: '错误' }
     },
     nodes: {
       columns: { nodeId: '节点ID', ip: 'IP', health: '健康状态', lastSeen: '最近活跃', action: '操作' },
+      stats: { total: '总计', healthy: '健康', unhealthy: '不健康', unknown: '未知' },
+      table: { title: '节点列表', items: '项' },
+      error: { title: '错误' },
       confirmDelete: '确认删除该节点？'
     },
     apps: {
@@ -365,16 +401,26 @@ const messages = {
     services: {
       title: '服务',
       endpointsTitle: '端点 - {name}',
+      stats: { services: '服务', endpoints: '端点', healthy: '健康' },
       columns: { instance: '实例', node: '节点', address: '地址', healthy: '健康', lastSeen: '最近活跃' }
     },
     workflows: {
       buttons: { refresh: '刷新', create: '创建工作流', run: '运行', viewLatest: '查看最新运行' },
+      stats: { workflows: '工作流', steps: '步骤' },
+      table: { title: '工作流列表', items: '项' },
       columns: { workflowId: '工作流ID', name: '名称', steps: '步骤', action: '操作' },
       dialog: {
         title: '创建工作流',
         form: { name: '名称', steps: '步骤', executor: '执行器', timeoutSec: '超时秒', maxRetries: '最大重试', addStep: '添加步骤', delete: '删除' },
         footer: { cancel: '取消', submit: '提交' }
       }
+    },
+    workflowRuns: {
+      title: '工作流运行历史 ({workflowId})',
+      buttons: { back: '← 返回工作流列表', view: '查看详情' },
+      stats: { total: '总计', succeeded: '成功', running: '运行中', failed: '失败' },
+      table: { items: '项' },
+      columns: { runId: '运行ID', state: '状态', createdAt: '创建时间', startedAt: '开始时间', finishedAt: '结束时间' }
     },
     workflowRun: {
       title: '工作流运行详情',

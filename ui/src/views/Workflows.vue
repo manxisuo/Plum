@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Refresh, Plus, Files, VideoPlay, View } from '@element-plus/icons-vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
@@ -200,16 +201,61 @@ async function submit() {
 
 onMounted(load)
 const { t } = useI18n()
+
+// 统计计算
+const totalWorkflows = computed(() => items.value.length)
+const totalSteps = computed(() => items.value.reduce((sum, wf) => sum + (wf.steps?.length || 0), 0))
 </script>
 
 <template>
   <div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <el-button type="primary" :loading="loading" @click="load">{{ t('workflows.buttons.refresh') }}</el-button>
-      <el-button type="success" @click="openCreate">{{ t('workflows.buttons.create') }}</el-button>
+    <!-- 操作按钮和统计信息 -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
+      <!-- 操作按钮 -->
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <el-button type="primary" :loading="loading" @click="load">
+          <el-icon><Refresh /></el-icon>
+          {{ t('workflows.buttons.refresh') }}
+        </el-button>
+        <el-button type="success" @click="openCreate">
+          <el-icon><Plus /></el-icon>
+          {{ t('workflows.buttons.create') }}
+        </el-button>
+      </div>
+      
+      <!-- 统计信息 -->
+      <div style="display:flex; gap:20px; align-items:center; flex:1; justify-content:center;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #409EFF, #67C23A); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><Files /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ totalWorkflows }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('workflows.stats.workflows') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #E6A23C, #F56C6C); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><VideoPlay /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ totalSteps }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('workflows.stats.steps') }}</span>
+        </div>
+      </div>
+      
+      <!-- 占位空间保持居中 -->
+      <div style="flex-shrink:0; width:120px;"></div>
     </div>
 
-    <el-table :data="items" v-loading="loading" style="width:100%; margin-top:12px;">
+    <!-- 工作流列表表格 -->
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('workflows.table.title') }}</span>
+          <span style="font-size:14px; color:#909399;">{{ items.length }} {{ t('workflows.table.items') }}</span>
+        </div>
+      </template>
+      
+      <el-table :data="items" v-loading="loading" style="width:100%;" stripe>
       <el-table-column :label="t('workflows.columns.workflowId')" width="320">
         <template #default="{ row }">{{ (row as any).workflowId || (row as any).WorkflowID }}</template>
       </el-table-column>
@@ -218,9 +264,7 @@ const { t } = useI18n()
       </el-table-column>
       <el-table-column :label="t('workflows.columns.steps')">
         <template #default="{ row }">
-          <code>
             {{ (()=>{ const a = (row as any).steps || (row as any).Steps || []; return Array.isArray(a) ? a.map((s:any)=> s?.name || s?.Name || s?.definitionId || s?.DefinitionID || '').join(' -> ') : '' })() }}
-          </code>
         </template>
       </el-table-column>
       <el-table-column :label="t('common.action')" width="440">
@@ -231,7 +275,8 @@ const { t } = useI18n()
           <el-button size="small" type="danger" @click="deleteWorkflow(((row as any).workflowId||(row as any).WorkflowID))">删除</el-button>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
+    </el-card>
 
     <el-dialog v-model="showCreate" :title="t('workflows.dialog.title')" width="700px">
       <el-form label-width="120px">

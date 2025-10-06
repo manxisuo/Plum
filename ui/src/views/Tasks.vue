@@ -303,9 +303,19 @@ async function onDel(id: string) {
 
 <template>
   <div>
-    <!-- 页面标题、统计和操作 -->
+    <!-- 操作按钮和统计信息 -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
-      <h2 style="margin:0; font-size:20px; flex-shrink:0;">{{ t('taskDefs.title') }}</h2>
+      <!-- 操作按钮 -->
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <el-button type="primary" :loading="loading" @click="load">
+          <el-icon><Refresh /></el-icon>
+          {{ t('taskDefs.buttons.refresh') }}
+        </el-button>
+        <el-button type="success" @click="openCreate">
+          <el-icon><Plus /></el-icon>
+          {{ t('taskDefs.buttons.create') }}
+        </el-button>
+      </div>
       
       <!-- 统计信息 -->
       <div style="display:flex; gap:20px; align-items:center; flex:1; justify-content:center;">
@@ -342,17 +352,8 @@ async function onDel(id: string) {
         </div>
       </div>
       
-      <!-- 操作按钮 -->
-      <div style="display:flex; gap:8px; flex-shrink:0;">
-        <el-button type="primary" :loading="loading" @click="load">
-          <el-icon><Refresh /></el-icon>
-          {{ t('taskDefs.buttons.refresh') }}
-        </el-button>
-        <el-button type="success" @click="openCreate">
-          <el-icon><Plus /></el-icon>
-          {{ t('taskDefs.buttons.create') }}
-        </el-button>
-      </div>
+      <!-- 占位空间保持居中 -->
+      <div style="flex-shrink:0; width:120px;"></div>
     </div>
 
     <!-- 搜索和筛选 -->

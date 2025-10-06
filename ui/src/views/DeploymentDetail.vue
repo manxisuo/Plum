@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { Refresh, DataBoard, Monitor, CircleCheck, VideoPlay, VideoPause, Delete } from '@element-plus/icons-vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
@@ -21,6 +22,18 @@ const nodesInDeployment = computed(() => {
     if (n && !seen.has(n)) { seen.add(n); out.push(n) }
   }
   return out
+})
+
+// 计算属性：统计信息
+const totalInstances = computed(() => assigns.value.length)
+const runningCount = computed(() => {
+  return assigns.value.filter(item => (item.desired || item.Desired) === 'Running').length
+})
+const stoppedCount = computed(() => {
+  return assigns.value.filter(item => (item.desired || item.Desired) === 'Stopped').length
+})
+const healthyCount = computed(() => {
+  return assigns.value.filter(item => item.healthy).length
 })
 
 async function load() {
@@ -90,18 +103,71 @@ async function stopByNode() {
 
 <template>
   <div>
+    <!-- 操作按钮和统计信息 -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
+      <!-- 操作按钮 -->
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <el-button type="primary" :loading="loading" @click="load">
+          <el-icon><Refresh /></el-icon>
+          {{ t('common.refresh') }}
+        </el-button>
+        <el-button type="warning" :loading="opLoading" @click="stopAll">
+          <el-icon><VideoPause /></el-icon>
+          {{ t('deploymentDetail.buttons.stopAll') }}
+        </el-button>
+        <el-select v-model="selectedNode" :placeholder="t('common.selectNode')" style="width:200px;">
+          <el-option v-for="n in nodesInDeployment" :key="n" :label="n" :value="n" />
+        </el-select>
+        <el-button type="warning" :loading="opLoading" @click="stopByNode">
+          <el-icon><VideoPause /></el-icon>
+          {{ t('deploymentDetail.buttons.stopByNode') }}
+        </el-button>
+      </div>
+      
+      <!-- 统计信息 -->
+      <div style="display:flex; gap:20px; align-items:center; flex:1; justify-content:center;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #409EFF, #67C23A); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><DataBoard /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ totalInstances }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('deploymentDetail.stats.instances') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #67C23A, #85CE61); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><VideoPlay /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ runningCount }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('deploymentDetail.stats.running') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #E6A23C, #F56C6C); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><VideoPause /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ stoppedCount }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('deploymentDetail.stats.stopped') }}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="width:20px; height:20px; background:linear-gradient(135deg, #67C23A, #85CE61); border-radius:4px; display:flex; align-items:center; justify-content:center;">
+            <el-icon size="12" color="white"><CircleCheck /></el-icon>
+          </div>
+          <span style="font-weight:bold;">{{ healthyCount }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('deploymentDetail.stats.healthy') }}</span>
+        </div>
+      </div>
+      
+      <!-- 占位空间保持居中 -->
+      <div style="flex-shrink:0; width:120px;"></div>
+    </div>
+
     <!-- 部署详情 -->
     <el-card class="box-card" style="margin-bottom: 16px;">
       <template #header>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span>{{ t('deploymentDetail.title') }}</span>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <el-button type="warning" :loading="opLoading" @click="stopAll">{{ t('deploymentDetail.buttons.stopAll') }}</el-button>
-            <el-select v-model="selectedNode" :placeholder="t('common.selectNode')" style="width:200px;">
-              <el-option v-for="n in nodesInDeployment" :key="n" :label="n" :value="n" />
-            </el-select>
-            <el-button type="warning" :loading="opLoading" @click="stopByNode">{{ t('deploymentDetail.buttons.stopByNode') }}</el-button>
-          </div>
         </div>
       </template>
       
@@ -110,30 +176,59 @@ async function stopByNode() {
         <el-descriptions-item :label="t('deploymentDetail.desc.name')">{{ deployment.name || deployment.Name }}</el-descriptions-item>
         <el-descriptions-item :label="t('deploymentDetail.desc.labels')" :span="2"><code>{{ JSON.stringify(deployment.labels || deployment.Labels || {}) }}</code></el-descriptions-item>
       </el-descriptions>
+    </el-card>
+
+    <!-- 实例列表 -->
+    <el-card class="box-card">
+      <template #header>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>{{ t('deploymentDetail.table.title') }}</span>
+          <span style="font-size:14px; color:#909399;">{{ assigns.length }} {{ t('deploymentDetail.table.items') }}</span>
+        </div>
+      </template>
       
-      <el-table :data="assigns" v-loading="loading" style="width:100%">
-      <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="300">
-        <template #default="{ row }">{{ row.instanceId || row.InstanceID }}</template>
-      </el-table-column>
-      <el-table-column :label="t('deploymentDetail.columns.nodeId')" width="180">
-        <template #default="{ row }">{{ row.nodeId || row.NodeID }}</template>
-      </el-table-column>
-      <el-table-column :label="t('deploymentDetail.columns.artifact')">
-        <template #default="{ row }">{{ row.artifactUrl || row.ArtifactURL }}</template>
-      </el-table-column>
-      <el-table-column prop="startCmd" :label="t('deploymentDetail.columns.startCmd')" />
-      <el-table-column :label="t('deploymentDetail.columns.desired')" width="120">
-        <template #default="{ row }">{{ row.desired || row.Desired }}</template>
-      </el-table-column>
-        <el-table-column :label="t('deploymentDetail.columns.action')" width="220">
+      <el-table :data="assigns" v-loading="loading" style="width:100%" stripe>
+        <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="300">
+          <template #default="{ row }">{{ row.instanceId || row.InstanceID }}</template>
+        </el-table-column>
+        <el-table-column :label="t('deploymentDetail.columns.nodeId')" width="180">
+          <template #default="{ row }">{{ row.nodeId || row.NodeID }}</template>
+        </el-table-column>
+        <el-table-column :label="t('deploymentDetail.columns.artifact')">
+          <template #default="{ row }">{{ row.artifactUrl || row.ArtifactURL }}</template>
+        </el-table-column>
+        <el-table-column prop="startCmd" :label="t('deploymentDetail.columns.startCmd')" />
+        <el-table-column :label="t('deploymentDetail.columns.desired')" width="120">
           <template #default="{ row }">
-            <el-button size="small" type="primary" :disabled="(row.desired||row.Desired)==='Running'" @click="setDesired(row,'Running')">{{ t('common.start') }}</el-button>
-            <el-button size="small" type="warning" :disabled="(row.desired||row.Desired)==='Stopped'" @click="setDesired(row,'Stopped')">{{ t('common.stop') }}</el-button>
-            <el-popconfirm :title="t('common.confirmDelete')" @confirm="del(row)">
-              <template #reference>
-                <el-button type="danger" size="small">{{ t('common.delete') }}</el-button>
-              </template>
-            </el-popconfirm>
+            <el-tag :type="(row.desired || row.Desired) === 'Running' ? 'success' : 'warning'" size="small">
+              <el-icon style="margin-right:4px;">
+                <VideoPlay v-if="(row.desired || row.Desired) === 'Running'" />
+                <VideoPause v-else />
+              </el-icon>
+              {{ row.desired || row.Desired }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('deploymentDetail.columns.action')" width="280" fixed="right">
+          <template #default="{ row }">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <el-button size="small" type="success" :disabled="(row.desired||row.Desired)==='Running'" @click="setDesired(row,'Running')">
+                <el-icon><VideoPlay /></el-icon>
+                {{ t('common.start') }}
+              </el-button>
+              <el-button size="small" type="warning" :disabled="(row.desired||row.Desired)==='Stopped'" @click="setDesired(row,'Stopped')">
+                <el-icon><VideoPause /></el-icon>
+                {{ t('common.stop') }}
+              </el-button>
+              <el-popconfirm :title="t('common.confirmDelete')" @confirm="del(row)">
+                <template #reference>
+                  <el-button type="danger" size="small">
+                    <el-icon><Delete /></el-icon>
+                    {{ t('common.delete') }}
+                  </el-button>
+                </template>
+              </el-popconfirm>
+            </div>
           </template>
         </el-table-column>
       </el-table>
