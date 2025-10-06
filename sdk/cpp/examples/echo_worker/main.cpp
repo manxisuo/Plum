@@ -18,6 +18,11 @@ int main() {
   opt.capacity = 4;
   opt.heartbeatSec = 5;
   opt.httpPort = 18081; // fixed port for MVP
+  
+  // 设置Worker标签
+  opt.labels["appName"] = "myApp";
+  opt.labels["deploymentId"] = "deploy-123";
+  opt.labels["version"] = "v1.2.0";
 
   Worker w(opt);
   w.registerTask("my.task.echo", [](const std::string& taskId, const std::string& name, const std::string& payload){

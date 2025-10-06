@@ -14,6 +14,7 @@ struct WorkerOptions {
   std::string controllerBase;
   std::string workerId;
   std::string nodeId;
+  std::map<std::string, std::string> labels; // 添加标签支持
   int capacity{1};
   int heartbeatSec{5};
   int httpPort{0}; // 0 means random

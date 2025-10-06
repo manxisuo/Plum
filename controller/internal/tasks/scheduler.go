@@ -213,19 +213,69 @@ func runEmbedded(t store.Task) {
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no workers", time.Now().Unix(), t.Attempt)
 		return
 	}
-	var candidate *store.Worker
+
+	var candidates []*store.Worker
+	// First, find all workers that support this task name
 	for i := range workers {
 		w := &workers[i]
 		for _, name := range w.Tasks {
 			if name == t.Name {
+				candidates = append(candidates, w)
+				break
+			}
+		}
+	}
+
+	if len(candidates) == 0 {
+		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no worker supports task name", time.Now().Unix(), t.Attempt)
+		return
+	}
+
+	// Filter by target type if specified
+	var candidate *store.Worker
+	if t.TargetKind == "node" && t.TargetRef != "" {
+		// Find worker on specific node
+		for _, w := range candidates {
+			if w.NodeID == t.TargetRef {
 				candidate = w
 				break
 			}
 		}
-		if candidate != nil {
-			break
+		if candidate == nil {
+			_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("no worker on node %s supports task %s", t.TargetRef, t.Name), time.Now().Unix(), t.Attempt)
+			return
 		}
+	} else if t.TargetKind == "deployment" && t.TargetRef != "" {
+		// For deployment, we need to find workers that are part of this deployment
+		// This is a simplified implementation - in practice you might need more complex logic
+		for _, w := range candidates {
+			if w.Labels != nil && w.Labels["deploymentId"] == t.TargetRef {
+				candidate = w
+				break
+			}
+		}
+		if candidate == nil {
+			_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("no worker in deployment %s supports task %s", t.TargetRef, t.Name), time.Now().Unix(), t.Attempt)
+			return
+		}
+	} else if t.TargetKind == "app" && t.TargetRef != "" {
+		// For app, find workers that are part of this application/service group
+		// Support both old "serviceName" and new "appName" labels for backward compatibility
+		for _, w := range candidates {
+			if w.Labels != nil && (w.Labels["appName"] == t.TargetRef || w.Labels["serviceName"] == t.TargetRef) {
+				candidate = w
+				break
+			}
+		}
+		if candidate == nil {
+			_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("no worker for application %s supports task %s", t.TargetRef, t.Name), time.Now().Unix(), t.Attempt)
+			return
+		}
+	} else {
+		// No target specified or unsupported target type, use first available worker
+		candidate = candidates[0]
 	}
+
 	if candidate == nil || candidate.URL == "" {
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "no matching worker or URL", time.Now().Unix(), t.Attempt)
 		return

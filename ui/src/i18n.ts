@@ -143,7 +143,10 @@ const messages = {
     apps: {
       uploadZip: 'Upload App ZIP',
       zipTip: 'Package must include start.sh and meta.ini(name/version)',
-      buttons: { selectUpload: 'Select and upload ZIP' },
+      uploadDescription: 'Upload a ZIP file containing your application package with start.sh and meta.ini',
+      buttons: { refresh: 'Refresh', selectUpload: 'Select and upload ZIP' },
+      stats: { total: 'Total' },
+      table: { title: 'Application Packages', items: 'items' },
       columns: { app: 'App', version: 'Version', artifact: 'Artifact', sizeBytes: 'Size(Bytes)', uploadedAt: 'UploadedAt', action: 'Action' },
       confirmDelete: 'Confirm delete this artifact?'
     },
@@ -180,7 +183,27 @@ const messages = {
       title: 'Task Definitions',
       buttons: { refresh: 'Refresh', create: 'Create Definition', run: 'Run', details: 'Details' },
       columns: { defId: 'DefID', name: 'Name', executor: 'Executor', target: 'Target', latestState: 'Latest State', latestTime: 'Latest Time', action: 'Action' },
-      dialog: { title: 'Create Task Definition', form: { name: 'Name', executor: 'Executor', targetKind: 'TargetKind', targetRef: 'TargetRef', serviceVersion: 'Service Version', serviceProtocol: 'Service Protocol', servicePort: 'Service Port', servicePath: 'Service Path', command: 'Command' }, footer: { cancel: 'Cancel', submit: 'Submit' } },
+      dialog: { 
+        title: 'Create Task Definition', 
+        form: { 
+          name: 'Name', 
+          executor: 'Executor', 
+          targetKind: 'Target Type', 
+          targetRef: 'Target Reference', 
+          serviceVersion: 'Service Version', 
+          serviceProtocol: 'Service Protocol', 
+          servicePort: 'Service Port', 
+          servicePath: 'Service Path', 
+          command: 'Command' 
+        }, 
+        footer: { cancel: 'Cancel', submit: 'Submit' },
+        help: {
+          embeddedNode: 'Execute on a specific node using embedded worker',
+          embeddedApp: 'Execute on workers belonging to a specific application',
+          service: 'Execute via HTTP call to service endpoint',
+          osProcessNode: 'Execute OS command on a specific node'
+        }
+      },
       stats: { total: 'Total', running: 'Running', completed: 'Completed', failed: 'Failed' },
       search: { placeholder: 'Search by name, ID, or executor...' },
       filter: { executor: 'Executor', state: 'State', all: 'All' },
@@ -394,7 +417,10 @@ const messages = {
     apps: {
       uploadZip: '上传应用包（ZIP）',
       zipTip: '包内需包含 start.sh 与 meta.ini(name/version)',
-      buttons: { selectUpload: '选择并上传 ZIP' },
+      uploadDescription: '上传包含应用程序包的ZIP文件，需要包含start.sh和meta.ini文件',
+      buttons: { refresh: '刷新', selectUpload: '选择并上传 ZIP' },
+      stats: { total: '总数' },
+      table: { title: '应用包列表', items: '项' },
       columns: { app: '应用', version: '版本', artifact: '制品', sizeBytes: '大小(字节)', uploadedAt: '上传时间', action: '操作' },
       confirmDelete: '确认删除该包？'
     },
@@ -431,7 +457,27 @@ const messages = {
       title: '任务定义',
       buttons: { refresh: '刷新', create: '创建定义', run: '运行', details: '详情' },
       columns: { defId: '定义ID', name: '名称', executor: '执行器', target: '目标', latestState: '最新状态', latestTime: '最新时间', action: '操作' },
-      dialog: { title: '创建任务定义', form: { name: '名称', executor: '执行器', targetKind: '目标类型', targetRef: '目标引用', serviceVersion: '服务版本', serviceProtocol: '服务协议', servicePort: '服务端口', servicePath: '调用路径', command: '命令' }, footer: { cancel: '取消', submit: '提交' } },
+      dialog: { 
+        title: '创建任务定义', 
+        form: { 
+          name: '名称', 
+          executor: '执行器', 
+          targetKind: '目标类型', 
+          targetRef: '目标引用', 
+          serviceVersion: '服务版本', 
+          serviceProtocol: '服务协议', 
+          servicePort: '服务端口', 
+          servicePath: '调用路径', 
+          command: '命令' 
+        }, 
+        footer: { cancel: '取消', submit: '提交' },
+        help: {
+          embeddedNode: '在指定节点上使用嵌入式工作器执行',
+          embeddedApp: '在属于特定应用的嵌入式工作器上执行',
+          service: '通过HTTP调用服务端点执行',
+          osProcessNode: '在指定节点上执行操作系统命令'
+        }
+      },
       stats: { total: '总数', running: '运行中', completed: '已完成', failed: '失败' },
       search: { placeholder: '按名称、ID或执行器搜索...' },
       filter: { executor: '执行器', state: '状态', all: '全部' },

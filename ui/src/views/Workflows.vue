@@ -24,8 +24,13 @@ async function load() {
   try {
     const res = await fetch(`${API_BASE}/v1/workflows`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    items.value = await res.json() as Workflow[]
-  } catch (e:any) { ElMessage.error(e?.message || '加载失败') }
+    const data = await res.json() as Workflow[]
+    items.value = Array.isArray(data) ? data : []
+  } catch (e:any) { 
+    ElMessage.error(e?.message || '加载失败')
+    // 确保在错误情况下也重置为安全值
+    items.value = []
+  }
   finally { loading.value = false }
 }
 
@@ -218,19 +223,19 @@ onMounted(load)
 const { t } = useI18n()
 
 // 统计计算
-const totalWorkflows = computed(() => items.value.length)
-const totalSteps = computed(() => items.value.reduce((sum, wf) => sum + (wf.steps?.length || 0), 0))
+const totalWorkflows = computed(() => (items.value || []).length)
+const totalSteps = computed(() => (items.value || []).reduce((sum, wf) => sum + (wf.steps?.length || 0), 0))
 
 // 计算属性：分页后的数据
 const paginatedItems = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return items.value.slice(start, end)
+  return (items.value || []).slice(start, end)
 })
 
 // 计算属性：总页数
 const totalPages = computed(() => {
-  return Math.ceil(items.value.length / pageSize.value)
+  return Math.ceil((items.value || []).length / pageSize.value)
 })
 </script>
 
@@ -278,7 +283,7 @@ const totalPages = computed(() => {
       <template #header>
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span>{{ t('workflows.table.title') }}</span>
-          <span style="font-size:14px; color:#909399;">{{ items.length }} {{ t('workflows.table.items') }}</span>
+          <span style="font-size:14px; color:#909399;">{{ (items || []).length }} {{ t('workflows.table.items') }}</span>
         </div>
       </template>
       
@@ -310,7 +315,7 @@ const totalPages = computed(() => {
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
           :page-sizes="pageSizes"
-          :total="items.length"
+          :total="(items || []).length"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"

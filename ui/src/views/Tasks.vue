@@ -196,6 +196,35 @@ function updateEnvKey(oldKey: string, newKey: string) {
   envVars.value[newKey] = value
 }
 
+function getTargetRefPlaceholder() {
+  if (form.executor === 'service') {
+    return '如 serviceName（必填）'
+  } else if (form.executor === 'os_process') {
+    return '节点ID（可选，留空则在controller本地执行）'
+  } else if (form.executor === 'embedded') {
+    if (form.targetKind === 'node') {
+      return '节点ID（可选，留空则选择任意可用节点）'
+    } else if (form.targetKind === 'app') {
+      return '应用名称（可选，留空则选择任意可用应用）'
+    }
+    return '目标引用（可选）'
+  }
+  return '目标引用（可选）'
+}
+
+function getTargetKindHelp() {
+  if (form.executor === 'embedded' && form.targetKind === 'node') {
+    return t('taskDefs.dialog.help.embeddedNode')
+  } else if (form.executor === 'embedded' && form.targetKind === 'app') {
+    return t('taskDefs.dialog.help.embeddedApp')
+  } else if (form.executor === 'service' && form.targetKind === 'service') {
+    return t('taskDefs.dialog.help.service')
+  } else if (form.executor === 'os_process' && form.targetKind === 'node') {
+    return t('taskDefs.dialog.help.osProcessNode')
+  }
+  return ''
+}
+
 async function delTask(id: string) {
   try {
     const res = await fetch(`${API_BASE}/v1/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' })
@@ -236,20 +265,20 @@ async function cancelTask(id: string) {
 
 // 创建定义（取代创建任务）
 const showCreate = ref(false)
-const form = reactive<TaskDef>({ defId:'', name:'', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
+const form = reactive<TaskDef>({ defId:'', name:'', executor:'embedded', targetKind:'node', targetRef:'', labels:{} })
 const defaultPayloadText = ref<string>('')
 const command = ref<string>('')
 const envVars = ref<Record<string, string>>({})
 
-function resetForm() { form.defId=''; form.name=''; form.executor='embedded'; form.targetKind=''; form.targetRef=''; form.labels={}; defaultPayloadText.value=''; command.value=''; envVars.value={} }
+function resetForm() { form.defId=''; form.name=''; form.executor='embedded'; form.targetKind='node'; form.targetRef=''; form.labels={}; defaultPayloadText.value=''; command.value=''; envVars.value={} }
 function openCreate() { resetForm(); showCreate.value = true }
 
 // Executor ↔ TargetKind 约束
-const ALL_KINDS: string[] = ['service','deployment','node']
+const ALL_KINDS: string[] = ['service','deployment','node','app']
 const allowedKinds = computed<string[]>(() => {
   if (form.executor === 'service') return ['service']
   if (form.executor === 'os_process') return ['node']
-  // embedded 默认不限：可选 service/deployment/node
+  if (form.executor === 'embedded') return ['node', 'app'] // embedded只支持node和app
   return ALL_KINDS
 })
 watch(() => form.executor, () => {
@@ -552,9 +581,12 @@ async function onDel(id: string) {
           <el-select v-model="form.targetKind" clearable :placeholder="allowedKinds.join(' / ')">
             <el-option v-for="k in allowedKinds" :key="k" :label="k" :value="k" />
           </el-select>
+          <div v-if="form.executor && form.targetKind" style="font-size:12px; color:#909399; margin-top:4px;">
+            {{ getTargetKindHelp() }}
+          </div>
         </el-form-item>
         <el-form-item :label="t('taskDefs.dialog.form.targetRef')" :required="form.executor === 'service'">
-          <el-input v-model="form.targetRef" :placeholder="form.executor === 'service' ? '如 serviceName（必填）' : (form.executor === 'os_process' ? '节点ID（可选，留空则在controller本地执行）' : '目标引用（可选）')" />
+          <el-input v-model="form.targetRef" :placeholder="getTargetRefPlaceholder()" />
         </el-form-item>
         <template v-if="form.executor==='service'">
           <el-form-item :label="t('taskDefs.dialog.form.serviceVersion')"><el-input v-model="(form as any).serviceVersion" placeholder="如 1.0.0（可选）" /></el-form-item>

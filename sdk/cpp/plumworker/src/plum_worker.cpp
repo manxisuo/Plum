@@ -74,7 +74,14 @@ bool Worker::doRegister() {
     json arr = json::array();
     for (auto& kv : handlers_) arr.push_back(kv.first);
     j["tasks"] = arr;
-    j["labels"] = json::object();
+    
+    // 使用配置的标签，而不是空对象
+    json labelsJson = json::object();
+    for (const auto& kv : options_.labels) {
+      labelsJson[kv.first] = kv.second;
+    }
+    j["labels"] = labelsJson;
+    
     j["capacity"] = options_.capacity;
     auto r = cli.Post("/v1/workers/register", j.dump(), "application/json");
     return r && r->status >= 200 && r->status < 300;
