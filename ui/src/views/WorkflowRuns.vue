@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Refresh, ArrowLeft, Files, Check, Close, Loading, Clock, View, Delete } from '@element-plus/icons-vue'
+import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
@@ -170,8 +171,10 @@ const { t } = useI18n()
       </template>
 
       <el-table :data="paginatedRuns" v-loading="loading" style="width:100%;" stripe>
-        <el-table-column :label="t('workflowRuns.columns.runId')" width="320">
-          <template #default="{ row }">{{ (row as any).runId || (row as any).RunID }}</template>
+        <el-table-column :label="t('workflowRuns.columns.runId')" width="140">
+          <template #default="{ row }">
+            <IdDisplay :id="(row as any).runId || (row as any).RunID" :length="8" />
+          </template>
         </el-table-column>
         <el-table-column :label="t('workflowRuns.columns.state')" width="120">
           <template #default="{ row }">
@@ -186,15 +189,15 @@ const { t } = useI18n()
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('workflowRuns.columns.createdAt')" width="200">
+        <el-table-column :label="t('workflowRuns.columns.createdAt')" width="220">
           <template #default="{ row }">{{ formatTime((row as any).createdAt || (row as any).CreatedAt) }}</template>
         </el-table-column>
-        <el-table-column :label="t('workflowRuns.columns.startedAt')" width="200">
+        <el-table-column :label="t('workflowRuns.columns.startedAt')" width="220">
           <template #default="{ row }">
             {{ (row as any).startedAt || (row as any).StartedAt ? formatTime((row as any).startedAt || (row as any).StartedAt) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column :label="t('workflowRuns.columns.finishedAt')" width="200">
+        <el-table-column :label="t('workflowRuns.columns.finishedAt')" width="220">
           <template #default="{ row }">
             {{ (row as any).finishedAt || (row as any).FinishedAt ? formatTime((row as any).finishedAt || (row as any).FinishedAt) : '-' }}
           </template>

@@ -125,18 +125,18 @@ const { t } = useI18n()
       </template>
       
       <el-table v-loading="loading" :data="stepRuns" style="width:100%">
-      <el-table-column :label="t('workflowRun.columns.ord')" width="80">
-        <template #default="{ row }">{{ row.ord ?? row.Ord }}</template>
-      </el-table-column>
-      <el-table-column :label="t('workflowRun.columns.step')">
-        <template #default="{ row }">
-          {{ (steps.find((s:any)=> (s.stepId||s.StepID)===(row.stepId||row.StepID))||{}).name || (row.stepId||row.StepID) }}
-        </template>
-      </el-table-column>
-      <el-table-column :label="t('workflowRun.columns.taskId')" width="320">
-        <template #default="{ row }">{{ row.taskId || row.TaskID }}</template>
-      </el-table-column>
-        <el-table-column :label="t('workflowRun.columns.state')" width="120">
+        <el-table-column :label="t('workflowRun.columns.ord')" width="100">
+          <template #default="{ row }">{{ row.ord ?? row.Ord }}</template>
+        </el-table-column>
+        <el-table-column :label="t('workflowRun.columns.step')">
+          <template #default="{ row }">
+            {{ (steps.find((s:any)=> (s.stepId||s.StepID)===(row.stepId||row.StepID))||{}).name || (row.stepId||row.StepID) }}
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('workflowRun.columns.taskId')" width="320">
+          <template #default="{ row }">{{ row.taskId || row.TaskID }}</template>
+        </el-table-column>
+        <el-table-column :label="t('workflowRun.columns.state')" width="220">
           <template #default="{ row }">{{ row.state || row.State }}</template>
         </el-table-column>
       </el-table>

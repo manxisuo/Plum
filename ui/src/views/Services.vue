@@ -106,17 +106,17 @@ function handleCurrentChange(val: number) {
       <el-card style="flex:1;">
         <template #header>{{ t('services.endpointsTitle', { name: active || '-' }) }}</template>
             <el-table :data="paginatedEndpoints" v-loading="loading" style="width:100%" stripe>
-        <el-table-column prop="instanceId" :label="t('services.columns.instance')" width="320" />
-        <el-table-column prop="nodeId" :label="t('services.columns.node')" width="160" />
-        <el-table-column :label="t('services.columns.address')">
-          <template #default="{ row }">{{ row.ip }}:{{ row.port }} ({{ row.protocol }})</template>
-        </el-table-column>
-        <el-table-column :label="t('services.columns.healthy')" width="100">
-          <template #default="{ row }"><el-tag :type="row.healthy?'success':'danger'">{{ row.healthy?'true':'false' }}</el-tag></template>
-        </el-table-column>
-        <el-table-column :label="t('services.columns.lastSeen')" width="200">
-          <template #default="{ row }">{{ new Date(row.lastSeen*1000).toLocaleString() }}</template>
-        </el-table-column>
+              <el-table-column prop="instanceId" :label="t('services.columns.instance')" width="340" />
+              <el-table-column prop="nodeId" :label="t('services.columns.node')" width="180" />
+              <el-table-column :label="t('services.columns.address')">
+                <template #default="{ row }">{{ row.ip }}:{{ row.port }} ({{ row.protocol }})</template>
+              </el-table-column>
+              <el-table-column :label="t('services.columns.healthy')" width="100">
+                <template #default="{ row }"><el-tag :type="row.healthy?'success':'danger'">{{ row.healthy?'true':'false' }}</el-tag></template>
+              </el-table-column>
+              <el-table-column :label="t('services.columns.lastSeen')" width="200">
+                <template #default="{ row }">{{ new Date(row.lastSeen*1000).toLocaleString() }}</template>
+              </el-table-column>
             </el-table>
             
             <!-- 分页组件 -->

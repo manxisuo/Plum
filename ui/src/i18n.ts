@@ -13,6 +13,7 @@ const messages = {
       start: 'Start',
       stop: 'Stop',
       submit: 'Submit',
+      reset: 'Reset',
       cancel: 'Cancel',
       yes: 'Yes',
       no: 'No',
@@ -264,7 +265,7 @@ const messages = {
           osProcessNode: 'Execute OS command on a specific node'
         }
       },
-      stats: { total: 'Total', running: 'Running', completed: 'Completed', failed: 'Failed' },
+      stats: { total: 'Total', running: 'Running', succeeded: 'Succeeded', failed: 'Failed' },
       search: { placeholder: 'Search by name, ID, or executor...' },
       filter: { executor: 'Executor', state: 'State', all: 'All' },
       table: { title: 'Task Definitions', items: 'items' },
@@ -347,6 +348,7 @@ const messages = {
       start: '开始',
       stop: '停止',
       submit: '提交',
+      reset: '重置',
       cancel: '取消',
       yes: '是',
       no: '否',
@@ -598,7 +600,7 @@ const messages = {
           osProcessNode: '在指定节点上执行操作系统命令'
         }
       },
-      stats: { total: '总数', running: '运行中', completed: '已完成', failed: '失败' },
+      stats: { total: '总数', running: '运行中', succeeded: '成功', failed: '失败' },
       search: { placeholder: '按名称、ID或执行器搜索...' },
       filter: { executor: '执行器', state: '状态', all: '全部' },
       table: { title: '任务定义列表', items: '项' },

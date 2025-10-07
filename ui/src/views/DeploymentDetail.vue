@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Refresh, DataBoard, Monitor, CircleCheck, VideoPlay, VideoPause, Delete } from '@element-plus/icons-vue'
+import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
@@ -199,7 +200,7 @@ async function stopByNode() {
       </template>
       
       <el-descriptions v-if="deployment" :column="2" border style="margin-bottom:16px;">
-        <el-descriptions-item :label="t('deploymentDetail.desc.deploymentId')">{{ deployment.deploymentId }}</el-descriptions-item>
+        <el-descriptions-item :label="t('deploymentDetail.desc.deploymentId')">{{ deployment.deploymentId || deployment.DeploymentID }}</el-descriptions-item>
         <el-descriptions-item :label="t('deploymentDetail.desc.name')">{{ deployment.name || deployment.Name }}</el-descriptions-item>
         <el-descriptions-item :label="t('deploymentDetail.desc.labels')" :span="2"><code>{{ JSON.stringify(deployment.labels || deployment.Labels || {}) }}</code></el-descriptions-item>
       </el-descriptions>
@@ -215,17 +216,19 @@ async function stopByNode() {
       </template>
       
       <el-table :data="paginatedAssigns" v-loading="loading" style="width:100%" stripe>
-        <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="300">
-          <template #default="{ row }">{{ row.instanceId || row.InstanceID }}</template>
+        <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="120">
+          <template #default="{ row }">
+            <IdDisplay :id="row.instanceId || row.InstanceID" :length="8" />
+          </template>
         </el-table-column>
-        <el-table-column :label="t('deploymentDetail.columns.nodeId')" width="180">
+        <el-table-column :label="t('deploymentDetail.columns.nodeId')" width="160">
           <template #default="{ row }">{{ row.nodeId || row.NodeID }}</template>
         </el-table-column>
-        <el-table-column :label="t('deploymentDetail.columns.artifact')">
+        <el-table-column :label="t('deploymentDetail.columns.artifact')" width="320">
           <template #default="{ row }">{{ row.artifactUrl || row.ArtifactURL }}</template>
         </el-table-column>
         <el-table-column prop="startCmd" :label="t('deploymentDetail.columns.startCmd')" />
-        <el-table-column :label="t('deploymentDetail.columns.desired')" width="120">
+        <el-table-column :label="t('deploymentDetail.columns.desired')" width="130">
           <template #default="{ row }">
             <el-tag :type="(row.desired || row.Desired) === 'Running' ? 'success' : 'warning'" size="small">
               <el-icon style="margin-right:4px;">

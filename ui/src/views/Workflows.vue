@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Refresh, Plus, Files, VideoPlay, View } from '@element-plus/icons-vue'
+import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
@@ -288,10 +289,12 @@ const totalPages = computed(() => {
       </template>
       
       <el-table :data="paginatedItems" v-loading="loading" style="width:100%;" stripe>
-      <el-table-column :label="t('workflows.columns.workflowId')" width="320">
-        <template #default="{ row }">{{ (row as any).workflowId || (row as any).WorkflowID }}</template>
+      <el-table-column :label="t('workflows.columns.workflowId')" width="120">
+        <template #default="{ row }">
+          <IdDisplay :id="(row as any).workflowId || (row as any).WorkflowID" :length="8" />
+        </template>
       </el-table-column>
-      <el-table-column :label="t('workflows.columns.name')" width="200">
+      <el-table-column :label="t('workflows.columns.name')" width="180">
         <template #default="{ row }">{{ (row as any).name || (row as any).Name }}</template>
       </el-table-column>
       <el-table-column :label="t('workflows.columns.steps')">
@@ -299,7 +302,7 @@ const totalPages = computed(() => {
             {{ (()=>{ const a = (row as any).steps || (row as any).Steps || []; return Array.isArray(a) ? a.map((s:any)=> s?.name || s?.Name || s?.definitionId || s?.DefinitionID || '').join(' -> ') : '' })() }}
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.action')" width="440">
+      <el-table-column :label="t('common.action')" width="400">
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="run(((row as any).workflowId||(row as any).WorkflowID))">{{ t('workflows.buttons.run') }}</el-button>
           <el-button size="small" @click="viewLatest(((row as any).workflowId||(row as any).WorkflowID))">{{ t('workflows.buttons.viewLatest') }}</el-button>
@@ -324,20 +327,20 @@ const totalPages = computed(() => {
     </el-card>
 
     <el-dialog v-model="showCreate" :title="t('workflows.dialog.title')" width="700px">
-      <el-form label-width="120px">
+      <el-form label-width="60px">
         <el-form-item :label="t('workflows.dialog.form.name')"><el-input v-model="form.name" placeholder="workflow 名称" /></el-form-item>
         <el-form-item :label="t('workflows.dialog.form.steps')">
           <div style="display:flex; flex-direction:column; gap:8px; width:100%">
             <div v-for="(s, i) in form.steps" :key="i" style="display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid #eee; border-radius:4px;">
               <div style="display:flex; gap:8px; align-items:center;">
-                <el-input v-model="s.name" placeholder="taskName，如 builtin.echo" style="flex:2" @blur="onTaskNameChange(s)" />
+                <el-input v-model="s.name" placeholder="taskName，如 builtin.echo" style="flex:1" @blur="onTaskNameChange(s)" />
                 <el-select v-model="s.executor" style="flex:1" @change="onExecutorChange(s)">
                   <el-option label="embedded" value="embedded" />
                   <el-option label="service" value="service" />
                   <el-option label="os_process" value="os_process" />
                 </el-select>
-                <el-input v-model.number="s.timeoutSec" :placeholder="t('workflows.dialog.form.timeoutSec')" style="width:120px" />
-                <el-input v-model.number="s.maxRetries" :placeholder="t('workflows.dialog.form.maxRetries')" style="width:120px" />
+                <el-input v-model.number="s.timeoutSec" :placeholder="t('workflows.dialog.form.timeoutSec')" style="width:90px" />
+                <el-input v-model.number="s.maxRetries" :placeholder="t('workflows.dialog.form.maxRetries')" style="width:90px" />
                 <el-button size="small" type="danger" @click="removeStep(i)">{{ t('workflows.dialog.form.delete') }}</el-button>
               </div>
               <div v-if="s.executor === 'service'" style="display:flex; flex-direction:column; gap:8px;">

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Refresh, Monitor, List, CircleCheck, CircleClose, VideoPlay, VideoPause } from '@element-plus/icons-vue'
+import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 type Assignment = { instanceId: string; deploymentId?: string; desired: string; artifactUrl: string; startCmd: string; healthy?: boolean; phase?: string; lastReportAt?: number }
@@ -184,9 +185,17 @@ const { t } = useI18n()
       </template>
       
       <el-table v-loading="loading" :data="paginatedItems" style="width:100%;" stripe>
-        <el-table-column prop="deploymentId" :label="t('assignments.columns.deployment')" width="160" />
-        <el-table-column prop="instanceId" :label="t('assignments.columns.instance')" width="160" />
-        <el-table-column :label="t('assignments.columns.desired')" width="100">
+        <el-table-column :label="t('assignments.columns.deployment')" width="100">
+          <template #default="{ row }">
+            <IdDisplay :id="row.deploymentId" :length="8" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('assignments.columns.instance')" width="100">
+          <template #default="{ row }">
+            <IdDisplay :id="row.instanceId" :length="8" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('assignments.columns.desired')" width="120">
           <template #default="{ row }">
             <el-tag :type="row.desired === 'Running' ? 'success' : 'warning'" size="small">
               <el-icon style="margin-right:4px;">
@@ -198,7 +207,7 @@ const { t } = useI18n()
           </template>
         </el-table-column>
         <el-table-column prop="phase" :label="t('assignments.columns.phase')" width="100" />
-        <el-table-column :label="t('assignments.columns.healthy')" width="100">
+        <el-table-column :label="t('assignments.columns.healthy')" width="110">
           <template #default="{ row }">
             <el-tag :type="row.healthy ? 'success' : 'danger'" size="small">
               <el-icon style="margin-right:4px;">
@@ -212,7 +221,7 @@ const { t } = useI18n()
         <el-table-column :label="t('assignments.columns.lastReportAt')" width="160">
           <template #default="{ row }">{{ row.lastReportAt ? new Date(row.lastReportAt*1000).toLocaleString() : '-' }}</template>
         </el-table-column>
-        <el-table-column prop="startCmd" :label="t('assignments.columns.startCmd')"  width="80" />
+        <el-table-column prop="startCmd" :label="t('assignments.columns.startCmd')"  width="100" />
         <el-table-column prop="artifactUrl" :label="t('assignments.columns.artifact')" />
         <el-table-column :label="t('common.action')" width="180" fixed="right">
           <template #default="{ row }">

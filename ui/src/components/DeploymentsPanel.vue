@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Refresh, Plus, DataBoard, List } from '@element-plus/icons-vue'
+import IdDisplay from './IdDisplay.vue'
 
 type Deployment = { deploymentId: string; name: string; labels?: Record<string,string>; instances: number }
 
@@ -93,7 +94,11 @@ const totalInstances = computed(() => items.value.reduce((sum, item) => sum + it
       </template>
       
       <el-table v-loading="loading" :data="items" style="width:100%;" stripe>
-      <el-table-column prop="deploymentId" :label="t('deployments.columns.deploymentId')" width="320" />
+      <el-table-column :label="t('deployments.columns.deploymentId')" width="120">
+        <template #default="{ row }">
+          <IdDisplay :id="row.deploymentId" :length="8" />
+        </template>
+      </el-table-column>
       <el-table-column prop="name" :label="t('deployments.columns.name')" width="220" />
       <el-table-column prop="instances" :label="t('deployments.columns.instances')" width="120" />
       <el-table-column :label="t('common.action')" width="260">

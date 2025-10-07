@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const route = useRoute()
@@ -71,7 +72,9 @@ async function deleteTask(id: string) {
       </template>
       
       <el-descriptions v-if="defn" :column="2" border>
-        <el-descriptions-item :label="t('taskDefDetail.desc.defId')">{{ defn.defId || defn.DefID }}</el-descriptions-item>
+        <el-descriptions-item :label="t('taskDefDetail.desc.defId')">
+          <IdDisplay :id="defn.defId || defn.DefID" :length="12" />
+        </el-descriptions-item>
         <el-descriptions-item :label="t('taskDefDetail.desc.name')">{{ defn.name || defn.Name }}</el-descriptions-item>
         <el-descriptions-item :label="t('taskDefDetail.desc.executor')">{{ defn.executor || defn.Executor }}</el-descriptions-item>
       </el-descriptions>
@@ -86,8 +89,10 @@ async function deleteTask(id: string) {
       </template>
       
       <el-table :data="runs" v-loading="loading" style="width:100%">
-      <el-table-column :label="t('taskDefDetail.columns.taskId')" width="320">
-        <template #default="{ row }">{{ row.taskId || row.TaskID }}</template>
+      <el-table-column :label="t('taskDefDetail.columns.taskId')" width="120">
+        <template #default="{ row }">
+          <IdDisplay :id="row.taskId || row.TaskID" :length="8" />
+        </template>
       </el-table-column>
       <el-table-column :label="t('taskDefDetail.columns.state')" width="140">
         <template #default="{ row }">{{ row.state || row.State }}</template>

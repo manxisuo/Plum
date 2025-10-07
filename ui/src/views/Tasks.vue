@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Refresh, Plus, List, Loading, Check, Close, Search, VideoPlay, View, Delete, Warning, Clock, InfoFilled } from '@element-plus/icons-vue'
+import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
@@ -179,7 +180,7 @@ const runningCount = computed(() => {
 })
 
 const completedCount = computed(() => {
-  return Object.values(latestByDef.value).filter(item => item.state === 'Completed').length
+  return Object.values(latestByDef.value).filter(item => item.state === 'Succeeded').length
 })
 
 const failedCount = computed(() => {
@@ -190,7 +191,6 @@ const failedCount = computed(() => {
 function getStateTagType(state: string) {
   switch (state) {
     case 'Running': return 'warning'
-    case 'Completed': return 'success'
     case 'Succeeded': return 'success'
     case 'Failed': return 'danger'
     case 'Cancelled': return 'info'
@@ -210,12 +210,17 @@ function formatDate(timestamp: number) {
   return new Date(timestamp * 1000).toLocaleDateString()
 }
 
+// ID格式化：显示缩短版
+function formatId(id: string, length: number = 8): string {
+  if (!id) return ''
+  return id.length > length ? id.substring(0, length) : id
+}
+
 // 状态翻译函数
 function getStateText(state: string) {
   if (!state) return t('taskDefs.status.neverRun')
   switch (state) {
     case 'Running': return t('taskDefs.status.running')
-    case 'Completed': return t('taskDefs.status.completed')
     case 'Succeeded': return t('taskDefs.status.succeeded')
     case 'Failed': return t('taskDefs.status.failed')
     case 'Cancelled': return t('taskDefs.status.cancelled')
@@ -500,7 +505,7 @@ async function onDel(id: string) {
             <el-icon size="12" color="white"><Check /></el-icon>
           </div>
           <span style="font-weight:bold;">{{ completedCount }}</span>
-          <span style="font-size:12px; color:#909399;">{{ t('taskDefs.stats.completed') }}</span>
+          <span style="font-size:12px; color:#909399;">{{ t('taskDefs.stats.succeeded') }}</span>
         </div>
         
         <div style="display:flex; align-items:center; gap:6px;">
@@ -535,8 +540,9 @@ async function onDel(id: string) {
       </el-select>
       <el-select v-model="selectedState" :placeholder="t('taskDefs.filter.state')" clearable style="width:150px;">
         <el-option :label="t('taskDefs.filter.all')" value="" />
+        <el-option label="Pending" value="Pending" />
         <el-option label="Running" value="Running" />
-        <el-option label="Completed" value="Completed" />
+        <el-option label="Succeeded" value="Succeeded" />
         <el-option label="Failed" value="Failed" />
         <el-option label="Cancelled" value="Cancelled" />
       </el-select>
@@ -552,10 +558,12 @@ async function onDel(id: string) {
       </template>
       
       <el-table v-loading="loading" :data="paginatedDefs" style="width:100%;" stripe>
-      <el-table-column :label="t('taskDefs.columns.defId')" width="280">
-        <template #default="{ row }">{{ (row as any).defId || (row as any).DefID }}</template>
+      <el-table-column :label="t('taskDefs.columns.defId')" width="120">
+        <template #default="{ row }">
+          <IdDisplay :id="(row as any).defId || (row as any).DefID" :length="8" />
+        </template>
       </el-table-column>
-      <el-table-column :label="t('taskDefs.columns.name')" width="200">
+      <el-table-column :label="t('taskDefs.columns.name')" width="220">
         <template #default="{ row }">{{ (row as any).name || (row as any).Name }}</template>
       </el-table-column>
       <el-table-column :label="t('taskDefs.columns.executor')" width="120">
@@ -569,7 +577,6 @@ async function onDel(id: string) {
           <el-tag :type="getStateTagType(latestByDef[(row as any).defId || (row as any).DefID]?.state)" size="small">
             <el-icon style="margin-right:4px;">
               <Loading v-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Running'" />
-              <Check v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Completed'" />
               <Check v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Succeeded'" />
               <Close v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Failed'" />
               <Warning v-else-if="latestByDef[(row as any).defId || (row as any).DefID]?.state === 'Cancelled'" />
