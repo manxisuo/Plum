@@ -171,9 +171,9 @@ const { t } = useI18n()
       </template>
       
       <el-table v-loading="loading" :data="paginatedNodes" style="width:100%;" stripe>
-        <el-table-column prop="nodeId" :label="t('nodes.columns.nodeId')" width="200" />
-        <el-table-column prop="ip" :label="t('nodes.columns.ip')" width="140" />
-        <el-table-column :label="t('nodes.columns.health')" width="120">
+        <el-table-column prop="nodeId" :label="t('nodes.columns.nodeId')" width="220" />
+        <el-table-column prop="ip" :label="t('nodes.columns.ip')" width="180" />
+        <el-table-column :label="t('nodes.columns.health')" width="140">
           <template #default="{ row }">
             <el-tag :type="getHealthStatus(row.health).type" size="small">
               <el-icon style="margin-right:4px;">
@@ -185,7 +185,7 @@ const { t } = useI18n()
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="t('nodes.columns.lastSeen')" width="180">
+        <el-table-column :label="t('nodes.columns.lastSeen')" width="220">
           <template #default="{ row }">{{ new Date(row.lastSeen*1000).toLocaleString() }}</template>
         </el-table-column>
         <el-table-column :label="t('nodes.columns.action')" width="160" fixed="right">

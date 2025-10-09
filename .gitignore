@@ -16,6 +16,7 @@ ui/.eslintcache
 # Go build outputs
 controller/bin/
 controller/dist/
+bin/
 
 # C++ build (CMake)
 agent/build/

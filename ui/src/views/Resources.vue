@@ -291,7 +291,7 @@ const { t } = useI18n()
 
 <template>
   <div>
-    <div style="display:flex; gap:16px; height:640px;">
+    <div style="display:flex; gap:16px; height:660px;">
       <!-- 资源列表 -->
       <el-card style="flex:1.2;">
         <template #header>
@@ -362,8 +362,8 @@ const { t } = useI18n()
               <span>{{ t('resources.sections.historyStates') }}</span>
             </div>
           </template>
-          <div style="height: 290px; overflow-y: auto;">
-            <el-table :data="resourceStates" size="small" style="width:100%;" :max-height="280">
+          <div style="height: 350px; overflow-y: auto;">
+            <el-table :data="resourceStates" size="small" style="width:100%;" :max-height="340">
               <!-- 时间列 -->
               <el-table-column :label="t('resources.columns.time')" width="130" fixed="left">
                 <template #default="{ row }">
@@ -404,7 +404,7 @@ const { t } = useI18n()
           </div>
         </template>
           <!-- 状态描述 -->
-          <el-card class="box-card" style="height: 260px; margin-bottom: 16px;">
+          <el-card class="box-card" style="height: 275px; margin-bottom: 16px;">
             <template #header>
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span>{{ t('resources.sections.stateDescription') }}</span>
@@ -421,7 +421,7 @@ const { t } = useI18n()
           </el-card>
 
           <!-- 操作描述 -->
-          <el-card class="box-card" style="height: 260px;">
+          <el-card class="box-card" style="height: 275px;">
             <template #header>
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span>{{ t('resources.sections.operationDescription') }}</span>
