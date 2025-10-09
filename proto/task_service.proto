@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package plum.task;
 
-option go_package = "plum/proto";
+option go_package = "github.com/manxisuo/Plum/controller/plum/proto;proto";
 
 service TaskService {
     rpc ExecuteTask(TaskRequest) returns (TaskResponse);

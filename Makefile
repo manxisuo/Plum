@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: controller controller-run agent agent-cpp agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build 
+.PHONY: controller controller-run agent agent-cpp agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build proto proto-clean
 .PHONY: sdk_cpp sdk_cpp_echo_worker sdk_cpp_echo_worker-run
 
 controller:
@@ -83,6 +83,13 @@ agent-help:
 	@echo "    CONTROLLER_BASE         - Controller地址（默认：http://127.0.0.1:8080）"
 	@echo "    AGENT_DATA_DIR          - 数据目录（默认：/tmp/plum-agent）"
 	@echo ""
+
+# ============ Proto编译 ============
+proto:
+	$(MAKE) -C proto all
+
+proto-clean:
+	$(MAKE) -C proto clean
 
 demo:
 	@echo "1) start controller: make controller && ./controller/bin/controller" 
