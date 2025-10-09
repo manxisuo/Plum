@@ -68,10 +68,18 @@ type Artifact struct {
 	CreatedAt  int64
 }
 
+type DeploymentStatus string
+
+const (
+	DeploymentStopped DeploymentStatus = "Stopped"
+	DeploymentRunning DeploymentStatus = "Running"
+)
+
 type Deployment struct {
 	DeploymentID string
 	Name         string
 	Labels       map[string]string
+	Status       DeploymentStatus // Stopped | Running
 }
 
 // Service endpoint exposed by an instance
@@ -226,6 +234,7 @@ type Store interface {
 	ListDeployments() ([]Deployment, error)
 	GetDeployment(id string) (Deployment, bool, error)
 	DeleteDeployment(id string) error
+	UpdateDeploymentStatus(id string, status DeploymentStatus) error
 	ListAssignmentsForDeployment(deploymentID string) ([]Assignment, error)
 
 	// Services / discovery

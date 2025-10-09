@@ -12,6 +12,7 @@ type DeploymentDTO struct {
 	DeploymentID string            `json:"deploymentId"`
 	Name         string            `json:"name"`
 	Labels       map[string]string `json:"labels"`
+	Status       string            `json:"status"` // Stopped | Running
 	Instances    int               `json:"instances"`
 }
 
@@ -39,7 +40,13 @@ func handleListDeployments(w http.ResponseWriter, r *http.Request) {
 	out := make([]DeploymentDTO, 0, len(deployments))
 	for _, t := range deployments {
 		assigns, _ := store.Current.ListAssignmentsForDeployment(t.DeploymentID)
-		out = append(out, DeploymentDTO{DeploymentID: t.DeploymentID, Name: t.Name, Labels: t.Labels, Instances: len(assigns)})
+		out = append(out, DeploymentDTO{
+			DeploymentID: t.DeploymentID,
+			Name:         t.Name,
+			Labels:       t.Labels,
+			Status:       string(t.Status),
+			Instances:    len(assigns),
+		})
 	}
 	writeJSON(w, out)
 }
@@ -51,6 +58,18 @@ func handleDeploymentByID(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	// 处理action参数（启动/停止部署）
+	action := r.URL.Query().Get("action")
+	if action == "start" || action == "stop" {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed, use POST", http.StatusMethodNotAllowed)
+			return
+		}
+		handleDeploymentAction(w, r, id, action)
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		t, ok, _ := store.Current.GetDeployment(id)
@@ -104,6 +123,47 @@ func handleDeploymentByID(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handleDeploymentAction 处理部署的启动/停止操作
+func handleDeploymentAction(w http.ResponseWriter, r *http.Request, id string, action string) {
+	_, ok, _ := store.Current.GetDeployment(id)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	var newStatus store.DeploymentStatus
+	if action == "start" {
+		newStatus = store.DeploymentRunning
+	} else {
+		newStatus = store.DeploymentStopped
+	}
+
+	if err := store.Current.UpdateDeploymentStatus(id, newStatus); err != nil {
+		http.Error(w, "failed to update status", http.StatusInternalServerError)
+		return
+	}
+
+	// 如果是停止操作，将所有实例的Desired状态设为Stopped
+	if action == "stop" {
+		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
+		for _, a := range assigns {
+			_ = store.Current.UpdateAssignmentDesired(a.InstanceID, store.DesiredStopped)
+		}
+	} else {
+		// 如果是启动操作，将所有实例的Desired状态设为Running
+		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
+		for _, a := range assigns {
+			_ = store.Current.UpdateAssignmentDesired(a.InstanceID, store.DesiredRunning)
+		}
+	}
+
+	writeJSON(w, map[string]any{
+		"deploymentId": id,
+		"status":       string(newStatus),
+		"message":      "Deployment " + action + "ed successfully",
+	})
 }
 
 // small helper to decode JSON with error handling

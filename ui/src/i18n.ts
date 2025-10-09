@@ -10,6 +10,7 @@ const messages = {
       config: 'Config',
       delete: 'Delete',
       action: 'Action',
+      status: 'Status',
       start: 'Start',
       stop: 'Stop',
       submit: 'Submit',
@@ -74,11 +75,18 @@ const messages = {
       }
     },
     deployments: {
-      columns: { deploymentId: 'DeploymentID', name: 'Name', instances: 'Instances' },
-      buttons: { create: 'Create Deployment' },
-      stats: { deployments: 'Deployments', instances: 'Instances' },
+      columns: { id: 'ID', deploymentId: 'DeploymentID', name: 'Name', instances: 'Instances' },
+      buttons: { create: 'Create Deployment', start: 'Start', stop: 'Stop' },
+      stats: { total: 'Total', running: 'Running', stopped: 'Stopped', instances: 'Instances' },
+      status: { running: 'Running', stopped: 'Stopped' },
       table: { title: 'Deployment List', items: 'items' },
       confirmDelete: 'Confirm delete this deployment? (will not cascade to instances)',
+      startSuccess: 'Deployment started',
+      stopSuccess: 'Deployment stopped',
+      startFailed: 'Failed to start deployment',
+      stopFailed: 'Failed to stop deployment',
+      deleteSuccess: 'Deleted successfully',
+      deleteFailed: 'Failed to delete',
       create: {
         title: 'Create Deployment',
         form: {
@@ -345,6 +353,7 @@ const messages = {
       config: '配置',
       delete: '删除',
       action: '操作',
+      status: '状态',
       start: '开始',
       stop: '停止',
       submit: '提交',
@@ -409,11 +418,18 @@ const messages = {
       }
     },
     deployments: {
-      columns: { deploymentId: '部署ID', name: '名称', instances: '实例数' },
-      buttons: { create: '创建部署' },
-      stats: { deployments: '部署', instances: '实例' },
+      columns: { id: 'ID', deploymentId: '部署ID', name: '名称', instances: '实例数' },
+      buttons: { create: '创建部署', start: '启动', stop: '停止' },
+      stats: { total: '总数', running: '运行中', stopped: '已停止', instances: '实例' },
+      status: { running: '运行中', stopped: '已停止' },
       table: { title: '部署列表', items: '项' },
       confirmDelete: '确认删除该部署？（不会级联删除实例分配）',
+      startSuccess: '部署已启动',
+      stopSuccess: '部署已停止',
+      startFailed: '启动失败',
+      stopFailed: '停止失败',
+      deleteSuccess: '删除成功',
+      deleteFailed: '删除失败',
       create: {
         title: '创建部署',
         form: {

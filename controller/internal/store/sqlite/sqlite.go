@@ -29,6 +29,8 @@ func New(dbPath string) (store.Store, error) {
 	if err := migrate(db); err != nil {
 		return nil, err
 	}
+	// 在线迁移：为已存在的deployments表添加status列（忽略错误，如果列已存在）
+	db.Exec(`ALTER TABLE deployments ADD COLUMN status TEXT DEFAULT 'Stopped'`)
 	return &sqliteStore{db: db}, nil
 }
 
@@ -44,7 +46,8 @@ func migrate(db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS deployments (
             deployment_id TEXT PRIMARY KEY,
 			name TEXT,
-			labels TEXT
+			labels TEXT,
+			status TEXT DEFAULT 'Stopped'
 		);`,
 		`CREATE TABLE IF NOT EXISTS assignments (
 			instance_id TEXT PRIMARY KEY,
@@ -331,7 +334,12 @@ func (s *sqliteStore) DeleteNode(id string) error {
 }
 
 func (s *sqliteStore) ListAssignmentsForNode(nodeID string) ([]store.Assignment, error) {
-	rows, err := s.db.Query(`SELECT instance_id, deployment_id, node_id, desired, artifact_url, start_cmd, app_name, app_version FROM assignments WHERE node_id=?`, nodeID)
+	// 只返回状态为Running的部署的实例
+	rows, err := s.db.Query(`
+		SELECT a.instance_id, a.deployment_id, a.node_id, a.desired, a.artifact_url, a.start_cmd, a.app_name, a.app_version 
+		FROM assignments a 
+		INNER JOIN deployments d ON a.deployment_id = d.deployment_id 
+		WHERE a.node_id=? AND COALESCE(d.status, 'Stopped') = 'Running'`, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +402,8 @@ func (s *sqliteStore) LatestStatus(instanceID string) (store.InstanceStatus, boo
 func (s *sqliteStore) CreateDeployment(name string, labels map[string]string) (string, []string, error) {
 	id := newID()
 	labelsJSON, _ := json.Marshal(labels)
-	if _, err := s.db.Exec(`INSERT INTO deployments(deployment_id, name, labels) VALUES(?,?,?)`, id, name, string(labelsJSON)); err != nil {
+	// 创建时默认状态为Stopped
+	if _, err := s.db.Exec(`INSERT INTO deployments(deployment_id, name, labels, status) VALUES(?,?,?,?)`, id, name, string(labelsJSON), store.DeploymentStopped); err != nil {
 		return "", nil, err
 	}
 	return id, []string{}, nil
@@ -405,7 +414,7 @@ func (s *sqliteStore) NewInstanceID(deploymentID string) string {
 }
 
 func (s *sqliteStore) ListDeployments() ([]store.Deployment, error) {
-	rows, err := s.db.Query(`SELECT deployment_id, name, labels FROM deployments ORDER BY rowid DESC`)
+	rows, err := s.db.Query(`SELECT deployment_id, name, labels, COALESCE(status, 'Stopped') FROM deployments ORDER BY rowid DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -414,31 +423,40 @@ func (s *sqliteStore) ListDeployments() ([]store.Deployment, error) {
 	for rows.Next() {
 		var t store.Deployment
 		var labelsStr string
-		if err := rows.Scan(&t.DeploymentID, &t.Name, &labelsStr); err != nil {
+		var statusStr string
+		if err := rows.Scan(&t.DeploymentID, &t.Name, &labelsStr, &statusStr); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
+		t.Status = store.DeploymentStatus(statusStr)
 		out = append(out, t)
 	}
 	return out, rows.Err()
 }
 
 func (s *sqliteStore) GetDeployment(id string) (store.Deployment, bool, error) {
-	row := s.db.QueryRow(`SELECT deployment_id, name, labels FROM deployments WHERE deployment_id=?`, id)
+	row := s.db.QueryRow(`SELECT deployment_id, name, labels, COALESCE(status, 'Stopped') FROM deployments WHERE deployment_id=?`, id)
 	var t store.Deployment
 	var labelsStr string
-	if err := row.Scan(&t.DeploymentID, &t.Name, &labelsStr); err != nil {
+	var statusStr string
+	if err := row.Scan(&t.DeploymentID, &t.Name, &labelsStr, &statusStr); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.Deployment{}, false, nil
 		}
 		return store.Deployment{}, false, err
 	}
 	_ = json.Unmarshal([]byte(labelsStr), &t.Labels)
+	t.Status = store.DeploymentStatus(statusStr)
 	return t, true, nil
 }
 
 func (s *sqliteStore) DeleteDeployment(id string) error {
 	_, err := s.db.Exec(`DELETE FROM deployments WHERE deployment_id=?`, id)
+	return err
+}
+
+func (s *sqliteStore) UpdateDeploymentStatus(id string, status store.DeploymentStatus) error {
+	_, err := s.db.Exec(`UPDATE deployments SET status=? WHERE deployment_id=?`, status, id)
 	return err
 }
 

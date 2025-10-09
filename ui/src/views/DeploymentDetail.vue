@@ -127,6 +127,34 @@ async function stopByNode() {
     ElMessage.success('已下发按节点停止')
   } finally { opLoading.value = false; load() }
 }
+
+async function startDeployment() {
+  try {
+    opLoading.value = true
+    const res = await fetch(`${API_BASE}/v1/deployments/${encodeURIComponent(id)}?action=start`, { method: 'POST' })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    ElMessage.success(t('deployments.startSuccess'))
+    load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || t('deployments.startFailed'))
+  } finally {
+    opLoading.value = false
+  }
+}
+
+async function stopDeployment() {
+  try {
+    opLoading.value = true
+    const res = await fetch(`${API_BASE}/v1/deployments/${encodeURIComponent(id)}?action=stop`, { method: 'POST' })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    ElMessage.success(t('deployments.stopSuccess'))
+    load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || t('deployments.stopFailed'))
+  } finally {
+    opLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -139,11 +167,28 @@ async function stopByNode() {
           <el-icon><Refresh /></el-icon>
           {{ t('common.refresh') }}
         </el-button>
+        <el-button 
+          v-if="deployment?.status === 'Stopped'"
+          type="success" 
+          :loading="opLoading" 
+          @click="startDeployment">
+          <el-icon><VideoPlay /></el-icon>
+          {{ t('deployments.buttons.start') }}
+        </el-button>
+        <el-button 
+          v-else
+          type="warning" 
+          :loading="opLoading" 
+          @click="stopDeployment">
+          <el-icon><VideoPause /></el-icon>
+          {{ t('deployments.buttons.stop') }}
+        </el-button>
+        <el-divider direction="vertical" />
         <el-button type="warning" :loading="opLoading" @click="stopAll">
           <el-icon><VideoPause /></el-icon>
           {{ t('deploymentDetail.buttons.stopAll') }}
         </el-button>
-        <el-select v-model="selectedNode" :placeholder="t('common.selectNode')" style="width:200px;">
+        <el-select v-model="selectedNode" :placeholder="t('common.selectNode')" style="width:180px;" size="default">
           <el-option v-for="n in nodesInDeployment" :key="n" :label="n" :value="n" />
         </el-select>
         <el-button type="warning" :loading="opLoading" @click="stopByNode">

@@ -18,6 +18,9 @@ controller/bin/
 controller/dist/
 bin/
 
+# Agent build outputs
+agent-go/plum-agent
+
 # C++ build (CMake)
 agent/build/
 sdk/cpp/build/
@@ -60,6 +63,7 @@ artifacts/
 *.log
 *.tmp
 *.bak
+logs/
 
 # Runtime logs from testing
 controller.log
