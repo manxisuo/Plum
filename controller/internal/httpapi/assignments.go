@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"plum/controller/internal/notify"
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/notify"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 func handleAssignmentByID(w http.ResponseWriter, r *http.Request) {

@@ -1,4 +1,4 @@
-module github.com/manxisuo/Plum/controller
+module github.com/manxisuo/plum/controller
 
 go 1.23.0
 

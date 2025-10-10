@@ -5,11 +5,11 @@
 ```
 proto/
 ├── task_service.proto    # gRPC服务定义（源文件）
-├── generate.sh           # 自动编译脚本
+├── Makefile              # proto编译构建文件
 └── README.md            # 本文档
 
 生成代码位置：
-├── controller/plum/proto/         # Go生成代码
+├── controller/proto/              # Go生成代码
 │   ├── task_service.pb.go
 │   └── task_service_grpc.pb.go
 └── sdk/cpp/grpc/proto/            # C++生成代码
@@ -112,7 +112,7 @@ sudo apt install libgrpc++-dev protobuf-compiler-grpc
 
 ### Controller (Go client)
 ```go
-import pb "plum/controller/plum/proto"
+import pb "github.com/manxisuo/plum/controller/proto"
 
 conn, _ := grpc.Dial(address)
 client := pb.NewTaskServiceClient(conn)
@@ -189,7 +189,7 @@ make controller         # 重新编译Controller
 make sdk_cpp            # 重新编译C++ SDK
 
 # 验证生成结果
-ls -lh controller/plum/proto/
+ls -lh controller/proto/
 ls -lh sdk/cpp/grpc/proto/
 ```
 

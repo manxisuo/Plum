@@ -63,14 +63,14 @@ make proto
 
 ### Go代码（Controller使用）
 ```
-controller/plum/proto/
+controller/proto/
 ├── task_service.pb.go         # 消息类型
 └── task_service_grpc.pb.go    # gRPC服务
 ```
 
 **使用方式**：
 ```go
-import pb "plum/controller/plum/proto"
+import pb "github.com/manxisuo/plum/controller/proto"
 
 client := pb.NewTaskServiceClient(conn)
 ```

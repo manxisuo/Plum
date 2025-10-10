@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"plum/controller/plum/proto"
+	"github.com/manxisuo/plum/controller/proto"
 )
 
 type TaskClient struct {

@@ -184,54 +184,124 @@ Plum 旨在解决分布式环境下的任务编排、调度和执行问题，支
 
 ### 环境要求
 
-- Go 1.19+
-- Node.js 16+
-- CMake 3.10+（用于C++ SDK）
+**核心组件**：
+- Go 1.19+ （Controller和Agent）
+- Node.js 16+ （Web UI）
 - Git
 
-### 安装和运行
+**可选组件**：
+- protobuf-compiler 3.12+ （修改proto文件时需要）
+- CMake 3.10+ （构建C++ SDK）
+- grpc++ （C++ gRPC支持）
 
-1. **克隆项目**
+### 安装依赖
+
+#### Ubuntu/Debian
+
 ```bash
-git clone <repository-url>
+# 核心依赖
+sudo apt update
+sudo apt install -y git curl
+
+# Go 1.19+（如果未安装）
+wget https://go.dev/dl/go1.22.6.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.22.6.linux-amd64.tar.gz
+echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
+source ~/.bashrc
+
+# Node.js 16+（使用nvm推荐）
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+
+# protobuf编译器（可选，修改proto时需要）
+sudo apt install -y protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+
+# CMake（可选，构建C++ SDK时需要）
+sudo apt install -y cmake build-essential
+```
+
+#### 验证安装
+
+```bash
+go version        # go version go1.22.6 linux/amd64
+node --version    # v18.x.x
+npm --version     # 9.x.x
+git --version     # git version 2.x.x
+protoc --version  # libprotoc 3.12.4（可选）
+```
+
+### 构建和运行
+
+#### 方式1：生产模式（一次性部署）
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/manxisuo/plum.git
 cd Plum
+
+# 2. 生成proto代码（首次需要）
+make proto
+
+# 3. 构建所有组件
+make controller       # 构建Controller
+make agent           # 构建Agent
+cd ui && npm install && npm run build && cd ..
+
+# 4. 启动服务（使用screen/tmux或systemd）
+./controller/bin/controller &               # Controller
+AGENT_NODE_ID=nodeA make agent-run &        # Agent
+
+# 5. 访问
+# Web UI: http://localhost:8080
+# API: http://localhost:8080/v1/
 ```
 
-2. **构建Controller**
+#### 方式2：开发模式（热更新）
+
 ```bash
-make controller
-```
+# 1. 克隆和初始化
+git clone https://github.com/manxisuo/plum.git
+cd Plum
+make proto
+cd ui && npm install && cd ..
 
-3. **构建前端**
-```bash
-make ui-build
-```
-
-4. **运行Controller**
-```bash
-CONTROLLER_DATA_DIR=/path/to/data ./controller/bin/controller
-```
-
-5. **访问Web UI**
-```
-http://localhost:5173 (或 5174，取决于端口占用情况)
-```
-
-### 开发环境
-
-1. **启动Controller**
-```bash
+# 2. 启动Controller（终端1）
 make controller-run
-```
 
-2. **启动前端开发服务器**
-```bash
+# 3. 启动Agent（终端2）
+make agent-run
+
+# 4. 启动Web UI开发服务器（终端3）
 cd ui && npm run dev
+# 访问 http://localhost:5173
+
+# 前端代码修改会自动热更新
+# Go代码修改需要重新make controller/agent
 ```
 
-3. **构建C++ SDK**
+### 常用命令速查
+
 ```bash
-make sdk_cpp
+# 构建
+make controller              # 构建Controller
+make agent                   # 构建Agent
+make proto                   # 生成proto代码
+make sdk_cpp                 # 构建C++ SDK
+make agent-clean             # 清理Agent构建产物
+make proto-clean             # 清理proto生成代码
+
+# 运行
+make controller-run          # 运行Controller
+make agent-run               # 运行Agent (nodeA)
+make agent-runB              # 运行Agent (nodeB)
+make agent-run-multi         # 后台运行3个Agent (A/B/C)
+make agent-help              # 查看Agent命令帮助
+
+# Web UI
+cd ui && npm run dev         # 开发模式
+cd ui && npm run build       # 生产构建
 ```
 
 ## 📖 使用指南
@@ -445,10 +515,72 @@ curl -X POST "http://127.0.0.1:8080/v1/workflows/{id}?action=run"
 
 ### ✅ 开发和运维
 - [x] 统一构建系统（Makefile）
+- [x] Go Agent（技术栈统一，维护成本降低）
+- [x] Proto编译自动化（make proto一键生成）
+- [x] 部署状态控制（Stopped/Running）
+- [x] 进程监控和自动重启
 - [x] C++ SDK构建支持
 - [x] 开发环境配置
 - [x] API文档和示例
 - [x] 错误日志和调试信息
+
+## ❓ 常见问题
+
+### 构建问题
+
+**Q: make proto报错"protoc: command not found"**
+```bash
+sudo apt install protobuf-compiler
+```
+
+**Q: make agent报错"go: command not found"**
+```bash
+# 检查Go是否安装
+which go
+
+# 如果已安装但找不到，添加到PATH
+echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Q: proto生成代码位置不对**
+```bash
+# 清理后重新生成
+make proto-clean
+make proto
+
+# 验证位置
+ls controller/proto/*.pb.go
+```
+
+### 运行问题
+
+**Q: Agent无法检测到进程死亡**
+- 确保使用Go版本Agent（agent-go/），不是C++版本
+- Go Agent已修复僵尸进程检测问题
+
+**Q: 部署创建后实例立即启动**
+- 新版本已修复：默认状态为Stopped
+- 需要手动点击"启动"按钮
+
+**Q: UI端口5173被占用**
+- Vite会自动尝试5174、5175等端口
+- 或修改ui/vite.config.ts指定端口
+
+### 依赖问题
+
+**Q: go install后找不到protoc-gen-go**
+```bash
+# 添加GOPATH/bin到PATH
+echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Q: C++编译失败**
+```bash
+# 安装完整的C++开发环境
+sudo apt install -y cmake build-essential libgrpc++-dev
+```
 
 ## 🚧 待办功能
 

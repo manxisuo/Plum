@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 type AppInfo struct {

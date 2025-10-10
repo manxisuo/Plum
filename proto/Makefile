@@ -28,12 +28,12 @@ $(PROTOC_GEN_GO_GRPC):
 generate-go: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC)
 	@echo "📦 Generating Go code..."
 	@cd .. && protoc -I=proto \
-		--go_out=. --go_opt=module=github.com/manxisuo/Plum/controller \
-		--go-grpc_out=. --go-grpc_opt=module=github.com/manxisuo/Plum/controller \
+		--go_out=. --go_opt=module=github.com/manxisuo/plum \
+		--go-grpc_out=. --go-grpc_opt=module=github.com/manxisuo/plum \
 		--plugin=protoc-gen-go=$(PROTOC_GEN_GO) \
 		--plugin=protoc-gen-go-grpc=$(PROTOC_GEN_GO_GRPC) \
 		proto/task_service.proto
-	@echo "✅ Go: controller/plum/proto/"
+	@echo "✅ Go: controller/proto/"
 
 # 生成C++代码（在父目录执行）
 generate-cpp:
@@ -54,8 +54,10 @@ generate-cpp:
 # 清理生成的代码
 clean:
 	@echo "Cleaning generated proto files..."
-	@rm -f ../controller/plum/proto/*.pb.go
+	@rm -f ../controller/proto/*.pb.go
+	@rm -f ../controller/plum/proto/*.pb.go 2>/dev/null || true
 	@rm -f ../controller/*.pb.go 2>/dev/null || true
+	@rm -rf ../plum 2>/dev/null || true
 	@rm -f ../sdk/cpp/grpc/proto/*.pb.{h,cc}
 	@rm -rf ../sdk/cpp/grpc/proto/proto 2>/dev/null || true
 	@echo "✅ Cleaned"

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 // ---- Resources ----

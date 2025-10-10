@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"plum/controller/internal/failover"
-	"plum/controller/internal/httpapi"
-	"plum/controller/internal/store"
-	sqlitestore "plum/controller/internal/store/sqlite"
-	"plum/controller/internal/tasks"
+	"github.com/manxisuo/plum/controller/internal/failover"
+	"github.com/manxisuo/plum/controller/internal/httpapi"
+	"github.com/manxisuo/plum/controller/internal/store"
+	sqlitestore "github.com/manxisuo/plum/controller/internal/store/sqlite"
+	"github.com/manxisuo/plum/controller/internal/tasks"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 		log.Fatalf("init db error: %v", err)
 	}
 	store.SetCurrent(s)
-	
+
 	// 确保数据库连接在程序退出时正确关闭
 	defer func() {
 		if closer, ok := s.(interface{ Close() error }); ok {
@@ -60,25 +60,25 @@ func main() {
 	// 设置信号处理
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	// 启动服务器
 	server := &http.Server{
 		Addr:    addr,
 		Handler: mux,
 	}
-	
+
 	go func() {
 		log.Printf("controller listening on %s", addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
 	}()
-	
+
 	// 等待信号
 	<-sigChan
 	log.Println("Received shutdown signal, gracefully shutting down...")
-	
+
 	// 这里可以添加更多的清理逻辑，比如停止任务调度器等
-	
+
 	log.Println("Controller shutdown complete")
 }

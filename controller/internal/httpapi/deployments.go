@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 type DeploymentDTO struct {

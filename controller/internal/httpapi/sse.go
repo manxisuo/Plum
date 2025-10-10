@@ -2,7 +2,8 @@ package httpapi
 
 import (
 	"net/http"
-	"plum/controller/internal/notify"
+
+	"github.com/manxisuo/plum/controller/internal/notify"
 )
 
 // Server-Sent Events: /v1/stream?nodeId=

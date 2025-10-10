@@ -10,7 +10,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 type sqliteStore struct {

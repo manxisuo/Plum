@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"plum/controller/internal/failover"
-	"plum/controller/internal/notify"
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/failover"
+	"github.com/manxisuo/plum/controller/internal/notify"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 type NodeHello struct {

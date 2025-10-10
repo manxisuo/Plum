@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"plum/controller/internal/grpc"
-	"plum/controller/internal/notify"
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/grpc"
+	"github.com/manxisuo/plum/controller/internal/notify"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 func intervalSeconds() int {

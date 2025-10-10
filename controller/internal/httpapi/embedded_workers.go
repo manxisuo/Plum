@@ -6,18 +6,18 @@ import (
 	"net/http"
 	"time"
 
-	"plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/internal/store"
 )
 
 type EmbeddedWorkerRegisterRequest struct {
-	WorkerID     string            `json:"workerId"`
-	NodeID       string            `json:"nodeId"`
-	InstanceID   string            `json:"instanceId"`
-	AppName      string            `json:"appName"`
-	AppVersion   string            `json:"appVersion"`
-	GRPCAddress  string            `json:"grpcAddress"`
-	Tasks        []string          `json:"tasks"`
-	Labels       map[string]string `json:"labels"`
+	WorkerID    string            `json:"workerId"`
+	NodeID      string            `json:"nodeId"`
+	InstanceID  string            `json:"instanceId"`
+	AppName     string            `json:"appName"`
+	AppVersion  string            `json:"appVersion"`
+	GRPCAddress string            `json:"grpcAddress"`
+	Tasks       []string          `json:"tasks"`
+	Labels      map[string]string `json:"labels"`
 }
 
 type EmbeddedWorkerHeartbeatRequest struct {
@@ -42,15 +42,15 @@ func handleRegisterEmbeddedWorker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	worker := store.EmbeddedWorker{
-		WorkerID:     req.WorkerID,
-		NodeID:       req.NodeID,
-		InstanceID:   req.InstanceID,
-		AppName:      req.AppName,
-		AppVersion:   req.AppVersion,
-		GRPCAddress:  req.GRPCAddress,
-		Tasks:        req.Tasks,
-		Labels:       req.Labels,
-		LastSeen:     time.Now().Unix(),
+		WorkerID:    req.WorkerID,
+		NodeID:      req.NodeID,
+		InstanceID:  req.InstanceID,
+		AppName:     req.AppName,
+		AppVersion:  req.AppVersion,
+		GRPCAddress: req.GRPCAddress,
+		Tasks:       req.Tasks,
+		Labels:      req.Labels,
+		LastSeen:    time.Now().Unix(),
 	}
 
 	if err := store.Current.RegisterEmbeddedWorker(worker); err != nil {
