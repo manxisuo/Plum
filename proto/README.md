@@ -56,21 +56,33 @@ protoc --cpp_out=./sdk/cpp/grpc/proto \
 
 ## 📋 依赖要求
 
-### 基础工具
+### 必需工具
+
+**1. protobuf编译器**
 ```bash
-# 安装protobuf编译器
 sudo apt install protobuf-compiler
 ```
 
-### Go插件（自动安装）
+**2. Go插件**（必须预先安装）
 ```bash
 go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# 确保GOPATH/bin在PATH中
+export PATH=$PATH:$HOME/go/bin
 ```
 
-### C++插件
+**3. C++插件**（生成C++代码时需要）
 ```bash
 sudo apt install libgrpc++-dev protobuf-compiler-grpc
+```
+
+### 验证安装
+```bash
+protoc --version                # libprotoc 3.12.4
+protoc-gen-go --version         # protoc-gen-go v1.36.10
+protoc-gen-go-grpc --version    # protoc-gen-go-grpc 1.5.1
+grpc_cpp_plugin --version       # （可选）
 ```
 
 ## 🔄 工作流程

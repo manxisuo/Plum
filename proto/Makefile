@@ -2,36 +2,23 @@ SHELL := /bin/bash
 
 # Go工具链路径
 GOBIN := $(shell go env GOPATH)/bin
-PROTOC_GEN_GO := $(GOBIN)/protoc-gen-go
-PROTOC_GEN_GO_GRPC := $(GOBIN)/protoc-gen-go-grpc
 
-.PHONY: all clean check-tools
+.PHONY: all clean generate-go generate-cpp
 
-all: check-tools generate-go generate-cpp
+all: generate-go generate-cpp
 	@echo "✅ Proto generation complete"
 
-# 检查protoc是否安装
-check-tools:
-	@command -v protoc > /dev/null 2>&1 || { echo "❌ protoc not found. Install: sudo apt install protobuf-compiler"; exit 1; }
-	@echo "✓ protoc version: $$(protoc --version)"
-
-# 检查并安装Go插件
-$(PROTOC_GEN_GO):
-	@echo "→ Installing protoc-gen-go..."
-	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-
-$(PROTOC_GEN_GO_GRPC):
-	@echo "→ Installing protoc-gen-go-grpc..."
-	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
 # 生成Go代码
-generate-go: $(PROTOC_GEN_GO) $(PROTOC_GEN_GO_GRPC)
+generate-go:
 	@echo "📦 Generating Go code..."
+	@command -v protoc > /dev/null 2>&1 || { echo "❌ protoc not found"; exit 1; }
+	@test -f $(GOBIN)/protoc-gen-go || { echo "❌ protoc-gen-go not found. Run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"; exit 1; }
+	@test -f $(GOBIN)/protoc-gen-go-grpc || { echo "❌ protoc-gen-go-grpc not found. Run: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"; exit 1; }
 	@cd .. && protoc -I=proto \
 		--go_out=. --go_opt=module=github.com/manxisuo/plum \
 		--go-grpc_out=. --go-grpc_opt=module=github.com/manxisuo/plum \
-		--plugin=protoc-gen-go=$(PROTOC_GEN_GO) \
-		--plugin=protoc-gen-go-grpc=$(PROTOC_GEN_GO_GRPC) \
+		--plugin=protoc-gen-go=$(GOBIN)/protoc-gen-go \
+		--plugin=protoc-gen-go-grpc=$(GOBIN)/protoc-gen-go-grpc \
 		proto/task_service.proto
 	@echo "✅ Go: controller/proto/"
 

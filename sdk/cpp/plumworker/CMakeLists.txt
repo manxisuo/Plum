@@ -25,9 +25,18 @@ target_include_directories(grpc_proto PUBLIC ${PROTOBUF_INCLUDE_DIRS})
 include(FetchContent)
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
+# 支持使用GitHub镜像（中国网络环境）
+# 使用方法: cmake -DUSE_GITHUB_MIRROR=ON ..
+option(USE_GITHUB_MIRROR "Use GitHub mirror for China network" OFF)
+if(USE_GITHUB_MIRROR)
+  set(GITHUB_MIRROR "https://ghproxy.com/")
+else()
+  set(GITHUB_MIRROR "")
+endif()
+
 FetchContent_Declare(
   json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_REPOSITORY ${GITHUB_MIRROR}https://github.com/nlohmann/json.git
   GIT_TAG v3.11.3
 )
 FetchContent_MakeAvailable(json)
@@ -35,7 +44,7 @@ target_link_libraries(plumworker PUBLIC nlohmann_json::nlohmann_json)
 
 FetchContent_Declare(
   httplib
-  GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+  GIT_REPOSITORY ${GITHUB_MIRROR}https://github.com/yhirose/cpp-httplib.git
   GIT_TAG v0.15.3
 )
 FetchContent_MakeAvailable(httplib)

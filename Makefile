@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 .PHONY: controller controller-run agent agent-cpp agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build proto proto-clean
-.PHONY: sdk_cpp sdk_cpp_echo_worker sdk_cpp_echo_worker-run
+.PHONY: sdk_cpp sdk_cpp_mirror sdk_cpp_echo_worker sdk_cpp_echo_worker-run
 
 controller:
 	$(MAKE) -C controller build
@@ -109,6 +109,11 @@ ui-build:
 # SDK C++ (library and examples)
 sdk_cpp:
 	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake --build sdk/cpp/build --config Release -j
+
+# SDK C++ (使用GitHub镜像，适合中国网络)
+sdk_cpp_mirror:
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release -DUSE_GITHUB_MIRROR=ON
 	cmake --build sdk/cpp/build --config Release -j
 
 # SDK C++ echo_worker

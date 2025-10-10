@@ -52,6 +52,13 @@ sdk/cpp/cmake-build-*/
 controller.db
 controller.db-shm
 controller.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# Data directories
+data/
+/data
 
 # Artifacts served by controller
 artifacts/

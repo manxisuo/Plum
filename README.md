@@ -191,8 +191,8 @@ Plum 旨在解决分布式环境下的任务编排、调度和执行问题，支
 
 **可选组件**：
 - protobuf-compiler 3.12+ （修改proto文件时需要）
-- CMake 3.10+ （构建C++ SDK）
-- grpc++ （C++ gRPC支持）
+- CMake 3.10+ + pkg-config （构建C++ SDK）
+- grpc++ + protobuf-dev （C++ gRPC Worker SDK）
 
 ### 安装依赖
 
@@ -204,10 +204,14 @@ sudo apt update
 sudo apt install -y git curl
 
 # Go 1.19+（如果未安装）
-wget https://go.dev/dl/go1.22.6.linux-amd64.tar.gz
+wget https://golang.google.cn/dl/go1.22.6.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.22.6.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
 source ~/.bashrc
+
+# 配置Go代理（中国网络推荐）
+go env -w GO111MODULE=on
+go env -w GOPROXY=https://goproxy.cn,direct
 
 # Node.js 16+（使用nvm推荐）
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
@@ -215,26 +219,48 @@ source ~/.bashrc
 nvm install 18
 nvm use 18
 
+# Node.js 16+（直接安装）
+wget https://nodejs.org/dist/v18.20.4/node-v18.20.4-linux-x64.tar.xz
+tar -xf node-v18.20.4-linux-x64.tar.xz
+sudo mv node-v18.20.4-linux-x64 /usr/local/nodejs18
+sudo ln -sf /usr/local/nodejs18/bin/node /usr/local/bin/node
+sudo ln -sf /usr/local/nodejs18/bin/npm /usr/local/bin/npm
+sudo ln -sf /usr/local/nodejs18/bin/npx /usr/local/bin/npx
+
 # protobuf编译器（可选，修改proto时需要）
 sudo apt install -y protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
 
-# CMake（可选，构建C++ SDK时需要）
-sudo apt install -y cmake build-essential
+# Go protobuf插件（可选，修改proto时需要）
+# 注意：需要先配置好GOPROXY（见上面Go安装部分）
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# CMake和C++开发环境（可选，构建C++ SDK时需要）
+sudo apt install -y cmake build-essential pkg-config
+
+# C++ gRPC依赖（可选，构建gRPC Worker时需要）
+sudo apt install -y libgrpc++-dev libprotobuf-dev
 ```
 
 #### 验证安装
 
 ```bash
-go version        # go version go1.22.6 linux/amd64
-node --version    # v18.x.x
-npm --version     # 9.x.x
-git --version     # git version 2.x.x
-protoc --version  # libprotoc 3.12.4（可选）
+go version                # go version go1.22.6 linux/amd64
+node --version            # v18.x.x
+npm --version             # 9.x.x
+git --version             # git version 2.x.x
+
+# 可选工具验证（构建C++ SDK时需要）
+protoc --version          # libprotoc 3.12.4
+protoc-gen-go --version   # protoc-gen-go v1.36.10
+protoc-gen-go-grpc --version  # protoc-gen-go-grpc 1.5.1
+cmake --version           # cmake version 3.x.x
+pkg-config --version      # pkg-config 0.29.x
 ```
 
 ### 构建和运行
 
-#### 方式1：生产模式（一次性部署）
+#### 方式1：生产模式（使用nginx）
 
 ```bash
 # 1. 克隆项目
@@ -247,38 +273,86 @@ make proto
 # 3. 构建所有组件
 make controller       # 构建Controller
 make agent           # 构建Agent
-cd ui && npm install && npm run build && cd ..
+make ui               # 安装UI依赖
+make ui-build         # 构建UI静态文件到ui/dist/
 
-# 4. 启动服务（使用screen/tmux或systemd）
-./controller/bin/controller &               # Controller
-AGENT_NODE_ID=nodeA make agent-run &        # Agent
+# 4. 配置nginx（示例）
+# server {
+#   listen 80;
+#   location / {
+#     root /path/to/Plum/ui/dist;
+#     try_files $uri $uri/ /index.html;
+#   }
+#   location /v1/ {
+#     proxy_pass http://localhost:8080;
+#   }
+# }
 
-# 5. 访问
-# Web UI: http://localhost:8080
-# API: http://localhost:8080/v1/
+# 5. 启动服务
+./controller/bin/controller &               # Controller (API服务)
+make agent-run &                            # Agent
+sudo systemctl restart nginx                # Nginx (UI服务)
+
+# 6. 访问
+# Web UI: http://your-server/
+# API: http://your-server/v1/
 ```
 
-#### 方式2：开发模式（热更新）
+#### 方式2：开发模式（推荐，无需nginx）
 
 ```bash
 # 1. 克隆和初始化
 git clone https://github.com/manxisuo/plum.git
 cd Plum
 make proto
-cd ui && npm install && cd ..
+make ui
 
-# 2. 启动Controller（终端1）
-make controller-run
+# 2. 构建并启动Controller（终端1）
+make controller && make controller-run
+# API服务: http://localhost:8080
 
-# 3. 启动Agent（终端2）
-make agent-run
+# 3. 构建并启动Agent（终端2）
+make agent && make agent-run
 
 # 4. 启动Web UI开发服务器（终端3）
-cd ui && npm run dev
-# 访问 http://localhost:5173
+make ui-dev
+# UI服务: http://localhost:5173
 
-# 前端代码修改会自动热更新
-# Go代码修改需要重新make controller/agent
+# 5. 访问Web UI
+# 浏览器打开 http://localhost:5173
+
+# 提示：
+# - 前端代码修改会自动热更新
+# - Go代码修改后需重新构建：make controller 或 make agent
+# - 然后重启对应进程
+```
+
+### 环境变量配置
+
+#### Controller环境变量
+```bash
+CONTROLLER_ADDR=:8080                    # 监听地址（默认:8080）
+CONTROLLER_DB=controller.db              # 数据库文件路径
+CONTROLLER_DATA_DIR=./data               # 数据目录（artifacts等）
+```
+
+#### Agent环境变量
+```bash
+AGENT_NODE_ID=nodeA                      # 节点ID（默认nodeA）
+CONTROLLER_BASE=http://127.0.0.1:8080   # Controller地址
+AGENT_DATA_DIR=/tmp/plum-agent           # Agent数据目录
+```
+
+#### 使用示例
+```bash
+# 自定义Controller端口
+CONTROLLER_ADDR=:9090 ./controller/bin/controller
+
+# Agent连接到自定义端口
+CONTROLLER_BASE=http://127.0.0.1:9090 make agent-run
+
+# 指定数据目录
+CONTROLLER_DATA_DIR=/var/plum/data ./controller/bin/controller
 ```
 
 ### 常用命令速查
@@ -289,6 +363,7 @@ make controller              # 构建Controller
 make agent                   # 构建Agent
 make proto                   # 生成proto代码
 make sdk_cpp                 # 构建C++ SDK
+make sdk_cpp_mirror          # 构建C++ SDK（使用GitHub镜像）
 make agent-clean             # 清理Agent构建产物
 make proto-clean             # 清理proto生成代码
 
@@ -300,8 +375,9 @@ make agent-run-multi         # 后台运行3个Agent (A/B/C)
 make agent-help              # 查看Agent命令帮助
 
 # Web UI
-cd ui && npm run dev         # 开发模式
-cd ui && npm run build       # 生产构建
+make ui                      # 安装依赖
+make ui-dev                  # 开发模式
+make ui-build                # 生产构建
 ```
 
 ## 📖 使用指南
@@ -564,8 +640,44 @@ ls controller/proto/*.pb.go
 - 需要手动点击"启动"按钮
 
 **Q: UI端口5173被占用**
-- Vite会自动尝试5174、5175等端口
-- 或修改ui/vite.config.ts指定端口
+```bash
+# Vite会自动尝试5174、5175等端口
+# 或手动指定端口
+cd ui && npm run dev -- --port 5180
+```
+
+**Q: 生产环境如何部署UI？**
+```bash
+# 1. 构建静态文件
+make ui-build
+
+# 2. 使用nginx serve ui/dist/目录
+# 配置示例见上面"方式1：生产模式"部分
+
+# 3. 或使用任何静态文件服务器
+cd ui/dist && python3 -m http.server 8000
+```
+
+**Q: 如何查看日志？**
+```bash
+# Controller日志（前台运行时直接显示）
+./controller/bin/controller
+
+# 或重定向到文件
+./controller/bin/controller > controller.log 2>&1 &
+
+# Agent日志
+make agent-run > agent.log 2>&1 &
+
+# 多Agent日志（自动保存）
+make agent-run-multi
+tail -f logs/agent-nodeA.log
+```
+
+**Q: 数据库文件在哪里？**
+- 默认位置：`./controller.db`（Controller运行目录）
+- 自定义：`CONTROLLER_DB=/path/to/db.db ./controller/bin/controller`
+- 备份：`cp controller.db controller.db.backup`
 
 ### 依赖问题
 
@@ -576,10 +688,37 @@ echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-**Q: C++编译失败**
+**Q: go install卡住或超时**
+```bash
+# 配置国内Go代理
+go env -w GOPROXY=https://goproxy.cn,direct
+
+# 重新安装
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+**Q: C++ SDK编译失败**
 ```bash
 # 安装完整的C++开发环境
-sudo apt install -y cmake build-essential libgrpc++-dev
+sudo apt install -y cmake build-essential pkg-config libgrpc++-dev libprotobuf-dev
+
+# 验证安装
+pkg-config --version
+cmake --version
+```
+
+**Q: pkg-config not found**
+```bash
+sudo apt install pkg-config
+```
+
+**Q: C++ SDK下载依赖失败（无法访问GitHub）**
+```bash
+# 推荐：使用GitHub镜像构建
+make sdk_cpp_mirror
+
+# 详细方案见: sdk/cpp/NETWORK_SETUP.md
 ```
 
 ## 🚧 待办功能
