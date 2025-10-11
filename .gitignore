@@ -26,6 +26,13 @@ agent/build/
 sdk/cpp/build/
 sdk/cpp/cmake-build-*/
 
+# Examples build outputs
+examples/*/build/
+examples/*/package/
+examples/*/*.zip
+examples/demo-app/demo-app
+examples/worker-demo/worker-demo
+
 # gRPC generated files (keep proto files, ignore generated code)
 *.pb.cc
 *.pb.h

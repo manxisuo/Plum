@@ -36,6 +36,79 @@ const showCreate = ref(false)
 const form = reactive<TaskDef>({ defId:'', name:'', executor:'embedded', targetKind:'', targetRef:'', labels:{} })
 const defaultPayloadText = ref<string>('')
 
+// 下拉框数据源
+const availableNodes = ref<string[]>([])
+const availableApps = ref<Array<{ name: string; online: boolean }>>([])
+const availableServices = ref<string[]>([])
+
+// 加载下拉框数据
+async function loadDropdownData() {
+  try {
+    // 加载节点列表
+    const nodesRes = await fetch(`${API_BASE}/v1/nodes`)
+    if (nodesRes.ok) {
+      const nodes = await nodesRes.json()
+      availableNodes.value = nodes.map((n: any) => n.nodeId).filter(Boolean)
+    }
+
+    // 加载应用列表（混合方案：应用包 + Worker在线状态）
+    const [appsRes, workersRes] = await Promise.all([
+      fetch(`${API_BASE}/v1/apps`),
+      fetch(`${API_BASE}/v1/embedded-workers`)
+    ])
+    
+    // 获取所有已上传的应用名称
+    const appNames = new Set<string>()
+    if (appsRes.ok) {
+      const apps = await appsRes.json()
+      apps.forEach((app: any) => {
+        if (app.name) appNames.add(app.name)
+      })
+    }
+    
+    // 获取在线Worker的应用名称
+    const onlineApps = new Set<string>()
+    if (workersRes.ok) {
+      const workers = await workersRes.json()
+      workers.forEach((w: any) => {
+        if (w.AppName || w.appName) {
+          onlineApps.add(w.AppName || w.appName)
+        }
+      })
+    }
+    
+    // 合并信息：所有应用 + 在线标记
+    availableApps.value = Array.from(appNames)
+      .sort()
+      .map(name => ({
+        name,
+        online: onlineApps.has(name)
+      }))
+
+    // 加载服务列表
+    const servicesRes = await fetch(`${API_BASE}/v1/services/list`)
+    if (servicesRes.ok) {
+      availableServices.value = await servicesRes.json()
+    }
+  } catch (e) {
+    console.warn('Failed to load dropdown data:', e)
+  }
+}
+
+// 计算目标引用的选项
+const targetRefOptions = computed(() => {
+  if (form.executor === 'service' && form.targetKind === 'service') {
+    return availableServices.value
+  } else if (form.executor === 'embedded' && form.targetKind === 'node') {
+    return availableNodes.value
+  } else if (form.executor === 'embedded' && form.targetKind === 'app') {
+    return availableApps.value
+  } else if (form.executor === 'os_process' && form.targetKind === 'node') {
+    return availableNodes.value
+  }
+  return []
+})
+
 function openCreate() {
   form.defId=''
   form.name=''
@@ -44,13 +117,15 @@ function openCreate() {
   form.targetRef=''
   form.labels={}
   showCreate.value = true
+  loadDropdownData()
 }
 
 // Executor ↔ TargetKind linkage
-const ALL_KINDS: string[] = ['service','deployment','node']
+const ALL_KINDS: string[] = ['service','deployment','node','app']
 const allowedKinds = computed<string[]>(() => {
   if (form.executor === 'service') return ['service']
   if (form.executor === 'os_process') return ['node']
+  if (form.executor === 'embedded') return ['node', 'app']
   return ALL_KINDS
 })
 watch(() => form.executor, () => {
@@ -160,7 +235,32 @@ const { t } = useI18n()
             <el-option v-for="k in allowedKinds" :key="k" :label="k" :value="k" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="t('taskDefs.dialog.form.targetRef')" required><el-input v-model="form.targetRef" placeholder="如 serviceName（必填）" /></el-form-item>
+        <el-form-item :label="t('taskDefs.dialog.form.targetRef')" required>
+          <el-select 
+            v-model="form.targetRef" 
+            placeholder="选择或输入目标引用"
+            clearable
+            filterable
+            allow-create
+            style="width: 100%"
+          >
+            <el-option
+              v-for="option in targetRefOptions"
+              :key="typeof option === 'string' ? option : option.name"
+              :label="typeof option === 'string' ? option : option.name"
+              :value="typeof option === 'string' ? option : option.name"
+            >
+              <template v-if="typeof option === 'object' && option.name">
+                <span :style="{ color: option.online ? '#67C23A' : '#909399' }">
+                  {{ option.online ? '●' : '○' }}
+                </span>
+                {{ option.name }}
+                <span v-if="option.online" style="font-size: 12px; color: #67C23A; margin-left: 8px;">(在线)</span>
+                <span v-else style="font-size: 12px; color: #909399; margin-left: 8px;">(离线)</span>
+              </template>
+            </el-option>
+          </el-select>
+        </el-form-item>
         <template v-if="form.executor==='service'">
           <el-form-item :label="t('taskDefs.dialog.form.serviceVersion')"><el-input v-model="(form as any).serviceVersion" placeholder="如 1.0.0（可选）" /></el-form-item>
           <el-form-item :label="t('taskDefs.dialog.form.serviceProtocol')"><el-input v-model="(form as any).serviceProtocol" placeholder="http 或 https（可选）" /></el-form-item>

@@ -29,7 +29,7 @@ let es: EventSource | null = null
 
 // 下拉框数据源
 const availableNodes = ref<string[]>([])
-const availableApps = ref<string[]>([])
+const availableApps = ref<Array<{ name: string; online: boolean }>>([])
 const availableServices = ref<string[]>([])
 
 // 分页相关
@@ -81,26 +81,39 @@ async function loadDropdownData() {
       availableNodes.value = nodes.map((n: any) => n.nodeId).filter(Boolean)
     }
 
-    // 加载应用列表
-    const [embeddedRes, httpRes] = await Promise.all([
-      fetch(`${API_BASE}/v1/embedded-workers`),
-      fetch(`${API_BASE}/v1/workers`)
+    // 加载应用列表（混合方案：应用包 + Worker在线状态）
+    const [appsRes, workersRes] = await Promise.all([
+      fetch(`${API_BASE}/v1/apps`),
+      fetch(`${API_BASE}/v1/embedded-workers`)
     ])
     
-    const apps = new Set<string>()
-    if (embeddedRes.ok) {
-      const embedded = await embeddedRes.json()
-      embedded.forEach((w: any) => {
-        if (w.AppName) apps.add(w.AppName)
+    // 获取所有已上传的应用名称
+    const appNames = new Set<string>()
+    if (appsRes.ok) {
+      const apps = await appsRes.json()
+      apps.forEach((app: any) => {
+        if (app.name) appNames.add(app.name)
       })
     }
-    if (httpRes.ok) {
-      const http = await httpRes.json()
-      http.forEach((w: any) => {
-        if (w.Labels?.appName) apps.add(w.Labels.appName)
+    
+    // 获取在线Worker的应用名称
+    const onlineApps = new Set<string>()
+    if (workersRes.ok) {
+      const workers = await workersRes.json()
+      workers.forEach((w: any) => {
+        if (w.AppName || w.appName) {
+          onlineApps.add(w.AppName || w.appName)
+        }
       })
     }
-    availableApps.value = Array.from(apps).sort()
+    
+    // 合并信息：所有应用 + 在线标记
+    availableApps.value = Array.from(appNames)
+      .sort()
+      .map(name => ({
+        name,
+        online: onlineApps.has(name)
+      }))
 
     // 加载服务列表
     const servicesRes = await fetch(`${API_BASE}/v1/services/list`)
@@ -663,10 +676,19 @@ async function onDel(id: string) {
           >
             <el-option
               v-for="option in targetRefOptions"
-              :key="option"
-              :label="option"
-              :value="option"
-            />
+              :key="typeof option === 'string' ? option : option.name"
+              :label="typeof option === 'string' ? option : option.name"
+              :value="typeof option === 'string' ? option : option.name"
+            >
+              <template v-if="typeof option === 'object' && option.name">
+                <span :style="{ color: option.online ? '#67C23A' : '#909399' }">
+                  {{ option.online ? '●' : '○' }}
+                </span>
+                {{ option.name }}
+                <span v-if="option.online" style="font-size: 12px; color: #67C23A; margin-left: 8px;">(在线)</span>
+                <span v-else style="font-size: 12px; color: #909399; margin-left: 8px;">(离线)</span>
+              </template>
+            </el-option>
           </el-select>
         </el-form-item>
         <template v-if="form.executor==='service'">
