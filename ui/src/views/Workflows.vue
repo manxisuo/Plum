@@ -9,7 +9,7 @@ import IdDisplay from '../components/IdDisplay.vue'
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
 
-type WorkflowStep = { stepId?: string; name: string; executor: string; targetKind: string; targetRef: string; timeoutSec: number; maxRetries: number }
+type WorkflowStep = { stepId?: string; name: string; executor: string; targetKind: string; targetRef: string; payloadJSON?: string; timeoutSec: number; maxRetries: number }
 type Workflow = { workflowId: string; name: string; labels?: Record<string,string>; steps: WorkflowStep[] }
 
 const items = ref<Workflow[]>([])
@@ -78,33 +78,26 @@ async function deleteWorkflow(workflowId: string) {
 const showCreate = ref(false)
 const form = reactive<{ name: string; steps: WorkflowStep[] }>({ name: '', steps: [{ name:'builtin.echo', executor:'embedded', targetKind: '', targetRef: '', timeoutSec: 300, maxRetries: 0 }] })
 
-// 可用任务列表（任务定义 + 内置任务）
-const availableTasks = ref<string[]>([])
+// 可用任务列表（从任务定义加载，包括内置任务）
+const availableTasks = ref<Array<{ name: string; isBuiltin: boolean }>>([])
 
-// 内置任务列表（与后端实际支持的一致）
-const builtinTasks = [
-  'builtin.echo',
-  'builtin.delay',
-  'builtin.fail'
-]
-
-// 加载任务定义列表
+// 加载任务定义列表（包括内置任务）
 async function loadTaskDefinitions() {
   try {
     const res = await fetch(`${API_BASE}/v1/task-defs`)
     if (res.ok) {
       const taskDefs = await res.json() as any[]
-      const taskNames = taskDefs.map(td => td.Name || td.name).filter(Boolean)
-      // 合并内置任务和任务定义，去重并排序
-      const allTasks = new Set([...builtinTasks, ...taskNames])
-      availableTasks.value = Array.from(allTasks).sort()
-    } else {
-      // 如果加载失败，至少显示内置任务
-      availableTasks.value = [...builtinTasks]
+      availableTasks.value = taskDefs
+        .map(td => ({
+          name: td.Name || td.name || '',
+          isBuiltin: td.Labels?.builtin === 'true' || td.labels?.builtin === 'true'
+        }))
+        .filter(t => t.name)
+        .sort((a, b) => a.name.localeCompare(b.name))
     }
   } catch (e) {
     console.warn('Failed to load task definitions:', e)
-    availableTasks.value = [...builtinTasks]
+    availableTasks.value = []
   }
 }
 
@@ -215,6 +208,15 @@ async function submit() {
     if (step.executor === 'service' && (!step.targetRef || !step.targetRef.trim())) {
       ElMessage.warning(`步骤 ${i + 1}：service 执行器需要填写服务名称`)
       return
+    }
+    // Validate payloadJSON is valid JSON if provided
+    if (step.payloadJSON && step.payloadJSON.trim()) {
+      try {
+        JSON.parse(step.payloadJSON.trim())
+      } catch {
+        ElMessage.error(`步骤 ${i + 1}：Payload 不是合法的 JSON`)
+        return
+      }
     }
     // Prepare service labels for service executor steps
     if (step.executor === 'service') {
@@ -372,22 +374,22 @@ const totalPages = computed(() => {
                   style="flex:1"
                   @blur="onTaskNameChange(s)"
                 >
-                  <el-option-group label="内置任务">
+                  <el-option-group label="内置任务" v-if="availableTasks.filter(t => t.isBuiltin).length > 0">
                     <el-option
-                      v-for="task in builtinTasks"
-                      :key="task"
-                      :label="task"
-                      :value="task"
+                      v-for="task in availableTasks.filter(t => t.isBuiltin)"
+                      :key="task.name"
+                      :label="task.name"
+                      :value="task.name"
                     >
-                      <span style="color: #409EFF">⚡</span> {{ task }}
+                      <span style="color: #409EFF">⚡</span> {{ task.name }}
                     </el-option>
                   </el-option-group>
-                  <el-option-group label="任务定义" v-if="availableTasks.filter(t => !builtinTasks.includes(t)).length > 0">
+                  <el-option-group label="任务定义" v-if="availableTasks.filter(t => !t.isBuiltin).length > 0">
                     <el-option
-                      v-for="task in availableTasks.filter(t => !builtinTasks.includes(t))"
-                      :key="task"
-                      :label="task"
-                      :value="task"
+                      v-for="task in availableTasks.filter(t => !t.isBuiltin)"
+                      :key="task.name"
+                      :label="task.name"
+                      :value="task.name"
                     />
                   </el-option-group>
                 </el-select>
@@ -412,6 +414,18 @@ const totalPages = computed(() => {
                   <el-input v-model="(s as any).servicePort" placeholder="端口（可选）" style="width:100px" />
                   <el-input v-model="(s as any).servicePath" placeholder="路径，如 /task001（可选）" style="flex:1" />
                 </div>
+              </div>
+              <div style="margin-top: 8px;">
+                <div style="font-size:12px; color:#909399; margin-bottom:4px;">
+                  Payload（JSON，可选）- 留空则使用任务定义的默认值
+                </div>
+                <el-input 
+                  v-model="s.payloadJSON" 
+                  type="textarea" 
+                  :rows="3" 
+                  placeholder='如: {"seconds": 5} 或留空使用默认值'
+                  style="width:100%"
+                />
               </div>
             </div>
             <el-button size="small" @click="addStep">{{ t('workflows.dialog.form.addStep') }}</el-button>

@@ -42,6 +42,11 @@ func main() {
 		}
 	}()
 
+	// Initialize builtin task definitions
+	if err := store.InitBuiltinTaskDefs(store.Current); err != nil {
+		log.Printf("Warning: failed to init builtin tasks: %v", err)
+	}
+
 	mux := http.NewServeMux()
 	httpapi.RegisterRoutes(mux)
 	// start failover loop

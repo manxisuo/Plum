@@ -140,6 +140,12 @@ async function submit() {
     return
   }
   
+  // 禁止使用 builtin.* 前缀
+  if (form.name.trim().startsWith('builtin.')) {
+    ElMessage.warning('任务名称不能以 "builtin." 开头（保留给系统内置任务）')
+    return
+  }
+  
   // 检查任务名称是否已存在
   const existingDef = items.value.find(d => d.name === form.name.trim())
   if (existingDef) {
@@ -226,11 +232,18 @@ const { t } = useI18n()
         <template #default="{ row }">
           <el-button size="small" type="primary" @click="run(((row as any).defId||(row as any).DefID))">{{ t('taskDefs.buttons.run') }}</el-button>
           <el-button size="small" @click="router.push('/task-defs/'+((row as any).defId||(row as any).DefID))">{{ t('taskDefs.buttons.details') }}</el-button>
-          <el-popconfirm :title="'确认删除该定义？'" @confirm="onDel(((row as any).defId||(row as any).DefID))">
+          <el-popconfirm 
+            v-if="!((row as any).labels?.builtin === 'true' || (row as any).Labels?.builtin === 'true')"
+            :title="'确认删除该定义？'" 
+            @confirm="onDel(((row as any).defId||(row as any).DefID))"
+          >
             <template #reference>
               <el-button size="small" type="danger">{{ t('common.delete') }}</el-button>
             </template>
           </el-popconfirm>
+          <el-tooltip v-else content="内置任务不能删除" placement="top">
+            <el-button size="small" type="danger" disabled>{{ t('common.delete') }}</el-button>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>

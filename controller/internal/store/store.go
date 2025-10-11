@@ -128,6 +128,7 @@ type WorkflowStep struct {
 	TargetKind   string            // service|deployment|node (for service executor)
 	TargetRef    string            // serviceName for service executor
 	Labels       map[string]string // service executor labels (servicePath, servicePort, etc.)
+	PayloadJSON  string            // optional: override default payload for this step
 	TimeoutSec   int
 	MaxRetries   int
 	Ord          int    // sequence order

@@ -371,6 +371,12 @@ async function submit() {
     return
   }
   
+  // 禁止使用 builtin.* 前缀
+  if (form.name.trim().startsWith('builtin.')) {
+    ElMessage.warning('任务名称不能以 "builtin." 开头（保留给系统内置任务）')
+    return
+  }
+  
   // 检查任务名称是否已存在
   const existingDef = defs.value.find(d => 
     (d.name || d.Name) === form.name.trim()

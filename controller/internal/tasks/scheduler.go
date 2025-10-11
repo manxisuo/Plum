@@ -121,6 +121,10 @@ func tick() {
 						labels["defId"] = td.DefID
 					}
 				}
+				// Step payload overrides TaskDefinition's default payload (highest priority)
+				if st.PayloadJSON != "" {
+					payloadJSON = st.PayloadJSON
+				}
 				newID, _ := store.Current.CreateTask(store.Task{Name: name, Executor: executor, TargetKind: targetKind, TargetRef: targetRef, State: "Pending", PayloadJSON: payloadJSON, TimeoutSec: st.TimeoutSec, MaxRetries: st.MaxRetries, CreatedAt: now, Labels: labels})
 				_ = store.Current.InsertStepRun(store.StepRun{RunID: r.RunID, StepID: st.StepID, TaskID: newID, State: "Pending", Ord: st.Ord})
 				notify.PublishTasks()

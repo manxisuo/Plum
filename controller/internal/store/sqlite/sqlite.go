@@ -144,6 +144,7 @@ func migrate(db *sql.DB) error {
             target_kind TEXT,
             target_ref TEXT,
             labels TEXT,
+            payload_json TEXT,
             timeout_sec INTEGER,
             max_retries INTEGER,
             ord INTEGER,
@@ -231,6 +232,10 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 	if err := ensureColumn(db, "task_defs", "default_payload_json", "TEXT"); err != nil {
+		return err
+	}
+	// Add payload_json column to workflow_steps if not exists (online schema upgrade)
+	if err := ensureColumn(db, "workflow_steps", "payload_json", "TEXT"); err != nil {
 		return err
 	}
 	// Add target_kind and target_ref columns to workflow_steps if not exists (online schema upgrade)
@@ -854,8 +859,8 @@ func (s *sqliteStore) CreateWorkflow(wf store.Workflow) (string, error) {
 	}
 	for _, st := range wf.Steps {
 		labelsJSON, _ := json.Marshal(st.Labels)
-		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, target_kind, target_ref, labels, timeout_sec, max_retries, ord, definition_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TargetKind, st.TargetRef, string(labelsJSON), st.TimeoutSec, st.MaxRetries, st.Ord, st.DefinitionID,
+		if _, err := tx.Exec(`INSERT INTO workflow_steps(workflow_id, step_id, name, executor, target_kind, target_ref, labels, payload_json, timeout_sec, max_retries, ord, definition_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+			wf.WorkflowID, st.StepID, st.Name, st.Executor, st.TargetKind, st.TargetRef, string(labelsJSON), st.PayloadJSON, st.TimeoutSec, st.MaxRetries, st.Ord, st.DefinitionID,
 		); err != nil {
 			tx.Rollback()
 			return "", err
@@ -1006,7 +1011,7 @@ func (s *sqliteStore) ListWorkflowRunsByWorkflow(workflowID string) ([]store.Wor
 }
 
 func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error) {
-	rows, err := s.db.Query(`SELECT step_id, name, executor, target_kind, target_ref, labels, timeout_sec, max_retries, ord, definition_id FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
+	rows, err := s.db.Query(`SELECT step_id, name, executor, target_kind, target_ref, labels, payload_json, timeout_sec, max_retries, ord, definition_id FROM workflow_steps WHERE workflow_id=? ORDER BY ord ASC`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -1015,10 +1020,14 @@ func (s *sqliteStore) ListWorkflowSteps(id string) ([]store.WorkflowStep, error)
 	for rows.Next() {
 		var st store.WorkflowStep
 		var labelsStr string
-		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TargetKind, &st.TargetRef, &labelsStr, &st.TimeoutSec, &st.MaxRetries, &st.Ord, &st.DefinitionID); err != nil {
+		var payloadStr sql.NullString
+		if err := rows.Scan(&st.StepID, &st.Name, &st.Executor, &st.TargetKind, &st.TargetRef, &labelsStr, &payloadStr, &st.TimeoutSec, &st.MaxRetries, &st.Ord, &st.DefinitionID); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(labelsStr), &st.Labels)
+		if payloadStr.Valid {
+			st.PayloadJSON = payloadStr.String
+		}
 		out = append(out, st)
 	}
 	return out, rows.Err()

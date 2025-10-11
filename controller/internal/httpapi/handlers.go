@@ -596,6 +596,11 @@ func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "task name is required", http.StatusBadRequest)
 			return
 		}
+		// 禁止用户创建 builtin.* 前缀的任务
+		if len(req.Name) >= 8 && req.Name[:8] == "builtin." {
+			http.Error(w, "task name cannot start with 'builtin.'", http.StatusBadRequest)
+			return
+		}
 		if _, exists, _ := store.Current.GetTaskDefByName(req.Name); exists {
 			http.Error(w, "task name already exists", http.StatusConflict)
 			return
@@ -617,6 +622,13 @@ func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
 		if id == "" {
 			http.Error(w, "id required", http.StatusBadRequest)
 			return
+		}
+		// Check if it's a builtin task
+		if td, ok, _ := store.Current.GetTaskDef(id); ok {
+			if td.Labels != nil && td.Labels["builtin"] == "true" {
+				http.Error(w, "cannot delete builtin task", http.StatusForbidden)
+				return
+			}
 		}
 		// conflict if referenced by tasks
 		n, err := store.Current.CountTasksByOrigin(id)
