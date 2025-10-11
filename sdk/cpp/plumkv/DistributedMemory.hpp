@@ -111,6 +111,15 @@ public:
      */
     std::vector<uint8_t> getBytes(const std::string& key, const std::vector<uint8_t>& defaultValue = {});
     
+    /**
+     * @brief 获取二进制数据（C风格接口）
+     * @param key 键
+     * @param buffer 输出缓冲区
+     * @param size 输入：缓冲区大小；输出：实际数据大小
+     * @return 是否成功（false表示key不存在或buffer太小）
+     */
+    bool getBytes(const std::string& key, void* buffer, size_t& size);
+    
     // ===== 批量操作 =====
     
     /**

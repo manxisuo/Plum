@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <atomic>
 #include <cstdlib>
+#include <cstring>
 #include <plumkv/DistributedMemory.hpp>
 
 using namespace plum::kv;

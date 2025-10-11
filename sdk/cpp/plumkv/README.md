@@ -90,6 +90,20 @@ vector<uint8_t> data = {0x01, 0x02, 0xFF};
 dm->putBytes("raw.data", data);
 auto restored = dm->getBytes("raw.data");
 
+// C风格接口（输出到预分配buffer）
+char buffer[1024];
+size_t bufferSize = sizeof(buffer);
+if (dm->getBytes("app.state", buffer, bufferSize)) {
+    cout << "成功读取 " << bufferSize << " 字节" << endl;
+    MyState* state = reinterpret_cast<MyState*>(buffer);
+} else {
+    if (bufferSize > sizeof(buffer)) {
+        cout << "缓冲区太小，需要 " << bufferSize << " 字节" << endl;
+    } else {
+        cout << "key不存在" << endl;
+    }
+}
+
 // 检查存在
 if (dm->exists("checkpoint")) {
     // ...

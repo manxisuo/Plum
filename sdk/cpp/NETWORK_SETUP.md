@@ -16,10 +16,10 @@ make sdk_cpp_mirror
 ```
 
 ### 原理
-使用[ghproxy.com](https://ghproxy.com)作为GitHub加速代理：
+使用[ghproxy.link](https://ghproxy.link)作为GitHub加速代理：
 ```
 原地址: https://github.com/nlohmann/json.git
-镜像:   https://ghproxy.com/https://github.com/nlohmann/json.git
+镜像:   https://ghproxy.link/https://github.com/nlohmann/json.git
 ```
 
 ### 手动配置
@@ -32,7 +32,7 @@ cmake --build sdk/cpp/build -j
 
 ### 使用ghproxy
 ```bash
-git config --global url."https://ghproxy.com/https://github.com/".insteadOf "https://github.com/"
+git config --global url."https://ghproxy.link/https://github.com/".insteadOf "https://github.com/"
 ```
 
 之后正常构建：
@@ -54,11 +54,11 @@ mkdir -p sdk/cpp/build/_deps
 
 # 2. 下载nlohmann/json
 cd sdk/cpp/build/_deps
-git clone https://ghproxy.com/https://github.com/nlohmann/json.git json-src
+git clone https://ghproxy.link/https://github.com/nlohmann/json.git json-src
 cd json-src && git checkout v3.11.3 && cd ../..
 
 # 3. 下载cpp-httplib
-git clone https://ghproxy.com/https://github.com/yhirose/cpp-httplib.git httplib-src
+git clone https://ghproxy.link/https://github.com/yhirose/cpp-httplib.git httplib-src
 cd httplib-src && git checkout v0.15.3 && cd ../..
 
 # 4. 返回项目根目录构建
@@ -88,7 +88,7 @@ make sdk_cpp_mirror   # 简单直接
 ### 团队/CI环境
 ```bash
 # 配置一次，全局生效
-git config --global url."https://ghproxy.com/https://github.com/".insteadOf "https://github.com/"
+git config --global url."https://ghproxy.link/https://github.com/".insteadOf "https://github.com/"
 make sdk_cpp
 ```
 
@@ -97,12 +97,13 @@ make sdk_cpp
 
 ## 📝 其他可用镜像
 
-### ghproxy.com（推荐）
+### ghproxy.link（推荐）
 ```bash
-https://ghproxy.com/https://github.com/...
+https://ghproxy.link/https://github.com/...
 ```
 - 速度快
 - 稳定性好
+- 注意：ghproxy.com 会重定向到 ghproxy.link
 
 ### gitclone.com
 ```bash

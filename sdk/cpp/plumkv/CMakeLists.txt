@@ -5,13 +5,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
-option(USE_GITHUB_MIRROR "Use GitHub mirror for dependencies" ON)  # 默认开启镜像
+option(USE_GITHUB_MIRROR "Use GitHub mirror for dependencies" OFF)  # 默认关闭镜像
 
 # GitHub mirror support
 set(GITHUB_MIRROR "")
 if(USE_GITHUB_MIRROR)
-    set(GITHUB_MIRROR "https://mirror.ghproxy.com/")
+    set(GITHUB_MIRROR "https://ghproxy.link/")
     message(STATUS "Using GitHub mirror: ${GITHUB_MIRROR}")
+else()
+    message(STATUS "Downloading from GitHub directly (use -DUSE_GITHUB_MIRROR=ON to enable mirror)")
 endif()
 
 # FetchContent for header-only libraries
@@ -20,16 +22,14 @@ include(FetchContent)
 # nlohmann/json
 FetchContent_Declare(
     json
-    GIT_REPOSITORY ${GITHUB_MIRROR}https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.2
+    URL https://github.com/nlohmann/json/archive/refs/tags/v3.11.2.tar.gz
 )
 FetchContent_MakeAvailable(json)
 
 # cpp-httplib
 FetchContent_Declare(
     httplib
-    GIT_REPOSITORY ${GITHUB_MIRROR}https://github.com/yhirose/cpp-httplib.git
-    GIT_TAG v0.14.0
+    URL https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.14.0.tar.gz
 )
 FetchContent_MakeAvailable(httplib)
 

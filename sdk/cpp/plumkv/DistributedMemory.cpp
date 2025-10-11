@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
+#include <cstring>
 #include <nlohmann/json.hpp>
 #include <httplib.h>
 
@@ -406,6 +407,35 @@ std::vector<uint8_t> DistributedMemory::getBytes(const std::string& key, const s
         return base64Decode(encoded);
     } catch (...) {
         return defaultValue;
+    }
+}
+
+bool DistributedMemory::getBytes(const std::string& key, void* buffer, size_t& size) {
+    if (!buffer || size == 0) {
+        return false;
+    }
+    
+    std::string encoded = get(key, "");
+    if (encoded.empty()) {
+        size = 0;
+        return false;
+    }
+    
+    try {
+        auto data = base64Decode(encoded);
+        if (data.size() > size) {
+            // 缓冲区太小
+            size = data.size();  // 返回实际需要的大小
+            return false;
+        }
+        
+        // 复制到用户buffer
+        std::memcpy(buffer, data.data(), data.size());
+        size = data.size();
+        return true;
+    } catch (...) {
+        size = 0;
+        return false;
     }
 }
 

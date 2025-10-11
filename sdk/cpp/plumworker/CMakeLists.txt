@@ -29,7 +29,7 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 # 使用方法: cmake -DUSE_GITHUB_MIRROR=ON ..
 option(USE_GITHUB_MIRROR "Use GitHub mirror for China network" OFF)
 if(USE_GITHUB_MIRROR)
-  set(GITHUB_MIRROR "https://ghproxy.com/")
+  set(GITHUB_MIRROR "https://ghproxy.link/")
 else()
   set(GITHUB_MIRROR "")
 endif()
