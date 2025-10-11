@@ -24,6 +24,8 @@ import TaskDefDetail from './views/TaskDefDetail.vue'
 // @ts-ignore
 import Resources from './views/Resources.vue'
 import Workers from './views/Workers.vue'
+// @ts-ignore
+import KVStore from './views/KVStore.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -42,6 +44,7 @@ export const router = createRouter({
     { path: '/resources', component: Resources },
     { path: '/workers', component: Workers },
     { path: '/assignments', component: Assignments },
+    { path: '/kv-store', component: KVStore },
     // deployments
     { path: '/deployments', component: DeploymentsList },
     { path: '/deployments/create', component: DeploymentCreate },

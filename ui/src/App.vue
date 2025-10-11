@@ -57,6 +57,7 @@ function switchLang(l: string){ locale.value = l; lang.value = l }
           <el-menu-item index="/tasks"><RouterLink to="/tasks">{{ t('nav.tasks') }}</RouterLink></el-menu-item>
           <el-menu-item index="/workers"><RouterLink to="/workers">{{ t('nav.workers') }}</RouterLink></el-menu-item>
           <el-menu-item index="/workflows"><RouterLink to="/workflows">{{ t('nav.workflows') }}</RouterLink></el-menu-item>
+          <el-menu-item index="/kv-store"><RouterLink to="/kv-store">{{ t('nav.kvStore') }}</RouterLink></el-menu-item>
           <el-menu-item index="/resources"><RouterLink to="/resources">{{ t('nav.resources') }}</RouterLink></el-menu-item>
         </el-menu>
         <div style="display:flex; align-items:center; gap:8px;">

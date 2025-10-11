@@ -310,6 +310,8 @@ type Store interface {
 	ListKVByPrefix(namespace, prefix string) ([]DistributedKV, error)
 	PutKVBatch(namespace string, kvs []DistributedKV) error
 	DeleteNamespace(namespace string) error
+	ListAllNamespaces() ([]string, error)
+	ListKeysByNamespace(namespace string) ([]string, error)
 }
 
 // TaskDefinition stores a reusable task template

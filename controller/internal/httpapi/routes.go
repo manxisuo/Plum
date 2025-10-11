@@ -74,9 +74,21 @@ func RegisterRoutes(mux *http.ServeMux) {
 func handleKV(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/v1/kv/")
 	
+	// GET /v1/kv - list all namespaces
+	if path == "" {
+		handleKVListNamespaces(w, r)
+		return
+	}
+	
 	// /v1/kv/{namespace}/batch
 	if strings.HasSuffix(path, "/batch") {
 		handleKVBatch(w, r)
+		return
+	}
+	
+	// GET /v1/kv/{namespace}/keys - list keys in namespace
+	if strings.HasSuffix(path, "/keys") {
+		handleKVListKeys(w, r)
 		return
 	}
 	

@@ -231,6 +231,56 @@ func handleKVBatch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /v1/kv - List all namespaces
+func handleKVListNamespaces(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	namespaces, err := store.Current.ListAllNamespaces()
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"namespaces": namespaces,
+	})
+}
+
+// GET /v1/kv/{namespace}/keys - List keys in namespace (no values)
+func handleKVListKeys(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/v1/kv/")
+	parts := strings.Split(path, "/")
+	if len(parts) != 2 || parts[1] != "keys" {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	namespace := parts[0]
+
+	if namespace == "" {
+		http.Error(w, "namespace required", http.StatusBadRequest)
+		return
+	}
+
+	keys, err := store.Current.ListKeysByNamespace(namespace)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]any{
+		"namespace": namespace,
+		"keys":      keys,
+	})
+}
+
 // Helper functions for type conversion
 func ParseInt(s string, defaultVal int64) int64 {
 	if v, err := strconv.ParseInt(s, 10, 64); err == nil {

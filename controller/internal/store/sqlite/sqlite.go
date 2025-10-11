@@ -1283,6 +1283,42 @@ func (s *sqliteStore) DeleteNamespace(namespace string) error {
 	return err
 }
 
+func (s *sqliteStore) ListAllNamespaces() ([]string, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT namespace FROM distributed_kv ORDER BY namespace`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var namespaces []string
+	for rows.Next() {
+		var ns string
+		if err := rows.Scan(&ns); err != nil {
+			return nil, err
+		}
+		namespaces = append(namespaces, ns)
+	}
+	return namespaces, rows.Err()
+}
+
+func (s *sqliteStore) ListKeysByNamespace(namespace string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT key FROM distributed_kv WHERE namespace=? ORDER BY key`, namespace)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
 // Close 关闭数据库连接
 func (s *sqliteStore) Close() error {
 	if s.db != nil {

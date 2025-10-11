@@ -32,6 +32,7 @@ const messages = {
       deployments: 'Deployments',
       resources: 'Resources',
       workers: 'Workers',
+      kvStore: 'KV Store',
       language: 'Language'
     },
     home: {
@@ -248,6 +249,17 @@ const messages = {
       desc: { runId: 'RunID', workflowId: 'WorkflowID', state: 'State', created: 'Created' },
       columns: { ord: '#', step: 'Step', taskId: 'TaskID', state: 'State' }
     },
+    kvStore: {
+      title: 'Distributed KV Store',
+      stats: { namespaces: 'Namespaces', totalKeys: 'Total Keys' },
+      keys: 'keys',
+      empty: 'No data in KV Store',
+      noKeys: 'No keys in this namespace',
+      errors: {
+        loadNamespacesFailed: 'Failed to load namespaces',
+        loadKeysFailed: 'Failed to load keys'
+      }
+    },
     taskDefs: {
       title: 'Task Definitions',
       buttons: { refresh: 'Refresh', create: 'Create Definition', run: 'Run', details: 'Details' },
@@ -375,6 +387,7 @@ const messages = {
       deployments: '部署',
       resources: '资源',
       workers: '工作器',
+      kvStore: 'KV存储',
       language: '语言'
     },
     home: {
@@ -590,6 +603,17 @@ const messages = {
       title: '工作流运行详情',
       desc: { runId: '运行ID', workflowId: '工作流ID', state: '状态', created: '创建时间' },
       columns: { ord: '#', step: '步骤', taskId: '任务ID', state: '状态' }
+    },
+    kvStore: {
+      title: '分布式KV存储',
+      stats: { namespaces: '命名空间', totalKeys: '总键数' },
+      keys: '个键',
+      empty: 'KV存储中暂无数据',
+      noKeys: '此命名空间中无键',
+      errors: {
+        loadNamespacesFailed: '加载命名空间失败',
+        loadKeysFailed: '加载键列表失败'
+      }
     },
     taskDefs: {
       title: '任务定义',
