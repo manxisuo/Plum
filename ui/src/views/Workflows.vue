@@ -78,10 +78,42 @@ async function deleteWorkflow(workflowId: string) {
 const showCreate = ref(false)
 const form = reactive<{ name: string; steps: WorkflowStep[] }>({ name: '', steps: [{ name:'builtin.echo', executor:'embedded', targetKind: '', targetRef: '', timeoutSec: 300, maxRetries: 0 }] })
 
+// 可用任务列表（任务定义 + 内置任务）
+const availableTasks = ref<string[]>([])
+
+// 内置任务列表
+const builtinTasks = [
+  'builtin.echo',
+  'builtin.delay',
+  'builtin.http',
+  'builtin.transform'
+]
+
+// 加载任务定义列表
+async function loadTaskDefinitions() {
+  try {
+    const res = await fetch(`${API_BASE}/v1/task-defs`)
+    if (res.ok) {
+      const taskDefs = await res.json() as any[]
+      const taskNames = taskDefs.map(td => td.Name || td.name).filter(Boolean)
+      // 合并内置任务和任务定义，去重并排序
+      const allTasks = new Set([...builtinTasks, ...taskNames])
+      availableTasks.value = Array.from(allTasks).sort()
+    } else {
+      // 如果加载失败，至少显示内置任务
+      availableTasks.value = [...builtinTasks]
+    }
+  } catch (e) {
+    console.warn('Failed to load task definitions:', e)
+    availableTasks.value = [...builtinTasks]
+  }
+}
+
 function openCreate() {
   form.name = ''
   form.steps = [{ name:'builtin.echo', executor:'embedded', targetKind: '', targetRef: '', timeoutSec: 300, maxRetries: 0 }]
   showCreate.value = true
+  loadTaskDefinitions()
 }
 
 function addStep() { form.steps.push({ name:'builtin.echo', executor:'embedded', targetKind: '', targetRef: '', timeoutSec: 300, maxRetries: 0 }) }
@@ -333,7 +365,33 @@ const totalPages = computed(() => {
           <div style="display:flex; flex-direction:column; gap:8px; width:100%">
             <div v-for="(s, i) in form.steps" :key="i" style="display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid #eee; border-radius:4px;">
               <div style="display:flex; gap:8px; align-items:center;">
-                <el-input v-model="s.name" placeholder="taskName，如 builtin.echo" style="flex:1" @blur="onTaskNameChange(s)" />
+                <el-select 
+                  v-model="s.name" 
+                  placeholder="选择或输入任务名称"
+                  filterable
+                  allow-create
+                  style="flex:1"
+                  @blur="onTaskNameChange(s)"
+                >
+                  <el-option-group label="内置任务">
+                    <el-option
+                      v-for="task in builtinTasks"
+                      :key="task"
+                      :label="task"
+                      :value="task"
+                    >
+                      <span style="color: #409EFF">⚡</span> {{ task }}
+                    </el-option>
+                  </el-option-group>
+                  <el-option-group label="任务定义" v-if="availableTasks.filter(t => !builtinTasks.includes(t)).length > 0">
+                    <el-option
+                      v-for="task in availableTasks.filter(t => !builtinTasks.includes(t))"
+                      :key="task"
+                      :label="task"
+                      :value="task"
+                    />
+                  </el-option-group>
+                </el-select>
                 <el-select v-model="s.executor" style="flex:1" @change="onExecutorChange(s)">
                   <el-option label="embedded" value="embedded" />
                   <el-option label="service" value="service" />
