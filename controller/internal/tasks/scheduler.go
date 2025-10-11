@@ -157,7 +157,7 @@ func tick() {
 }
 
 func runBuiltin(t store.Task) {
-	// simulate simple builtins: builtin.echo, builtin.sleep, builtin.delay, builtin.fail
+	// simulate simple builtins: builtin.echo, builtin.delay, builtin.fail
 	var payload map[string]any
 	_ = json.Unmarshal([]byte(t.PayloadJSON), &payload)
 	switch t.Name {
@@ -165,16 +165,6 @@ func runBuiltin(t store.Task) {
 		res := map[string]any{"echo": payload}
 		b, _ := json.Marshal(res)
 		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", string(b), "", time.Now().Unix(), t.Attempt)
-	case "builtin.sleep":
-		d := 1.0
-		if v, ok := payload["seconds"]; ok {
-			switch vv := v.(type) {
-			case float64:
-				d = vv
-			}
-		}
-		time.Sleep(time.Duration(d*1000) * time.Millisecond)
-		_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", "{}", "", time.Now().Unix(), t.Attempt)
 	case "builtin.delay":
 		// builtin.delay: 默认延迟3秒，可通过payload指定秒数
 		d := 3.0

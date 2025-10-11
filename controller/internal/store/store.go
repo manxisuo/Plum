@@ -294,6 +294,7 @@ type Store interface {
 	// TaskDefinition (for reusable task templates)
 	CreateTaskDef(td TaskDefinition) (string, error)
 	GetTaskDef(id string) (TaskDefinition, bool, error)
+	GetTaskDefByName(name string) (TaskDefinition, bool, error)
 	ListTaskDefs() ([]TaskDefinition, error)
 	DeleteTaskDef(id string) error
 

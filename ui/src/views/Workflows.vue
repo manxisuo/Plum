@@ -81,12 +81,11 @@ const form = reactive<{ name: string; steps: WorkflowStep[] }>({ name: '', steps
 // 可用任务列表（任务定义 + 内置任务）
 const availableTasks = ref<string[]>([])
 
-// 内置任务列表
+// 内置任务列表（与后端实际支持的一致）
 const builtinTasks = [
   'builtin.echo',
   'builtin.delay',
-  'builtin.http',
-  'builtin.transform'
+  'builtin.fail'
 ]
 
 // 加载任务定义列表

@@ -1116,6 +1116,20 @@ func (s *sqliteStore) GetTaskDef(id string) (store.TaskDefinition, bool, error) 
 	return td, true, nil
 }
 
+func (s *sqliteStore) GetTaskDefByName(name string) (store.TaskDefinition, bool, error) {
+	row := s.db.QueryRow(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs WHERE name=?`, name)
+	var td store.TaskDefinition
+	var labelsStr string
+	if err := row.Scan(&td.DefID, &td.Name, &td.Executor, &td.TargetKind, &td.TargetRef, &labelsStr, &td.DefaultPayloadJSON, &td.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.TaskDefinition{}, false, nil
+		}
+		return store.TaskDefinition{}, false, err
+	}
+	_ = json.Unmarshal([]byte(labelsStr), &td.Labels)
+	return td, true, nil
+}
+
 func (s *sqliteStore) ListTaskDefs() ([]store.TaskDefinition, error) {
 	rows, err := s.db.Query(`SELECT def_id, name, executor, target_kind, target_ref, labels, default_payload_json, created_at FROM task_defs ORDER BY created_at DESC, def_id DESC`)
 	if err != nil {

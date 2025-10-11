@@ -591,6 +591,15 @@ func handleTaskDefs(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
+		// 检查任务名称是否已存在
+		if req.Name == "" {
+			http.Error(w, "task name is required", http.StatusBadRequest)
+			return
+		}
+		if _, exists, _ := store.Current.GetTaskDefByName(req.Name); exists {
+			http.Error(w, "task name already exists", http.StatusConflict)
+			return
+		}
 		payload := ""
 		if req.DefaultPayload != nil {
 			if bs, err := json.Marshal(req.DefaultPayload); err == nil {

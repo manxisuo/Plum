@@ -139,6 +139,14 @@ async function submit() {
     ElMessage.warning('请填写任务名称')
     return
   }
+  
+  // 检查任务名称是否已存在
+  const existingDef = items.value.find(d => d.name === form.name.trim())
+  if (existingDef) {
+    ElMessage.warning('任务名称已存在，请使用其他名称')
+    return
+  }
+  
   if (!form.targetRef || !String(form.targetRef).trim()) {
     ElMessage.warning('请填写目标引用')
     return
@@ -162,7 +170,14 @@ async function submit() {
     }
     if (defaultPayload !== undefined) body.defaultPayload = defaultPayload
     const res = await fetch(`${API_BASE}/v1/task-defs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      if (res.status === 409) {
+        ElMessage.error('任务名称已存在')
+      } else {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      return
+    }
     ElMessage.success('已创建')
     showCreate.value = false
     load()
