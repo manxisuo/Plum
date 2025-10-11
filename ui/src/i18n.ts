@@ -251,10 +251,21 @@ const messages = {
     },
     kvStore: {
       title: 'Distributed KV Store',
-      stats: { namespaces: 'Namespaces', totalKeys: 'Total Keys' },
+      stats: { namespaces: 'Namespaces', currentKeys: 'Current Keys' },
       keys: 'keys',
       empty: 'No data in KV Store',
       noKeys: 'No keys in this namespace',
+      buttons: {
+        create: 'Create Key',
+        view: 'View',
+        edit: 'Edit',
+        delete: 'Delete'
+      },
+      dialog: {
+        detailTitle: 'Key Details',
+        editTitle: 'Edit Key',
+        createTitle: 'Create Key'
+      },
       errors: {
         loadNamespacesFailed: 'Failed to load namespaces',
         loadKeysFailed: 'Failed to load keys'
@@ -606,10 +617,21 @@ const messages = {
     },
     kvStore: {
       title: '分布式KV存储',
-      stats: { namespaces: '命名空间', totalKeys: '总键数' },
+      stats: { namespaces: '命名空间', currentKeys: '当前键数' },
       keys: '个键',
       empty: 'KV存储中暂无数据',
       noKeys: '此命名空间中无键',
+      buttons: {
+        create: '新建Key',
+        view: '查看',
+        edit: '编辑',
+        delete: '删除'
+      },
+      dialog: {
+        detailTitle: 'Key详情',
+        editTitle: '编辑Key',
+        createTitle: '新建Key'
+      },
       errors: {
         loadNamespacesFailed: '加载命名空间失败',
         loadKeysFailed: '加载键列表失败'

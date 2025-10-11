@@ -66,43 +66,45 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// task definitions
 	mux.HandleFunc("/v1/task-defs", withCORS(handleTaskDefs))
 	mux.HandleFunc("/v1/task-defs/", withCORS(handleTaskDefByID))
-	// distributed KV
+	// distributed KV (both with and without trailing slash)
 	mux.HandleFunc("/v1/kv/", withCORS(handleKV))
+	mux.HandleFunc("/v1/kv", withCORS(handleKV))
 }
 
 // handleKV routes KV requests based on path pattern
 func handleKV(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/v1/kv/")
-	
-	// GET /v1/kv - list all namespaces
+	path := strings.TrimPrefix(r.URL.Path, "/v1/kv")
+	path = strings.TrimPrefix(path, "/") // Remove leading slash if present
+
+	// GET /v1/kv or /v1/kv/ - list all namespaces
 	if path == "" {
 		handleKVListNamespaces(w, r)
 		return
 	}
-	
+
 	// /v1/kv/{namespace}/batch
 	if strings.HasSuffix(path, "/batch") {
 		handleKVBatch(w, r)
 		return
 	}
-	
+
 	// GET /v1/kv/{namespace}/keys - list keys in namespace
 	if strings.HasSuffix(path, "/keys") {
 		handleKVListKeys(w, r)
 		return
 	}
-	
+
 	// /v1/kv/{namespace}/{key}
 	if strings.Count(path, "/") >= 1 {
 		handleKVByKey(w, r)
 		return
 	}
-	
+
 	// /v1/kv/{namespace}
 	if path != "" && !strings.Contains(path, "/") {
 		handleKVByNamespace(w, r)
 		return
 	}
-	
+
 	http.Error(w, "invalid path", http.StatusBadRequest)
 }

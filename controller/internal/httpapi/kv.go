@@ -75,8 +75,8 @@ func handleKVPut(w http.ResponseWriter, r *http.Request, namespace, key string) 
 	}
 
 	// 验证类型
-	if req.Type != "string" && req.Type != "int" && req.Type != "double" && req.Type != "bool" {
-		http.Error(w, "invalid type (must be string|int|double|bool)", http.StatusBadRequest)
+	if req.Type != "string" && req.Type != "int" && req.Type != "double" && req.Type != "bool" && req.Type != "bytes" {
+		http.Error(w, "invalid type (must be string|int|double|bool|bytes)", http.StatusBadRequest)
 		return
 	}
 
@@ -143,16 +143,16 @@ func handleKVByNamespace(w http.ResponseWriter, r *http.Request) {
 
 	// 支持前缀查询
 	prefix := r.URL.Query().Get("prefix")
-	
+
 	var kvs []store.DistributedKV
 	var err error
-	
+
 	if prefix != "" {
 		kvs, err = store.Current.ListKVByPrefix(namespace, prefix)
 	} else {
 		kvs, err = store.Current.ListKVByNamespace(namespace)
 	}
-	
+
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
@@ -160,13 +160,26 @@ func handleKVByNamespace(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]KVDTO, 0, len(kvs))
 	for _, kv := range kvs {
-		out = append(out, KVDTO{
+		dto := KVDTO{
 			Namespace: kv.Namespace,
 			Key:       kv.Key,
 			Value:     kv.Value,
 			Type:      kv.Type,
 			UpdatedAt: kv.UpdatedAt,
-		})
+		}
+
+		// 对于bytes类型，只返回长度信息，不返回完整内容（优化响应大小）
+		if kv.Type == "bytes" {
+			// 计算Base64解码后的长度
+			decodedLen := (len(kv.Value) * 3) / 4
+			// 减去padding字符
+			for i := len(kv.Value) - 1; i >= 0 && kv.Value[i] == '='; i-- {
+				decodedLen--
+			}
+			dto.Value = strconv.Itoa(decodedLen)
+		}
+
+		out = append(out, dto)
 	}
 
 	writeJSON(w, out)
@@ -302,4 +315,3 @@ func ParseBool(s string, defaultVal bool) bool {
 	}
 	return defaultVal
 }
-
