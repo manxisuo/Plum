@@ -1,0 +1,33 @@
+[Unit]
+Description=Plum Controller - Task Orchestration Service
+Documentation=https://github.com/manxisuo/plum
+After=network.target
+
+[Service]
+Type=simple
+User=manxisuo
+Group=manxisuo
+WorkingDirectory=/home/manxisuo/Plum
+ExecStart=/home/manxisuo/Plum/controller/bin/controller
+
+# 环境变量
+Environment="CONTROLLER_ADDR=:8080"
+Environment="CONTROLLER_DB=/home/manxisuo/Plum/data/plum.db"
+Environment="CONTROLLER_DATA_DIR=/home/manxisuo/Plum/data"
+
+# 重启策略
+Restart=always
+RestartSec=10
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=plum-controller
+
+# 资源限制（可选）
+#LimitNOFILE=65536
+#LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
+

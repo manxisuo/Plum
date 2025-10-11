@@ -652,7 +652,7 @@ cd ui && npm run dev -- --port 5180
 make ui-build
 
 # 2. 使用nginx serve ui/dist/目录
-# 配置示例见上面"方式1：生产模式"部分
+# 详细步骤见: docs/NGINX_DEPLOYMENT.md
 
 # 3. 或使用任何静态文件服务器
 cd ui/dist && python3 -m http.server 8000
