@@ -14,6 +14,7 @@ Plum的分布式KV存储提供集群级别的键值对存储能力，结合了�
 - `int`：64位整数
 - `double`：双精度浮点数
 - `bool`：布尔值
+- `bytes`：二进制数据（Base64编码存储）
 
 ### 存储架构
 ```
@@ -255,6 +256,28 @@ double prog = dm->getDouble("progress", 0.0);
 // 布尔
 dm->putBool("enabled", true);
 bool enabled = dm->getBool("enabled", false);
+
+// 二进制数据（Base64编码存储）
+struct MyData {
+    int id;
+    double value;
+    char name[32];
+};
+
+MyData data = {123, 3.14, "test"};
+dm->putBytes("struct.data", &data, sizeof(data));
+
+// 读取并恢复
+auto bytes = dm->getBytes("struct.data");
+if (bytes.size() == sizeof(MyData)) {
+    MyData* restored = reinterpret_cast<MyData*>(bytes.data());
+    cout << "ID: " << restored->id << endl;
+}
+
+// vector版本
+vector<uint8_t> buffer = {0x01, 0x02, 0xFF};
+dm->putBytes("raw.data", buffer);
+auto restored = dm->getBytes("raw.data");
 ```
 
 #### 批量操作
@@ -624,12 +647,49 @@ sseClient_.onMessage([this](const string& event, const string& data) {
 - 更节省资源（事件驱动 vs 轮询）
 - 更实时（立即推送 vs 等待下次轮询）
 
+### ⏳ gRPC协议支持（替代HTTP+Base64）
+
+**当前实现**：HTTP REST + JSON + Base64编码二进制
+**计划改进**：可选的gRPC接口
+
+```protobuf
+// proto定义
+message KVPutRequest {
+  string namespace = 1;
+  string key = 2;
+  bytes value = 3;      // 原生二进制支持
+  string type = 4;
+}
+
+service KVService {
+  rpc Put(KVPutRequest) returns (KVPutResponse);
+  rpc Get(KVGetRequest) returns (KVGetResponse);
+  rpc Watch(KVWatchRequest) returns (stream KVEvent);  // 双向流
+}
+```
+
+**优势：**
+- 二进制数据无需Base64（节省33%空间和编解码时间）
+- 双向流支持（实时推送更高效）
+- 类型安全（protobuf强类型）
+- 性能更高（二进制协议）
+
+**为什么现在不用？**
+- HTTP REST已经够用（对于小型二进制数据）
+- 简单性和一致性优先
+- 避免协议混用（REST+gRPC）
+
+**实施条件：**
+- 当二进制数据成为性能瓶颈时
+- 当需要大量二进制数据传输时（> 100KB频繁操作）
+- 当需要双向流实时推送时
+
 ### ⏳ 其他可能的增强
 
 - **事务支持**：批量操作的原子性保证
 - **数据版本控制**：支持历史版本查询和回滚
 - **权限控制**：基于namespace的访问控制
-- **数据压缩**：大value自动压缩存储
+- **数据压缩**：大value自动压缩存储（gzip/lz4）
 - **数据统计**：namespace使用情况、热点key分析
 
 ## 🔗 相关文档

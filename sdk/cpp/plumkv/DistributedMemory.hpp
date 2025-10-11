@@ -87,6 +87,30 @@ public:
     bool putBool(const std::string& key, bool value);
     bool getBool(const std::string& key, bool defaultValue = false);
     
+    // ===== 二进制数据 =====
+    
+    /**
+     * @brief 存储二进制数据（使用Base64编码）
+     * @param key 键
+     * @param data 二进制数据指针
+     * @param size 数据大小（字节）
+     * @return 是否成功
+     */
+    bool putBytes(const std::string& key, const void* data, size_t size);
+    
+    /**
+     * @brief 存储二进制数据（vector版本）
+     */
+    bool putBytes(const std::string& key, const std::vector<uint8_t>& data);
+    
+    /**
+     * @brief 获取二进制数据
+     * @param key 键
+     * @param defaultValue 默认值
+     * @return 二进制数据
+     */
+    std::vector<uint8_t> getBytes(const std::string& key, const std::vector<uint8_t>& defaultValue = {});
+    
     // ===== 批量操作 =====
     
     /**

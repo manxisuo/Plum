@@ -10,6 +10,94 @@ using json = nlohmann::json;
 namespace plum {
 namespace kv {
 
+// ===== Base64 编解码 =====
+
+static const std::string base64_chars = 
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/";
+
+static std::string base64Encode(const void* data, size_t size) {
+    const unsigned char* bytes = static_cast<const unsigned char*>(data);
+    std::string ret;
+    int i = 0;
+    unsigned char char_array_3[3];
+    unsigned char char_array_4[4];
+
+    while (size--) {
+        char_array_3[i++] = *(bytes++);
+        if (i == 3) {
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+            char_array_4[3] = char_array_3[2] & 0x3f;
+
+            for(i = 0; i < 4; i++)
+                ret += base64_chars[char_array_4[i]];
+            i = 0;
+        }
+    }
+
+    if (i) {
+        for(int j = i; j < 3; j++)
+            char_array_3[j] = '\0';
+
+        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+
+        for (int j = 0; j < i + 1; j++)
+            ret += base64_chars[char_array_4[j]];
+
+        while(i++ < 3)
+            ret += '=';
+    }
+
+    return ret;
+}
+
+static bool isBase64(unsigned char c) {
+    return (isalnum(c) || (c == '+') || (c == '/'));
+}
+
+static std::vector<uint8_t> base64Decode(const std::string& encoded_string) {
+    size_t in_len = encoded_string.size();
+    int i = 0;
+    int j = 0;
+    int in_ = 0;
+    unsigned char char_array_4[4], char_array_3[3];
+    std::vector<uint8_t> ret;
+
+    while (in_len-- && (encoded_string[in_] != '=') && isBase64(encoded_string[in_])) {
+        char_array_4[i++] = encoded_string[in_]; in_++;
+        if (i == 4) {
+            for (i = 0; i < 4; i++)
+                char_array_4[i] = base64_chars.find(char_array_4[i]);
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; i < 3; i++)
+                ret.push_back(char_array_3[i]);
+            i = 0;
+        }
+    }
+
+    if (i) {
+        for (j = 0; j < i; j++)
+            char_array_4[j] = base64_chars.find(char_array_4[j]);
+
+        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+
+        for (j = 0; j < i - 1; j++)
+            ret.push_back(char_array_3[j]);
+    }
+
+    return ret;
+}
+
 static std::string getEnvOr(const char* key, const char* defaultVal) {
     const char* val = std::getenv(key);
     return val ? std::string(val) : std::string(defaultVal);
@@ -291,6 +379,34 @@ bool DistributedMemory::getBool(const std::string& key, bool defaultValue) {
     std::string val = get(key, "");
     if (val.empty()) return defaultValue;
     return val == "true" || val == "1";
+}
+
+bool DistributedMemory::putBytes(const std::string& key, const void* data, size_t size) {
+    if (!data || size == 0) {
+        return httpPut(key, "", "bytes");
+    }
+    std::string encoded = base64Encode(data, size);
+    return httpPut(key, encoded, "bytes");
+}
+
+bool DistributedMemory::putBytes(const std::string& key, const std::vector<uint8_t>& data) {
+    if (data.empty()) {
+        return httpPut(key, "", "bytes");
+    }
+    return putBytes(key, data.data(), data.size());
+}
+
+std::vector<uint8_t> DistributedMemory::getBytes(const std::string& key, const std::vector<uint8_t>& defaultValue) {
+    std::string encoded = get(key, "");
+    if (encoded.empty()) {
+        return defaultValue;
+    }
+    
+    try {
+        return base64Decode(encoded);
+    } catch (...) {
+        return defaultValue;
+    }
 }
 
 std::map<std::string, std::string> DistributedMemory::getAll() {

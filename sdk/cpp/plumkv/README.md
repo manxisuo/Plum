@@ -70,6 +70,26 @@ double pi = dm->getDouble("pi", 0.0);
 dm->putBool("enabled", true);
 bool enabled = dm->getBool("enabled", false);
 
+// 二进制数据（Base64编码存储）
+struct MyState {
+    int counter;
+    double value;
+};
+MyState state = {100, 3.14};
+dm->putBytes("app.state", &state, sizeof(state));
+
+// 读取二进制
+auto bytes = dm->getBytes("app.state");
+if (bytes.size() == sizeof(MyState)) {
+    MyState* restored = reinterpret_cast<MyState*>(bytes.data());
+    cout << "Counter: " << restored->counter << endl;
+}
+
+// vector版本
+vector<uint8_t> data = {0x01, 0x02, 0xFF};
+dm->putBytes("raw.data", data);
+auto restored = dm->getBytes("raw.data");
+
 // 检查存在
 if (dm->exists("checkpoint")) {
     // ...

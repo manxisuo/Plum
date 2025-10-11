@@ -566,7 +566,8 @@ curl -X POST "http://127.0.0.1:8080/v1/workflows/{id}?action=run"
 ### ✅ 分布式KV存储
 - [x] 持久化存储（Controller SQLite）
 - [x] 命名空间隔离
-- [x] 类型安全接口（string/int/double/bool）
+- [x] 类型安全接口（string/int/double/bool/bytes）
+- [x] 二进制数据支持（Base64编码）
 - [x] 本地缓存 + 快速访问
 - [x] SSE实时变更通知
 - [x] 批量操作支持

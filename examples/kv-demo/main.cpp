@@ -131,6 +131,24 @@ int main() {
         if (taskCounter == 5) {
             std::cout << "🔧 执行中间计算..." << std::endl;
             g_dm->putDouble("calculation.result", 3.14159 * taskCounter);
+            
+            // 测试二进制数据存储（模拟结构体）
+            struct CheckpointData {
+                int taskId;
+                int progress;
+                double timestamp;
+                char description[32];
+            };
+            
+            CheckpointData checkpoint;
+            checkpoint.taskId = 12345;
+            checkpoint.progress = taskProgress;
+            checkpoint.timestamp = static_cast<double>(std::time(nullptr));
+            strncpy(checkpoint.description, "Step5 checkpoint", sizeof(checkpoint.description) - 1);
+            checkpoint.description[sizeof(checkpoint.description) - 1] = '\0';
+            
+            std::cout << "💾 保存二进制检查点数据..." << std::endl;
+            g_dm->putBytes("binary.checkpoint", &checkpoint, sizeof(checkpoint));
         }
     }
     
@@ -146,8 +164,29 @@ int main() {
         std::cout << "  总计数: " << taskCounter << std::endl;
         std::cout << "  完成进度: " << taskProgress << "%" << std::endl;
         
+        // 验证二进制数据
+        if (g_dm->exists("binary.checkpoint")) {
+            auto binaryData = g_dm->getBytes("binary.checkpoint");
+            if (binaryData.size() > 0) {
+                struct CheckpointData {
+                    int taskId;
+                    int progress;
+                    double timestamp;
+                    char description[32];
+                };
+                
+                if (binaryData.size() == sizeof(CheckpointData)) {
+                    CheckpointData* checkpoint = reinterpret_cast<CheckpointData*>(binaryData.data());
+                    std::cout << "\n🔬 二进制检查点数据验证：" << std::endl;
+                    std::cout << "  TaskID: " << checkpoint->taskId << std::endl;
+                    std::cout << "  Progress: " << checkpoint->progress << "%" << std::endl;
+                    std::cout << "  Description: " << checkpoint->description << std::endl;
+                }
+            }
+        }
+        
         auto allData = g_dm->getAll();
-        std::cout << "\n📦 分布式内存中的所有数据：" << std::endl;
+        std::cout << "\n📦 分布式KV存储中的所有数据：" << std::endl;
         for (const auto& [k, v] : allData) {
             std::cout << "  " << k << " = " << v << std::endl;
         }
