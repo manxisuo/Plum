@@ -121,7 +121,7 @@ async function openEdit(item: KVItem) {
 
 // 打开创建
 function openCreate() {
-  form.namespace = selectedNamespace.value
+  form.namespace = selectedNamespace.value || ''  // 如果没有namespace，留空让用户输入
   form.key = ''
   form.value = ''
   form.type = 'string'
@@ -347,7 +347,7 @@ onMounted(() => {
           <el-icon><Refresh /></el-icon>
           {{ t('common.refresh') }}
         </el-button>
-        <el-button type="success" @click="openCreate" :disabled="namespaces.length === 0">
+        <el-button type="success" @click="openCreate">
           <el-icon><Plus /></el-icon>
           {{ t('kvStore.buttons.create') }}
         </el-button>
