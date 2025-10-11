@@ -125,6 +125,8 @@ func migrateNode(badNode string, healthySet map[string]bool) {
 			Desired:      store.DesiredRunning,
 			ArtifactURL:  a.ArtifactURL,
 			StartCmd:     a.StartCmd,
+			AppName:      a.AppName,    // 复制应用名称
+			AppVersion:   a.AppVersion, // 复制应用版本
 		})
 		if err != nil {
 			log.Printf("failover: add assignment %s->%s error: %v", a.InstanceID, target, err)

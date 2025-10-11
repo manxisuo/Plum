@@ -32,6 +32,7 @@ examples/*/package/
 examples/*/*.zip
 examples/demo-app/demo-app
 examples/worker-demo/worker-demo
+examples/kv-demo/kv-demo
 
 # gRPC generated files (keep proto files, ignore generated code)
 *.pb.cc

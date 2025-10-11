@@ -16,6 +16,7 @@ Plum 旨在解决分布式环境下的任务编排、调度和执行问题，支
 - 🌍 **国际化**：支持中英文界面切换
 - 🎯 **智能管理**：工作器管理、资源监控、智能表单选择
 - 🔌 **设备集成**：支持外部设备状态监控和操作控制
+- 💾 **分布式KV存储**：集群级别的键值对存储，持久化可靠，支持状态共享和崩溃恢复
 
 ## 🏗️ 系统架构
 
@@ -562,6 +563,17 @@ curl -X POST "http://127.0.0.1:8080/v1/workflows/{id}?action=run"
 - [x] 级联删除支持
 - [x] 完整的CRUD操作
 
+### ✅ 分布式KV存储
+- [x] 持久化存储（Controller SQLite）
+- [x] 命名空间隔离
+- [x] 类型安全接口（string/int/double/bool）
+- [x] 本地缓存 + 快速访问
+- [x] SSE实时变更通知
+- [x] 批量操作支持
+- [x] 崩溃恢复能力
+- [x] 跨节点状态共享
+- [x] C++ SDK封装
+
 ### ✅ Web UI功能
 - [x] 响应式设计
 - [x] 国际化支持（中英文）
@@ -599,6 +611,41 @@ curl -X POST "http://127.0.0.1:8080/v1/workflows/{id}?action=run"
 - [x] 开发环境配置
 - [x] API文档和示例
 - [x] 错误日志和调试信息
+
+## 📦 示例应用
+
+Plum提供了三个完整的示例应用，展示不同的使用场景：
+
+### 1. demo-app - 基础HTTP服务
+- 简单的HTTP服务器应用
+- 演示基本的应用打包和部署流程
+- 包含服务注册和健康检查
+- 位置：`examples/demo-app/`
+
+### 2. worker-demo - Embedded Worker集成
+- 集成gRPC Worker SDK的应用
+- 演示embedded执行器的使用
+- 实现TaskService接口接受任务调度
+- 支持自动注册和心跳
+- 位置：`examples/worker-demo/`
+
+### 3. kv-demo - 分布式KV存储崩溃恢复
+- 演示分布式KV存储的崩溃恢复能力
+- 定期保存任务进度到持久化KV存储
+- 崩溃后自动恢复到上次检查点
+- 支持跨节点迁移（主备切换）
+- 展示状态共享和持久化特性
+- 位置：`examples/kv-demo/`
+
+**使用方式：**
+```bash
+# 构建示例
+cd examples/demo-app  # 或 worker-demo / kv-demo
+./build.sh
+
+# 上传zip包到Plum并创建部署
+# 详见各示例的README.md
+```
 
 ## ❓ 常见问题
 

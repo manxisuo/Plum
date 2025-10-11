@@ -60,3 +60,14 @@ func SubscribeTasks() (chan struct{}, func()) {
 func PublishTasks() {
 	Publish("__tasks__")
 }
+
+// KV channel (per namespace)
+func SubscribeKV(namespace string) (chan struct{}, func()) {
+	return Subscribe("__kv__:" + namespace)
+}
+
+func PublishKV(namespace, key, value, valueType string) {
+	Publish("__kv__:" + namespace)
+	// Also publish to global KV channel for monitoring
+	Publish("__kv__")
+}

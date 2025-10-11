@@ -181,6 +181,17 @@ func migrate(db *sql.DB) error {
             default_payload_json TEXT,
 			created_at INTEGER
 		);`,
+		// DistributedKV
+		`CREATE TABLE IF NOT EXISTS distributed_kv (
+            namespace TEXT NOT NULL,
+            key TEXT NOT NULL,
+            value TEXT NOT NULL,
+            type TEXT NOT NULL,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY(namespace, key)
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_kv_namespace ON distributed_kv(namespace);`,
+		`CREATE INDEX IF NOT EXISTS idx_kv_updated ON distributed_kv(updated_at);`,
 		// Resources
 		`CREATE TABLE IF NOT EXISTS resources (
             resource_id TEXT PRIMARY KEY,
@@ -1170,6 +1181,106 @@ func (s *sqliteStore) CountTasksByOrigin(defID string) (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+// ---- DistributedKV ----
+
+func (s *sqliteStore) PutKV(namespace, key, value, valueType string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO distributed_kv(namespace, key, value, type, updated_at)
+		VALUES(?, ?, ?, ?, ?)
+		ON CONFLICT(namespace, key) DO UPDATE SET
+			value=excluded.value,
+			type=excluded.type,
+			updated_at=excluded.updated_at
+	`, namespace, key, value, valueType, time.Now().Unix())
+	return err
+}
+
+func (s *sqliteStore) GetKV(namespace, key string) (store.DistributedKV, bool, error) {
+	row := s.db.QueryRow(`SELECT namespace, key, value, type, updated_at FROM distributed_kv WHERE namespace=? AND key=?`, namespace, key)
+	var kv store.DistributedKV
+	if err := row.Scan(&kv.Namespace, &kv.Key, &kv.Value, &kv.Type, &kv.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.DistributedKV{}, false, nil
+		}
+		return store.DistributedKV{}, false, err
+	}
+	return kv, true, nil
+}
+
+func (s *sqliteStore) DeleteKV(namespace, key string) error {
+	_, err := s.db.Exec(`DELETE FROM distributed_kv WHERE namespace=? AND key=?`, namespace, key)
+	return err
+}
+
+func (s *sqliteStore) ListKVByNamespace(namespace string) ([]store.DistributedKV, error) {
+	rows, err := s.db.Query(`SELECT namespace, key, value, type, updated_at FROM distributed_kv WHERE namespace=? ORDER BY key ASC`, namespace)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.DistributedKV
+	for rows.Next() {
+		var kv store.DistributedKV
+		if err := rows.Scan(&kv.Namespace, &kv.Key, &kv.Value, &kv.Type, &kv.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, kv)
+	}
+	return out, rows.Err()
+}
+
+func (s *sqliteStore) ListKVByPrefix(namespace, prefix string) ([]store.DistributedKV, error) {
+	rows, err := s.db.Query(`SELECT namespace, key, value, type, updated_at FROM distributed_kv WHERE namespace=? AND key LIKE ? ORDER BY key ASC`, namespace, prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.DistributedKV
+	for rows.Next() {
+		var kv store.DistributedKV
+		if err := rows.Scan(&kv.Namespace, &kv.Key, &kv.Value, &kv.Type, &kv.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, kv)
+	}
+	return out, rows.Err()
+}
+
+func (s *sqliteStore) PutKVBatch(namespace string, kvs []store.DistributedKV) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO distributed_kv(namespace, key, value, type, updated_at)
+		VALUES(?, ?, ?, ?, ?)
+		ON CONFLICT(namespace, key) DO UPDATE SET
+			value=excluded.value,
+			type=excluded.type,
+			updated_at=excluded.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now().Unix()
+	for _, kv := range kvs {
+		if _, err := stmt.Exec(namespace, kv.Key, kv.Value, kv.Type, now); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *sqliteStore) DeleteNamespace(namespace string) error {
+	_, err := s.db.Exec(`DELETE FROM distributed_kv WHERE namespace=?`, namespace)
+	return err
 }
 
 // Close 关闭数据库连接

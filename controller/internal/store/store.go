@@ -301,6 +301,15 @@ type Store interface {
 
 	// References
 	CountTasksByOrigin(defID string) (int, error)
+
+	// DistributedKV (namespace-based key-value store)
+	PutKV(namespace, key, value, valueType string) error
+	GetKV(namespace, key string) (DistributedKV, bool, error)
+	DeleteKV(namespace, key string) error
+	ListKVByNamespace(namespace string) ([]DistributedKV, error)
+	ListKVByPrefix(namespace, prefix string) ([]DistributedKV, error)
+	PutKVBatch(namespace string, kvs []DistributedKV) error
+	DeleteNamespace(namespace string) error
 }
 
 // TaskDefinition stores a reusable task template
@@ -314,6 +323,15 @@ type TaskDefinition struct {
 	// DefaultPayloadJSON stores the default input for runs created from this definition
 	DefaultPayloadJSON string
 	CreatedAt          int64
+}
+
+// DistributedKV stores key-value pairs with namespace isolation
+type DistributedKV struct {
+	Namespace string
+	Key       string
+	Value     string
+	Type      string // string|int|double|bool
+	UpdatedAt int64
 }
 
 var Current Store

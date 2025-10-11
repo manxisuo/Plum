@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 )
 
 func RegisterRoutes(mux *http.ServeMux) {
@@ -65,4 +66,31 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// task definitions
 	mux.HandleFunc("/v1/task-defs", withCORS(handleTaskDefs))
 	mux.HandleFunc("/v1/task-defs/", withCORS(handleTaskDefByID))
+	// distributed KV
+	mux.HandleFunc("/v1/kv/", withCORS(handleKV))
+}
+
+// handleKV routes KV requests based on path pattern
+func handleKV(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/v1/kv/")
+	
+	// /v1/kv/{namespace}/batch
+	if strings.HasSuffix(path, "/batch") {
+		handleKVBatch(w, r)
+		return
+	}
+	
+	// /v1/kv/{namespace}/{key}
+	if strings.Count(path, "/") >= 1 {
+		handleKVByKey(w, r)
+		return
+	}
+	
+	// /v1/kv/{namespace}
+	if path != "" && !strings.Contains(path, "/") {
+		handleKVByNamespace(w, r)
+		return
+	}
+	
+	http.Error(w, "invalid path", http.StatusBadRequest)
 }
