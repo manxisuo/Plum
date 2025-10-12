@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -21,12 +22,37 @@ func getEnv(key, defaultVal string) string {
 	return defaultVal
 }
 
+func getExeDir() string {
+	exePath, err := os.Executable()
+	if err != nil {
+		return "."
+	}
+	return filepath.Dir(exePath)
+}
+
 func main() {
 	// 加载.env文件（优先级：环境变量 > .env > 默认值）
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Note: .env file not found or failed to load: %v", err)
+	// 查找顺序：程序目录 → 程序上级目录 → 当前工作目录
+	var envPath string
+	for _, path := range []string{
+		filepath.Join(getExeDir(), ".env"),    // 程序目录（agent-go/）
+		filepath.Join(getExeDir(), "../.env"), // 上级目录（项目根）
+		".env",                                // 当前工作目录
+	} {
+		if _, err := os.Stat(path); err == nil {
+			envPath = path
+			break
+		}
 	}
-	
+
+	if envPath != "" {
+		if err := godotenv.Load(envPath); err != nil {
+			log.Printf("Note: failed to load %s: %v", envPath, err)
+		} else {
+			log.Printf("Loaded configuration from %s", envPath)
+		}
+	}
+
 	nodeID := getEnv("AGENT_NODE_ID", "nodeA")
 	controller := getEnv("CONTROLLER_BASE", "http://127.0.0.1:8080")
 	dataDir := getEnv("AGENT_DATA_DIR", "/tmp/plum-agent")

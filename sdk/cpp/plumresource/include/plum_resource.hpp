@@ -86,10 +86,17 @@ using ResourceOpCallback = std::function<void(const std::list<ResourceOp>&)>;
 // 资源管理选项
 struct ResourceOptions {
     std::string controllerBase;    // Controller基础URL
-    std::string resourceId;        // 资源ID
-    std::string nodeId;            // 节点ID
+    std::string resourceId;        // 资源ID（空值时自动生成：hostname-uuid）
+    std::string nodeId;            // 节点ID（空值时自动使用主机名）
     int heartbeatSec{10};          // 心跳间隔（秒）
     // HTTP端口已移除，系统自动分配（避免冲突）
+    
+    /**
+     * @brief 规范化配置（自动填充默认值）
+     * - nodeId为空 → 使用主机名
+     * - resourceId为空 → 生成唯一ID（hostname-uuid8位）
+     */
+    void normalize();
 };
 
 // 资源管理器类

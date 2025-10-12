@@ -29,8 +29,9 @@ agent-clean:
 
 # ============ Agent 运行 ============
 agent-run:
-	@echo "Starting Go Agent (nodeA)..."
-	@AGENT_NODE_ID=nodeA ./agent-go/plum-agent
+	@echo "Starting Go Agent..."
+    #@AGENT_NODE_ID=nodeA ./agent-go/plum-agent
+	@./agent-go/plum-agent
 
 agent-run%:
 	@num=$(patsubst agent-run%,%,$@); \
@@ -130,7 +131,9 @@ sdk_cpp_radar_sensor:
 	cmake --build sdk/cpp/build --target radar_sensor -j
 
 sdk_cpp_radar_sensor-run:
-	RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA ./sdk/cpp/build/examples/radar_sensor/radar_sensor
+    #RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA ./sdk/cpp/build/examples/radar_sensor/radar_sensor
+    #RESOURCE_ID=radar-001  ./sdk/cpp/build/examples/radar_sensor/radar_sensor
+	./sdk/cpp/build/examples/radar_sensor/radar_sensor
 
 # SDK C++ grpc_echo_worker
 sdk_cpp_grpc_echo_worker:

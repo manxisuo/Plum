@@ -28,6 +28,22 @@ cd examples/kv-demo
 # 生成: kv-demo.zip
 ```
 
+## ⚙️ 配置
+
+本应用使用 Plum KV SDK，配置示例见：`../../sdk/cpp/plumkv/env.example`
+
+```bash
+# 复制配置模板
+cp ../../sdk/cpp/plumkv/env.example .env
+vim .env  # 修改配置
+
+# 主要配置项：
+# CONTROLLER_BASE=http://127.0.0.1:8080
+# PLUM_KV_SYNC_MODE=polling  # 或 sse/disabled
+```
+
+**注意：** Agent部署时会自动注入 `PLUM_INSTANCE_ID`、`PLUM_APP_NAME` 等环境变量。
+
 ## 📦 部署测试
 
 ### 1. 上传并部署

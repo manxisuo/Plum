@@ -345,9 +345,9 @@ cd agent-go
 cp env.example .env
 vim .env
 
-# 应用（如kv-demo）
+# SDK应用（如kv-demo）
 cd examples/kv-demo
-cp env.example .env
+cp ../../sdk/cpp/plumkv/env.example .env
 vim .env
 ```
 
@@ -381,7 +381,12 @@ CONTROLLER_BASE=http://127.0.0.1:9090 make agent-run
 - `PLUM_KV_SYNC_MODE` - KV同步模式：`polling`/`sse`/`disabled`
 - `CONTROLLER_BASE` - Controller地址
 
-详见各目录下的`env.example`文件。
+**配置模板位置：**
+- `controller/env.example` - Controller配置
+- `agent-go/env.example` - Agent配置
+- `sdk/cpp/plumkv/env.example` - KV SDK配置
+- `sdk/cpp/plumresource/env.example` - Resource SDK配置
+- `sdk/cpp/env_loader.hpp` - C++ SDK公共.env工具
 
 ### 常用命令速查
 

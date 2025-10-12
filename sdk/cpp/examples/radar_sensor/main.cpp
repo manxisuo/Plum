@@ -98,10 +98,13 @@ int main() {
     // 配置选项
     ResourceOptions opt;
     opt.controllerBase = getenv_or("CONTROLLER_BASE", "http://127.0.0.1:8080");
-    opt.resourceId = getenv_or("RESOURCE_ID", "radar-001");
-    opt.nodeId = getenv_or("RESOURCE_NODE_ID", "nodeA");
+    opt.resourceId = getenv_or("RESOURCE_ID", "");  // 空值时自动生成唯一ID
+    opt.nodeId = getenv_or("RESOURCE_NODE_ID", "");  // 空值时自动使用主机名
     opt.heartbeatSec = 10;
     // httpPort已移除，系统自动分配端口（避免冲突）
+    
+    // 规范化配置（自动填充默认值：nodeId、resourceId）
+    opt.normalize();
     
     // 创建资源管理器
     ResourceManager resourceManager(opt);

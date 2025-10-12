@@ -1,10 +1,12 @@
 #include "plum_resource.hpp"
+#include "../../env_loader.hpp"
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <chrono>
 #include <random>
 #include <sstream>
+#include <unistd.h>
 
 using json = nlohmann::json;
 
@@ -12,6 +14,14 @@ namespace plumresource {
 
 static std::string get_local_ip() {
     return "127.0.0.1"; // MVP
+}
+
+static std::string get_hostname() {
+    char hostname[256];
+    if (gethostname(hostname, sizeof(hostname)) == 0) {
+        return std::string(hostname);
+    }
+    return "unknown";
 }
 
 static std::string generate_uuid() {
@@ -44,6 +54,34 @@ static std::string generate_uuid() {
         ss << dis(gen);
     }
     return ss.str();
+}
+
+void ResourceOptions::normalize() {
+    // 如果nodeId未指定，自动使用主机名
+    if (nodeId.empty()) {
+        nodeId = get_hostname();
+    }
+    
+    // 如果resourceId未指定，尝试从.env读取，否则生成并保存
+    if (resourceId.empty()) {
+        // 尝试从.env读取
+        resourceId = plum::env::readValue("RESOURCE_ID");
+        
+        if (resourceId.empty()) {
+            // 生成新ID
+            std::string uuid = generate_uuid();
+            resourceId = nodeId + "-" + uuid.substr(0, 8);
+            
+            // 保存到.env供下次启动使用
+            if (plum::env::writeValue("RESOURCE_ID", resourceId)) {
+                std::cout << "[plumresource] Generated resourceId: " << resourceId << " (saved to .env)" << std::endl;
+            } else {
+                std::cout << "[plumresource] Generated resourceId: " << resourceId << " (failed to save to .env)" << std::endl;
+            }
+        } else {
+            std::cout << "[plumresource] Using resourceId from .env: " << resourceId << std::endl;
+        }
+    }
 }
 
 ResourceManager::ResourceManager(const ResourceOptions& opt) 
