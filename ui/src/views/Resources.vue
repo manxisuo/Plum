@@ -140,7 +140,7 @@ function connectSSE() {
     console.log('SSE disabled for debugging')
   } catch (e) {
     console.warn('SSE connection failed:', e)
-  }
+    }
 }
 
 function selectResource(resource: Resource) {
@@ -269,8 +269,9 @@ function getEnumOptions(min?: string, max?: string) {
 function getHealthStatus(lastSeen: number) {
   const now = Date.now() / 1000
   const diff = now - lastSeen
-  if (diff < 30) return { status: 'healthy', type: 'success', text: t('resources.status.healthy') }
-  if (diff < 120) return { status: 'warning', type: 'warning', text: t('resources.status.warning') }
+  // 心跳间隔10秒，15秒内正常，30秒后离线
+  if (diff < 15) return { status: 'healthy', type: 'success', text: t('resources.status.healthy') }
+  if (diff < 30) return { status: 'warning', type: 'warning', text: t('resources.status.warning') }
   return { status: 'error', type: 'danger', text: t('resources.status.offline') }
 }
 
