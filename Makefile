@@ -30,31 +30,31 @@ agent-clean:
 # ============ Agent 运行 ============
 agent-run:
 	@echo "Starting Go Agent (nodeA)..."
-	@AGENT_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./agent-go/plum-agent
+	@AGENT_NODE_ID=nodeA ./agent-go/plum-agent
 
 agent-run%:
 	@num=$(patsubst agent-run%,%,$@); \
 	echo "Starting Go Agent (node$$num)..."; \
-	AGENT_NODE_ID=node$$num CONTROLLER_BASE=http://127.0.0.1:8080 ./agent-go/plum-agent
+	AGENT_NODE_ID=node$$num ./agent-go/plum-agent
 
 agent-cpp-run:
 	@echo "Starting C++ Agent (nodeA)..."
-	@AGENT_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./agent/build/plum_agent
+	@AGENT_NODE_ID=nodeA ./agent/build/plum_agent
 
 agent-cpp-run%:
 	@num=$(patsubst agent-cpp-run%,%,$@); \
 	echo "Starting C++ Agent (node$$num)..."; \
-	AGENT_NODE_ID=node$$num CONTROLLER_BASE=http://127.0.0.1:8080 ./agent/build/plum_agent
+	AGENT_NODE_ID=node$$num ./agent/build/plum_agent
 
 # 运行多个Agent节点（后台）
 agent-run-multi:
 	@echo "Starting multiple Go Agents..."
 	@mkdir -p logs
-	@AGENT_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./agent-go/plum-agent > logs/agent-nodeA.log 2>&1 & echo "Started nodeA (PID: $$!)"
+	@AGENT_NODE_ID=nodeA ./agent-go/plum-agent > logs/agent-nodeA.log 2>&1 & echo "Started nodeA (PID: $$!)"
 	@sleep 1
-	@AGENT_NODE_ID=nodeB CONTROLLER_BASE=http://127.0.0.1:8080 ./agent-go/plum-agent > logs/agent-nodeB.log 2>&1 & echo "Started nodeB (PID: $$!)"
+	@AGENT_NODE_ID=nodeB ./agent-go/plum-agent > logs/agent-nodeB.log 2>&1 & echo "Started nodeB (PID: $$!)"
 	@sleep 1
-	@AGENT_NODE_ID=nodeC CONTROLLER_BASE=http://127.0.0.1:8080 ./agent-go/plum-agent > logs/agent-nodeC.log 2>&1 & echo "Started nodeC (PID: $$!)"
+	@AGENT_NODE_ID=nodeC ./agent-go/plum-agent > logs/agent-nodeC.log 2>&1 & echo "Started nodeC (PID: $$!)"
 	@echo "✅ 3 agents started. Logs in logs/agent-*.log"
 	@echo "   To stop: pkill -f plum-agent"
 
@@ -130,7 +130,7 @@ sdk_cpp_radar_sensor:
 	cmake --build sdk/cpp/build --target radar_sensor -j
 
 sdk_cpp_radar_sensor-run:
-	RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 ./sdk/cpp/build/examples/radar_sensor/radar_sensor
+	RESOURCE_ID=radar-001 RESOURCE_NODE_ID=nodeA ./sdk/cpp/build/examples/radar_sensor/radar_sensor
 
 # SDK C++ grpc_echo_worker
 sdk_cpp_grpc_echo_worker:
@@ -138,7 +138,7 @@ sdk_cpp_grpc_echo_worker:
 	cmake --build sdk/cpp/build --target grpc_echo_worker -j
 
 sdk_cpp_grpc_echo_worker-run:
-	PLUM_INSTANCE_ID=grpc-instance-001 PLUM_APP_NAME=grpc-echo-app PLUM_APP_VERSION=v2.0.0 WORKER_ID=grpc-echo-1 WORKER_NODE_ID=nodeA CONTROLLER_BASE=http://127.0.0.1:8080 GRPC_ADDRESS=0.0.0.0:18082 ./sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker
+	PLUM_INSTANCE_ID=grpc-instance-001 PLUM_APP_NAME=grpc-echo-app PLUM_APP_VERSION=v2.0.0 WORKER_ID=grpc-echo-1 WORKER_NODE_ID=nodeA GRPC_ADDRESS=0.0.0.0:18082 ./sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker
 
 # 优雅停止agent
 stop-agent:

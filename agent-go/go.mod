@@ -2,6 +2,4 @@ module github.com/manxisuo/plum/agent
 
 go 1.19
 
-require (
-)
-
+require github.com/joho/godotenv v1.5.1 // indirect

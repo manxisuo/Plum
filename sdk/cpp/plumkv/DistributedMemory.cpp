@@ -1,4 +1,5 @@
 #include "DistributedMemory.hpp"
+#include "env_loader.hpp"
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
@@ -139,6 +140,15 @@ std::shared_ptr<DistributedMemory> DistributedMemory::create(
     const std::string& ns,
     const std::string& controllerURL
 ) {
+    // 加载.env文件（优先级：环境变量 > .env > 默认值）
+    static bool envLoaded = false;
+    if (!envLoaded) {
+        if (plum::env::EnvLoader::load()) {
+            std::cout << "[KVStore] Loaded configuration from .env file" << std::endl;
+        }
+        envLoaded = true;
+    }
+    
     std::string url = controllerURL;
     if (url.empty()) {
         url = getEnvOr("CONTROLLER_BASE", "http://127.0.0.1:8080");

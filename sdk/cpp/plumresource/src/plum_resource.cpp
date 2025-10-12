@@ -76,8 +76,6 @@ void ResourceManager::stop() {
 }
 
 bool ResourceManager::startHttp() {
-    // Pick port or use provided
-    int port = options_.httpPort > 0 ? options_.httpPort : 0;
     auto svr = new httplib::Server();
     
     // 处理资源操作请求
@@ -139,24 +137,18 @@ bool ResourceManager::startHttp() {
         res.set_content("{\"status\":\"error\"}", "application/json");
     });
     
-    // Use a fixed port if not specified
-    int p = port > 0 ? port : 18081;
-    std::cout << "[plumresource] Starting HTTP server on port " << p << std::endl;
-    
-    // Start server in background thread
-    std::atomic<bool> server_failed{false};
-    std::string error_message;
-    
-    // Create a test client to check if server is running
-    httplib::Client cli("http://127.0.0.1:" + std::to_string(p));
-    cli.set_connection_timeout(0, 100000); // 100ms
-    cli.set_read_timeout(0, 100000);       // 100ms
-    cli.set_write_timeout(0, 100000);      // 100ms
+    // 使用系统自动分配端口（避免冲突）
+    std::cout << "[plumresource] Starting HTTP server (auto-assign port)..." << std::endl;
     
     // Store server instance for cleanup
     httpServer_ = svr;
     
-    std::thread server_thread([this, svr, p, &server_failed, &error_message]{
+    // 使用bind_to_any_port自动分配端口
+    std::atomic<bool> server_failed{false};
+    std::string error_message;
+    std::atomic<int> bound_port{0};
+    
+    std::thread server_thread([this, svr, &server_failed, &error_message, &bound_port]{
         try {
             if (!svr->is_valid()) {
                 error_message = "Server configuration invalid";
@@ -164,9 +156,20 @@ bool ResourceManager::startHttp() {
                 return;
             }
             
-            std::cout << "[plumresource] Attempting to listen on port " << p << std::endl;
-            if (!svr->listen("0.0.0.0", p)) {
-                error_message = "Failed to bind to port " + std::to_string(p);
+            // 绑定到任意可用端口
+            int p = svr->bind_to_any_port("0.0.0.0");
+            if (p < 0) {
+                error_message = "Failed to bind to any port";
+                server_failed.store(true);
+                return;
+            }
+            
+            bound_port.store(p);
+            std::cout << "[plumresource] HTTP server bound to port " << p << std::endl;
+            
+            // 开始监听
+            if (!svr->listen_after_bind()) {
+                error_message = "Failed to listen after bind";
                 server_failed.store(true);
                 return;
             }
@@ -184,44 +187,27 @@ bool ResourceManager::startHttp() {
     // Move thread to member variable for proper lifecycle management
     httpServerThread_ = std::move(server_thread);
     
-    // Wait for server to start (up to 5 seconds)
-    bool server_ready = false;
+    // Wait for server to bind (up to 5 seconds)
     for (int i = 0; i < 50; ++i) {
         if (server_failed.load()) {
             std::cerr << "[plumresource] Failed to start HTTP server: " << error_message << std::endl;
             return false;
         }
         
-        // Try to connect to the server
-        auto res = cli.Get("/");
-        if (res.error() == httplib::Error::Success) {
-            // Server is running and responded
-            server_ready = true;
-            break;
-        } else if (res.error() == httplib::Error::Connection) {
-            // Server is still starting up (connection refused)
-            std::cout << "[plumresource] Waiting for server to start..." << std::endl;
-        } else {
-            std::cout << "[plumresource] Connection attempt failed: " << httplib::to_string(res.error()) << std::endl;
+        int p = bound_port.load();
+        if (p > 0) {
+            // Server bound successfully
+            actualPort_.store(p);
+            httpURL_ = "http://" + get_local_ip() + ":" + std::to_string(p);
+            std::cout << "[plumresource] HTTP server started successfully on port " << p << std::endl;
+            return true;
         }
         
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     
-    if (!server_ready) {
-        if (server_failed.load()) {
-            std::cerr << "[plumresource] Failed to start HTTP server: " << error_message << std::endl;
-        } else {
-            std::cerr << "[plumresource] HTTP server startup timed out" << std::endl;
-        }
-        return false;
-    }
-    
-    std::cout << "[plumresource] HTTP server started successfully on port " << p << std::endl;
-    
-    // Use the same port for URL
-    httpURL_ = std::string("http://") + get_local_ip() + ":" + std::to_string(p);
-    return true;
+    std::cerr << "[plumresource] HTTP server startup timed out" << std::endl;
+    return false;
 }
 
 bool ResourceManager::registerResource(const ResourceDesc& resource) {

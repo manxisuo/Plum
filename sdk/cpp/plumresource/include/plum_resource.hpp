@@ -89,7 +89,7 @@ struct ResourceOptions {
     std::string resourceId;        // 资源ID
     std::string nodeId;            // 节点ID
     int heartbeatSec{10};          // 心跳间隔（秒）
-    int httpPort{0};               // HTTP服务端口（0表示随机）
+    // HTTP端口已移除，系统自动分配（避免冲突）
 };
 
 // 资源管理器类
@@ -127,6 +127,7 @@ private:
     // HTTP服务器相关
     httplib::Server* httpServer_{nullptr};
     std::thread httpServerThread_;
+    std::atomic<int> actualPort_{0};
     
     void heartbeatLoop();
     bool doRegister();

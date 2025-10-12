@@ -101,7 +101,7 @@ int main() {
     opt.resourceId = getenv_or("RESOURCE_ID", "radar-001");
     opt.nodeId = getenv_or("RESOURCE_NODE_ID", "nodeA");
     opt.heartbeatSec = 10;
-    opt.httpPort = 18081; // 固定端口
+    // httpPort已移除，系统自动分配端口（避免冲突）
     
     // 创建资源管理器
     ResourceManager resourceManager(opt);
@@ -144,7 +144,7 @@ int main() {
     std::cout << "Device ID: " << opt.resourceId << std::endl;
     std::cout << "Node ID: " << opt.nodeId << std::endl;
     std::cout << "Controller: " << opt.controllerBase << std::endl;
-    std::cout << "HTTP Port: " << opt.httpPort << std::endl;
+    std::cout << "HTTP Port: auto-assigned" << std::endl;
     
     // 模拟运行，定期上报状态
     while (true) {

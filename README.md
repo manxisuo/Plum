@@ -328,33 +328,60 @@ make ui-dev
 # - 然后重启对应进程
 ```
 
-### 环境变量配置
+### 配置管理
 
-#### Controller环境变量
+Plum支持两种配置方式（优先级：**环境变量 > .env文件 > 默认值**）
+
+#### 方式1：.env文件（推荐）
+
 ```bash
-CONTROLLER_ADDR=:8080                    # 监听地址（默认:8080）
-CONTROLLER_DB=controller.db              # 数据库文件路径
-CONTROLLER_DATA_DIR=./data               # 数据目录（artifacts等）
+# Controller
+cd controller
+cp env.example .env
+vim .env  # 修改配置
+
+# Agent
+cd agent-go
+cp env.example .env
+vim .env
+
+# 应用（如kv-demo）
+cd examples/kv-demo
+cp env.example .env
+vim .env
 ```
 
-#### Agent环境变量
-```bash
-AGENT_NODE_ID=nodeA                      # 节点ID（默认nodeA）
-CONTROLLER_BASE=http://127.0.0.1:8080   # Controller地址
-AGENT_DATA_DIR=/tmp/plum-agent           # Agent数据目录
-```
+#### 方式2：环境变量
 
-#### 使用示例
 ```bash
-# 自定义Controller端口
+# Controller
 CONTROLLER_ADDR=:9090 ./controller/bin/controller
 
-# Agent连接到自定义端口
+# Agent
 CONTROLLER_BASE=http://127.0.0.1:9090 make agent-run
-
-# 指定数据目录
-CONTROLLER_DATA_DIR=/var/plum/data ./controller/bin/controller
 ```
+
+#### 主要配置项
+
+**Controller:**
+- `CONTROLLER_ADDR` - 监听地址（默认`:8080`）
+- `CONTROLLER_DB` - 数据库路径
+- `CONTROLLER_DATA_DIR` - 数据目录
+- `HEARTBEAT_TTL_SEC` - 心跳超时（默认30秒）
+- `FAILOVER_ENABLED` - 故障转移开关（默认true）
+
+**Agent:**
+- `AGENT_NODE_ID` - 节点ID（默认`nodeA`）
+- `CONTROLLER_BASE` - Controller地址
+- `AGENT_DATA_DIR` - 数据目录
+
+**SDK/应用:**
+- `PLUM_INSTANCE_ID` - 实例ID（Agent注入）
+- `PLUM_APP_NAME` - 应用名称（Agent注入）
+- `PLUM_KV_SYNC_MODE` - KV同步模式：`polling`/`sse`/`disabled`
+- `CONTROLLER_BASE` - Controller地址
+
+详见各目录下的`env.example`文件。
 
 ### 常用命令速查
 

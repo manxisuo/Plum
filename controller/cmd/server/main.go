@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/manxisuo/plum/controller/internal/failover"
 	"github.com/manxisuo/plum/controller/internal/httpapi"
 	"github.com/manxisuo/plum/controller/internal/store"
@@ -15,6 +16,11 @@ import (
 )
 
 func main() {
+	// 加载.env文件（优先级：环境变量 > .env > 默认值）
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Note: .env file not found or failed to load: %v", err)
+	}
+	
 	addr := os.Getenv("CONTROLLER_ADDR")
 	if addr == "" {
 		addr = ":8080"

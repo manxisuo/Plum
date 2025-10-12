@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func getEnv(key, defaultVal string) string {
@@ -20,6 +22,11 @@ func getEnv(key, defaultVal string) string {
 }
 
 func main() {
+	// 加载.env文件（优先级：环境变量 > .env > 默认值）
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Note: .env file not found or failed to load: %v", err)
+	}
+	
 	nodeID := getEnv("AGENT_NODE_ID", "nodeA")
 	controller := getEnv("CONTROLLER_BASE", "http://127.0.0.1:8080")
 	dataDir := getEnv("AGENT_DATA_DIR", "/tmp/plum-agent")
