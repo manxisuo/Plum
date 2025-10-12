@@ -569,11 +569,13 @@ curl -X POST "http://127.0.0.1:8080/v1/workflows/{id}?action=run"
 - [x] 类型安全接口（string/int/double/bool/bytes）
 - [x] 二进制数据支持（Base64编码）
 - [x] 本地缓存 + 快速访问
-- [x] SSE实时变更通知
+- [x] 双模式同步（polling/sse/disabled）
+- [x] SSE实时推送（可选）
 - [x] 批量操作支持
 - [x] 崩溃恢复能力
 - [x] 跨节点状态共享
 - [x] C++ SDK封装
+- [x] Web UI查看管理（查看/编辑/删除）
 
 ### ✅ Web UI功能
 - [x] 响应式设计

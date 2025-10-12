@@ -150,9 +150,23 @@ std::shared_ptr<DistributedMemory> DistributedMemory::create(
     return dm;
 }
 
+SyncMode DistributedMemory::parseSyncMode() {
+    const char* mode = std::getenv("PLUM_KV_SYNC_MODE");
+    if (!mode) return SyncMode::Polling; // 默认轮询
+    
+    std::string modeStr(mode);
+    if (modeStr == "sse" || modeStr == "SSE") return SyncMode::SSE;
+    if (modeStr == "disabled" || modeStr == "DISABLED") return SyncMode::Disabled;
+    return SyncMode::Polling;
+}
+
 DistributedMemory::DistributedMemory(const std::string& ns, const std::string& controllerURL)
     : namespace_(ns), controllerURL_(controllerURL), sseRunning_(false) {
-    std::cout << "[KVStore] Initialized for namespace: " << ns << std::endl;
+    syncMode_ = parseSyncMode();
+    
+    const char* modeNames[] = {"Polling", "SSE", "Disabled"};
+    std::cout << "[KVStore] Initialized for namespace: " << ns 
+              << ", sync mode: " << modeNames[static_cast<int>(syncMode_)] << std::endl;
 }
 
 DistributedMemory::~DistributedMemory() {
@@ -191,23 +205,135 @@ void DistributedMemory::preloadCache() {
 }
 
 void DistributedMemory::startSSE() {
-    // SSE实现较复杂，暂时简化为定期轮询
-    // 后续可以改进为真正的SSE EventSource
+    if (syncMode_ == SyncMode::Disabled) {
+        std::cout << "[KVStore] Sync disabled, using local cache only" << std::endl;
+        return;
+    }
+    
     sseRunning_ = true;
-    sseThread_ = std::thread([this]() {
-        while (sseRunning_) {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-            if (!sseRunning_) break;
-            // 定期刷新缓存
-            refresh();
-        }
-    });
+    
+    if (syncMode_ == SyncMode::SSE) {
+        std::cout << "[KVStore] Starting SSE mode" << std::endl;
+        sseThread_ = std::thread([this]() { sseLoop(); });
+    } else {
+        std::cout << "[KVStore] Starting polling mode (5s interval)" << std::endl;
+        sseThread_ = std::thread([this]() { pollingLoop(); });
+    }
 }
 
 void DistributedMemory::stopSSE() {
     sseRunning_ = false;
     if (sseThread_.joinable()) {
         sseThread_.join();
+    }
+}
+
+void DistributedMemory::pollingLoop() {
+    while (sseRunning_) {
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        if (!sseRunning_) break;
+        refresh();
+    }
+}
+
+void DistributedMemory::sseLoop() {
+    while (sseRunning_) {
+        try {
+            auto host = parseHostOnly(controllerURL_);
+            auto port = parsePort(controllerURL_);
+            
+            httplib::Client cli(host, port);
+            cli.set_read_timeout(300, 0); // 5分钟超时
+            
+            std::cout << "[KVStore] Connecting to SSE stream..." << std::endl;
+            
+            auto res = cli.Get(
+                buildURL("/v1/stream?namespace=" + namespace_).c_str(),
+                [this](const char* data, size_t len) {
+                    if (len > 0) {
+                        parseSSEStream(std::string(data, len));
+                    }
+                    return sseRunning_.load();
+                }
+            );
+            
+            if (!sseRunning_) break;
+            
+            std::cout << "[KVStore] SSE disconnected, reconnecting in 3s..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+        } catch (const std::exception& e) {
+            std::cerr << "[KVStore] SSE error: " << e.what() << ", retrying in 5s..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+        }
+    }
+}
+
+void DistributedMemory::parseSSEStream(const std::string& chunk) {
+    sseBuffer_ += chunk;
+    
+    // SSE协议：事件以 \n\n 结尾
+    size_t pos;
+    while ((pos = sseBuffer_.find("\n\n")) != std::string::npos) {
+        std::string event = sseBuffer_.substr(0, pos);
+        sseBuffer_ = sseBuffer_.substr(pos + 2);
+        
+        // 解析事件
+        std::string eventType;
+        std::string eventData;
+        
+        std::istringstream iss(event);
+        std::string line;
+        while (std::getline(iss, line)) {
+            if (line.empty() || line[0] == ':') continue; // 注释或空行
+            
+            size_t colonPos = line.find(':');
+            if (colonPos == std::string::npos) continue;
+            
+            std::string field = line.substr(0, colonPos);
+            std::string value = colonPos + 1 < line.size() ? line.substr(colonPos + 1) : "";
+            
+            // 去掉开头的空格
+            if (!value.empty() && value[0] == ' ') value = value.substr(1);
+            
+            if (field == "event") {
+                eventType = value;
+            } else if (field == "data") {
+                eventData = value;
+            }
+        }
+        
+        // 处理kv事件
+        if (eventType == "kv" && !eventData.empty()) {
+            try {
+                auto j = json::parse(eventData);
+                std::string key = j.value("key", "");
+                std::string value = j.value("value", "");
+                std::string type = j.value("type", "string");
+                
+                if (!key.empty()) {
+                    bool shouldUpdate = false;
+                    {
+                        std::lock_guard<std::mutex> lock(cacheMutex_);
+                        
+                        // 客户端去重：如果值没变化，跳过更新和回调
+                        auto it = cache_.find(key);
+                        if (it == cache_.end() || it->second != value || types_[key] != type) {
+                            cache_[key] = value;
+                            types_[key] = type;
+                            shouldUpdate = true;
+                        }
+                    }
+                    
+                    if (shouldUpdate) {
+                        std::cout << "[KVStore] SSE update: " << key << " = " << value << std::endl;
+                        // 触发回调
+                        onSSEEvent(key, value);
+                    }
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[KVStore] Parse SSE event failed: " << e.what() << std::endl;
+            }
+        }
     }
 }
 

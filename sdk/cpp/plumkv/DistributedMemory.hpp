@@ -13,6 +13,15 @@ namespace plum {
 namespace kv {
 
 /**
+ * @brief 同步模式
+ */
+enum class SyncMode {
+    Polling,   // 轮询模式（5秒间隔，默认）
+    SSE,       // SSE推送模式（实时）
+    Disabled   // 禁用同步（仅本地缓存）
+};
+
+/**
  * @brief 分布式KV存储客户端
  * 
  * Plum的分布式KV存储提供集群级别的键值对存储能力，
@@ -22,9 +31,14 @@ namespace kv {
  * - 持久化存储：数据保存在Controller的SQLite中，不会丢失
  * - 快速访问：本地缓存提供内存般的读取速度
  * - 命名空间隔离：多应用/实例互不干扰
- * - 实时同步：SSE推送保证多节点数据一致性
- * - 类型安全：支持 string/int/double/bool
+ * - 双模式同步：支持轮询（稳定）和SSE（实时）
+ * - 类型安全：支持 string/int/double/bool/bytes
  * - 崩溃恢复：支持应用崩溃后状态恢复
+ * 
+ * 环境变量配置：
+ * - PLUM_KV_SYNC_MODE=polling (默认，5秒轮询)
+ * - PLUM_KV_SYNC_MODE=sse (SSE实时推送)
+ * - PLUM_KV_SYNC_MODE=disabled (禁用同步)
  * 
  * 使用示例：
  * @code
@@ -156,6 +170,12 @@ private:
     void stopSSE();
     void onSSEEvent(const std::string& event, const std::string& data);
     
+    // 双模式同步
+    void pollingLoop();
+    void sseLoop();
+    void parseSSEStream(const std::string& chunk);
+    SyncMode parseSyncMode();
+    
     std::string buildURL(const std::string& path) const;
     bool httpPut(const std::string& key, const std::string& value, const std::string& type);
     std::string httpGet(const std::string& key, bool& found);
@@ -163,15 +183,19 @@ private:
     
     std::string namespace_;
     std::string controllerURL_;
+    SyncMode syncMode_;
     
     // 本地缓存
     std::map<std::string, std::string> cache_;
     std::map<std::string, std::string> types_; // 记录类型
     mutable std::mutex cacheMutex_;
     
-    // SSE相关
+    // 同步线程
     std::thread sseThread_;
     std::atomic<bool> sseRunning_;
+    
+    // SSE缓冲区
+    std::string sseBuffer_;
     
     // 变更回调
     std::vector<std::function<void(const std::string&, const std::string&)>> callbacks_;

@@ -8,8 +8,8 @@ Plum的分布式KV存储C++ SDK，提供集群级别的键值对存储能力。
 - ✅ **持久化存储**：数据保存在Controller的SQLite中，不会丢失
 - ✅ **快速访问**：本地缓存提供内存般的读取速度
 - ✅ **命名空间隔离**：多应用/实例互不干扰
-- ✅ **类型安全**：支持 string/int/double/bool
-- ✅ **实时同步**：SSE推送变更（定期刷新）
+- ✅ **类型安全**：支持 string/int/double/bool/bytes
+- ✅ **双模式同步**：支持轮询（稳定）和SSE（实时）
 - ✅ **崩溃恢复**：支持应用崩溃后状态恢复
 - ✅ **批量操作**：减少网络开销
 
@@ -50,6 +50,29 @@ auto dm = DistributedMemory::create("my-namespace");
 // 指定Controller地址
 auto dm = DistributedMemory::create("my-namespace", "http://192.168.1.100:8080");
 ```
+
+### 环境变量配置
+
+**同步模式（PLUM_KV_SYNC_MODE）：**
+
+```bash
+# 轮询模式（默认）- 5秒刷新一次，稳定可靠
+export PLUM_KV_SYNC_MODE=polling
+
+# SSE推送模式 - 实时更新，低延迟
+export PLUM_KV_SYNC_MODE=sse
+
+# 禁用同步 - 仅本地缓存，不从Controller同步
+export PLUM_KV_SYNC_MODE=disabled
+```
+
+**模式对比：**
+
+| 模式 | 延迟 | 带宽占用 | 适用场景 |
+|------|------|---------|---------|
+| **polling** | ~5秒 | 中等 | 默认推荐，弱网环境，移动网络 |
+| **sse** | 毫秒级 | 低（idle时几乎为0） | 实时性要求高，稳定网络 |
+| **disabled** | N/A | 极低 | 无跨节点同步需求，纯本地使用 |
 
 ### 基本操作
 

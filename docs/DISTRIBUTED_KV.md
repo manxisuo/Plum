@@ -521,6 +521,25 @@ Node2: dm->get("key")
 | CONTROLLER_BASE | http://127.0.0.1:8080 | Controller地址 |
 | PLUM_INSTANCE_ID | - | Agent自动注入 |
 | PLUM_APP_NAME | - | Agent自动注入 |
+| PLUM_KV_SYNC_MODE | polling | 同步模式：polling/sse/disabled |
+
+**同步模式说明：**
+
+| 模式 | 延迟 | 带宽 | 适用场景 |
+|------|------|------|---------|
+| **polling** | ~5秒 | 中 | 默认，稳定可靠，弱网友好 |
+| **sse** | 毫秒级 | 低 | 实时性要求高，网络稳定 |
+| **disabled** | N/A | 极低 | 仅本地缓存，无跨节点同步 |
+
+**节流机制：**
+
+SSE模式下自动启用两级节流：
+- **Controller端**：100ms批量推送（相同namespace的多次更新合并）
+- **SDK端**：客户端去重（相同值不触发更新和回调）
+
+示例：1秒内修改同一key 5次
+- 无节流：5次推送 × N个节点
+- 有节流：~10次推送 × N个节点（100ms批次）+ 客户端去重
 
 ### 命名空间选择建议
 
