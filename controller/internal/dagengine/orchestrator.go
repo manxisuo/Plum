@@ -127,5 +127,5 @@ func (o *DAGOrchestrator) GetRunStatus(runID string) map[string]string {
 }
 
 func newRunID() string {
-	return "dagrun-" + time.Now().Format("20060102-150405")
+	return fmt.Sprintf("dagrun-%s-%03d", time.Now().Format("20060102-150405"), time.Now().Nanosecond()/1000000)
 }

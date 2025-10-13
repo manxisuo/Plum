@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/manxisuo/plum/controller/internal/store"
@@ -17,6 +18,7 @@ type DAGExecutor struct {
 	nodeStates map[string]NodeState      // 节点执行状态
 	taskIDs    map[string]string         // nodeID -> taskID
 	results    map[string]map[string]any // taskID -> result JSON
+	mu         sync.RWMutex              // 保护并发访问
 }
 
 type NodeState string
@@ -47,6 +49,9 @@ func NewDAGExecutor(runID string, dag store.WorkflowDAG) *DAGExecutor {
 
 // Tick - 调度一轮
 func (e *DAGExecutor) Tick(storeInst store.Store) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	// 1. 更新节点状态（从Task状态同步）
 	e.syncNodeStates(storeInst)
 
@@ -356,6 +361,9 @@ func (e *DAGExecutor) skipDownstream(nodeID string) {
 
 // 检查DAG是否完成
 func (e *DAGExecutor) IsFinished() (bool, string) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	allDone := true
 	hasFailure := false
 
@@ -381,6 +389,9 @@ func (e *DAGExecutor) IsFinished() (bool, string) {
 
 // 获取节点状态（用于前端展示）
 func (e *DAGExecutor) GetNodeStates() map[string]string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	result := make(map[string]string)
 	for nodeID, state := range e.nodeStates {
 		result[nodeID] = string(state)
