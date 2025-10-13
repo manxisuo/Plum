@@ -151,6 +151,16 @@ func migrate(db *sql.DB) error {
             definition_id TEXT,
             PRIMARY KEY(workflow_id, step_id)
         );`,
+		// DAG Workflows (v2)
+		`CREATE TABLE IF NOT EXISTS workflow_dags (
+            workflow_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            version INTEGER DEFAULT 2,
+            nodes TEXT NOT NULL,
+            edges TEXT NOT NULL,
+            start_nodes TEXT NOT NULL,
+            created_at INTEGER
+        );`,
 		// Workflow runs and step runs
 		`CREATE TABLE IF NOT EXISTS workflow_runs (
             run_id TEXT PRIMARY KEY,

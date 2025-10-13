@@ -120,7 +120,75 @@ type EmbeddedWorker struct {
 	LastSeen    int64
 }
 
-// Workflow (sequential MVP)
+// ========== DAG Workflow (新架构) ==========
+
+type NodeType string
+
+const (
+	NodeTypeTask     NodeType = "task"     // 任务节点
+	NodeTypeParallel NodeType = "parallel" // 并行节点
+	NodeTypeBranch   NodeType = "branch"   // 分支节点
+)
+
+type TriggerRule string
+
+const (
+	TriggerAllSuccess TriggerRule = "all_success" // 所有前驱成功（默认）
+	TriggerOneSuccess TriggerRule = "one_success" // 任一前驱成功
+)
+
+// 分支条件
+type BranchCondition struct {
+	SourceTask string `json:"sourceTask"` // 依赖的任务节点ID
+	Field      string `json:"field"`      // 结果字段路径，如 "code"
+	Operator   string `json:"operator"`   // ==, !=, >, <, >=, <=
+	Value      string `json:"value"`      // 比较值
+}
+
+// DAG节点
+type WorkflowNode struct {
+	NodeID      string
+	Type        NodeType
+	Name        string
+	TriggerRule TriggerRule
+
+	// Task节点配置
+	TaskDefID   string
+	PayloadJSON string
+	TimeoutSec  int
+	MaxRetries  int
+
+	// Branch节点配置
+	Condition *BranchCondition
+
+	// Parallel节点配置
+	WaitPolicy string // all | one
+
+	// UI位置
+	PosX int
+	PosY int
+}
+
+// DAG边
+type WorkflowEdge struct {
+	From     string
+	To       string
+	EdgeType string // normal | true | false (for branch)
+}
+
+// DAG工作流
+type WorkflowDAG struct {
+	WorkflowID string
+	Name       string
+	Version    int // DAG版本（v2）
+	Nodes      map[string]WorkflowNode
+	Edges      []WorkflowEdge
+	StartNodes []string
+	CreatedAt  int64
+}
+
+// ========== Legacy Sequential Workflow (向后兼容) ==========
+
 type WorkflowStep struct {
 	StepID       string
 	Name         string            // taskName
@@ -275,7 +343,7 @@ type Store interface {
 	SubmitResourceState(rs ResourceState) error
 	ListResourceStates(resourceID string, limit int) ([]ResourceState, error)
 
-	// Workflows (sequential MVP)
+	// Workflows (sequential MVP - legacy)
 	CreateWorkflow(wf Workflow) (string, error)
 	ListWorkflows() ([]Workflow, error)
 	GetWorkflow(id string) (Workflow, bool, error)
@@ -291,6 +359,12 @@ type Store interface {
 	UpdateStepRunFinished(runID string, stepID string, state string, finishedAt int64) error
 	UpdateWorkflowRunState(runID string, state string, ts int64) error
 	DeleteWorkflowRun(runID string) error
+
+	// DAG Workflows (v2)
+	CreateWorkflowDAG(dag WorkflowDAG) (string, error)
+	GetWorkflowDAG(id string) (WorkflowDAG, bool, error)
+	ListWorkflowDAGs() ([]WorkflowDAG, error)
+	DeleteWorkflowDAG(id string) error
 
 	// TaskDefinition (for reusable task templates)
 	CreateTaskDef(td TaskDefinition) (string, error)
