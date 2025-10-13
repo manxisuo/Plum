@@ -1,21 +1,23 @@
 <template>
   <div class="dag-workflows">
-    <el-card class="header-card">
-      <div class="header-content">
-        <div class="title-section">
-          <h2>{{ t('dag.title') }}</h2>
-          <p class="subtitle">{{ t('dag.subtitle') }}</p>
+    <!-- 列表视图 -->
+    <div v-if="viewMode === 'list'">
+      <el-card class="header-card">
+        <div class="header-content">
+          <div class="title-section">
+            <h2>{{ t('dag.title') }}</h2>
+            <p class="subtitle">{{ t('dag.subtitle') }}</p>
+          </div>
+          <div class="actions">
+            <el-button type="primary" @click="openCreateView">
+              {{ t('dag.buttons.create') }}
+            </el-button>
+          </div>
         </div>
-        <div class="actions">
-          <el-button type="primary" @click="openCreateDialog">
-            {{ t('dag.buttons.create') }}
-          </el-button>
-        </div>
-      </div>
-    </el-card>
+      </el-card>
 
-    <el-card class="content-card">
-      <el-table :data="workflows" v-loading="loading" style="width: 100%">
+      <el-card class="content-card">
+        <el-table :data="workflows" v-loading="loading" style="width: 100%">
         <el-table-column prop="Name" :label="t('dag.table.name')" width="200" />
         <el-table-column :label="t('dag.table.nodes')" width="100">
           <template #default="{ row }">
@@ -42,6 +44,105 @@
         </el-table-column>
       </el-table>
     </el-card>
+    </div>
+
+    <!-- 创建视图 -->
+    <div v-if="viewMode === 'create'">
+      <el-card class="header-card">
+        <div class="header-content">
+          <div class="title-section">
+            <h2>创建DAG工作流</h2>
+          </div>
+          <div class="actions">
+            <el-button @click="cancelCreate">取消</el-button>
+            <el-button type="primary" @click="createDAG">提交创建</el-button>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="content-card">
+        <el-tabs v-model="createMode" type="border-card">
+          <!-- 拖拽编辑 -->
+          <el-tab-pane label="拖拽编辑" name="flow">
+            <div style="display: flex; gap: 10px;">
+              <div style="flex: 1; height: 500px; border: 1px solid #ddd; position: relative;">
+                <VueFlow 
+                  v-model="flowElements" 
+                  :default-zoom="1" 
+                  @connect="onConnect"
+                  :connect-on-click="false"
+                  :default-edge-options="{ type: 'smoothstep', markerEnd: 'arrowclosed' }"
+                >
+                  <Background pattern-color="#aaa" :gap="16" />
+                  <Controls position="bottom-left" :show-zoom="true" :show-fit-view="true" :show-interactive="false" />
+                  <template #node-custom="{ data, id }">
+                    <div :class="['custom-node', `node-${data.type}`]" @click="editFlowNodeProps(id, data)">
+                      <Handle type="target" :position="Top" />
+                      <Handle type="source" :position="Bottom" />
+                      <div class="node-label">{{ data.label }}</div>
+                      <div class="node-type">{{ data.type }}</div>
+                      <div v-if="data.taskDefId" class="node-task">{{ taskDefs[data.taskDefId]?.Name }}</div>
+                    </div>
+                  </template>
+                </VueFlow>
+              </div>
+              
+              <!-- 右侧属性面板 -->
+              <div style="width: 280px; border: 1px solid #ddd; padding: 15px; background: #f5f7fa;">
+                <h4 style="margin-top: 0;">属性编辑</h4>
+                <el-form v-if="editingNode" label-width="70px" size="small">
+                  <el-form-item label="节点ID">
+                    <el-input v-model="editingNodeId" disabled />
+                  </el-form-item>
+                  <el-form-item label="名称">
+                    <el-input v-model="editingNode.label" />
+                  </el-form-item>
+                  <el-form-item label="类型">
+                    <el-tag>{{ editingNode.type }}</el-tag>
+                  </el-form-item>
+                  <div v-if="editingNode.type === 'task'">
+                    <el-form-item label="任务定义">
+                      <el-select v-model="editingNode.taskDefId" style="width: 100%" size="small">
+                        <el-option v-for="def in Object.values(taskDefs)" :key="def.DefID" :label="def.Name" :value="def.DefID" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="Payload">
+                      <el-input v-model="editingNode.payloadJson" type="textarea" :rows="4" />
+                    </el-form-item>
+                  </div>
+                  <el-button type="primary" size="small" @click="saveNodeEdit" style="width: 100%">保存</el-button>
+                </el-form>
+                <el-empty v-else description="点击节点编辑属性" :image-size="80" />
+              </div>
+            </div>
+            <div style="margin-top: 10px;">
+              <el-input v-model="flowForm.name" placeholder="工作流名称" style="width: 200px; margin-right: 10px;" />
+              <el-button @click="addFlowNode('task')" size="small">+ Task</el-button>
+              <el-button @click="addFlowNode('parallel')" size="small">+ Parallel</el-button>
+              <el-button @click="addFlowNode('branch')" size="small">+ Branch</el-button>
+              <el-button @click="clearFlow" size="small" type="danger">清空</el-button>
+            </div>
+          </el-tab-pane>
+          
+          <!-- JSON模式 -->
+          <el-tab-pane label="JSON编辑" name="json">
+            <el-form :model="createForm" label-width="120px">
+              <el-form-item :label="t('dag.create.name')">
+                <el-input v-model="createForm.name" :placeholder="t('dag.create.namePlaceholder')" />
+              </el-form-item>
+              <el-form-item :label="t('dag.create.json')">
+                <el-input
+                  v-model="createForm.json"
+                  type="textarea"
+                  :rows="15"
+                  :placeholder="t('dag.create.jsonPlaceholder')"
+                />
+              </el-form-item>
+            </el-form>
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
+    </div>
 
     <!-- DAG详情对话框 -->
     <el-dialog v-model="showDetailDialog" :title="currentDAG?.Name" width="80%">
@@ -86,154 +187,6 @@
       </div>
     </el-dialog>
 
-    <!-- 创建DAG对话框 -->
-    <el-dialog v-model="showCreateDialog" :title="t('dag.create.title')" width="70%">
-      <el-tabs v-model="createMode" type="border-card">
-        <!-- JSON模式 -->
-        <el-tab-pane label="JSON编辑" name="json">
-          <el-form :model="createForm" label-width="120px">
-            <el-form-item :label="t('dag.create.name')">
-              <el-input v-model="createForm.name" :placeholder="t('dag.create.namePlaceholder')" />
-            </el-form-item>
-            <el-form-item :label="t('dag.create.json')">
-              <el-input
-                v-model="createForm.json"
-                type="textarea"
-                :rows="15"
-                :placeholder="t('dag.create.jsonPlaceholder')"
-              />
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 可视化模式 -->
-        <el-tab-pane label="可视化编辑" name="visual">
-          <el-form :model="visualForm" label-width="120px" style="max-height: 500px; overflow-y: auto;">
-            <el-form-item label="工作流名称">
-              <el-input v-model="visualForm.name" placeholder="请输入工作流名称" />
-            </el-form-item>
-            
-            <el-divider>节点配置</el-divider>
-            <div class="visual-editor">
-              <el-card v-for="(node, idx) in visualForm.nodes" :key="node._uid || idx" class="node-card">
-                <template #header>
-                  <div class="node-header">
-                    <span><strong>节点 {{ idx + 1 }}</strong>: {{ node.name || '未命名' }}</span>
-                    <el-button type="danger" size="small" @click="removeNode(idx)">删除</el-button>
-                  </div>
-                </template>
-                <el-form label-width="80px" size="small">
-                  <el-row :gutter="10">
-                    <el-col :span="8">
-                      <el-form-item label="节点ID">
-                        <el-input v-model="node.nodeId" placeholder="如: task1" />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="8">
-                      <el-form-item label="名称">
-                        <el-input v-model="node.name" placeholder="节点名称" />
-                      </el-form-item>
-                    </el-col>
-                    <el-col :span="8">
-                      <el-form-item label="类型">
-                        <el-select v-model="node.type" style="width: 100%">
-                          <el-option label="任务" value="task" />
-                          <el-option label="并行" value="parallel" />
-                          <el-option label="分支" value="branch" />
-                        </el-select>
-                      </el-form-item>
-                    </el-col>
-                  </el-row>
-                  
-                  <div v-if="node.type === 'task'">
-                    <el-form-item label="任务定义">
-                      <el-select v-model="node.taskDefId" style="width: 100%" placeholder="请选择任务定义">
-                        <el-option 
-                          v-for="def in Object.values(taskDefs)" 
-                          :key="def.DefID" 
-                          :label="`${def.Name} (${def.Executor})`" 
-                          :value="def.DefID" 
-                        />
-                      </el-select>
-                    </el-form-item>
-                    <el-form-item label="Payload">
-                      <el-input v-model="node.payloadJson" type="textarea" :rows="2" placeholder='{"key": "value"}' />
-                    </el-form-item>
-                  </div>
-                  
-                  <div v-if="node.type === 'branch'">
-                    <el-row :gutter="10">
-                      <el-col :span="8">
-                        <el-form-item label="字段">
-                          <el-input v-model="node.conditionField" placeholder="score" />
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8">
-                        <el-form-item label="操作符">
-                          <el-select v-model="node.conditionOp" style="width: 100%">
-                            <el-option label=">" value=">" />
-                            <el-option label=">=" value=">=" />
-                            <el-option label="<" value="<" />
-                            <el-option label="<=" value="<=" />
-                            <el-option label="==" value="==" />
-                            <el-option label="!=" value="!=" />
-                          </el-select>
-                        </el-form-item>
-                      </el-col>
-                      <el-col :span="8">
-                        <el-form-item label="值">
-                          <el-input v-model="node.conditionValue" placeholder="60" />
-                        </el-form-item>
-                      </el-col>
-                    </el-row>
-                  </div>
-                </el-form>
-              </el-card>
-              <el-button @click="addNode" type="primary" icon="Plus" style="width: 100%; margin-top: 10px;">添加节点</el-button>
-            </div>
-
-            <el-divider>连接配置</el-divider>
-            <div class="edge-list">
-              <el-card v-for="(edge, idx) in visualForm.edges" :key="edge._uid || idx" shadow="hover" style="margin-bottom: 10px;">
-                <el-row :gutter="10" align="middle">
-                  <el-col :span="10">
-                    <el-select v-model="edge.from" placeholder="从" size="small" style="width: 100%">
-                      <el-option v-for="n in visualForm.nodes" :key="n.nodeId" :label="n.name || n.nodeId" :value="n.nodeId" />
-                    </el-select>
-                  </el-col>
-                  <el-col :span="2" style="text-align: center; font-size: 18px;">→</el-col>
-                  <el-col :span="10">
-                    <el-select v-model="edge.to" placeholder="到" size="small" style="width: 100%">
-                      <el-option v-for="n in visualForm.nodes" :key="n.nodeId" :label="n.name || n.nodeId" :value="n.nodeId" />
-                    </el-select>
-                  </el-col>
-                  <el-col :span="2">
-                    <el-button type="danger" size="small" circle icon="Close" @click="removeEdge(idx)" />
-                  </el-col>
-                </el-row>
-                <div v-if="getNodeById(edge.from)?.type === 'branch'" style="margin-top: 8px;">
-                  <el-select v-model="edge.edgeType" placeholder="分支类型" size="small" style="width: 100%">
-                    <el-option label="True (条件满足)" value="true" />
-                    <el-option label="False (条件不满足)" value="false" />
-                  </el-select>
-                </div>
-              </el-card>
-              <el-button @click="addEdge" type="primary" icon="Plus" style="width: 100%">添加连接</el-button>
-            </div>
-
-            <el-divider>起始节点</el-divider>
-            <el-select v-model="visualForm.startNodes" multiple placeholder="选择起始节点（可多选）" style="width: 100%">
-              <el-option v-for="n in visualForm.nodes" :key="n.nodeId" :label="n.name || n.nodeId" :value="n.nodeId" />
-            </el-select>
-          </el-form>
-        </el-tab-pane>
-      </el-tabs>
-
-      <template #footer>
-        <el-button @click="showCreateDialog = false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="createDAG">{{ t('common.submit') }}</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 运行历史对话框 -->
     <el-dialog v-model="showRunsDialog" :title="t('dag.runs.title')" width="70%">
@@ -304,6 +257,7 @@
         </el-table>
       </div>
     </el-dialog>
+
   </div>
 </template>
 
@@ -312,9 +266,16 @@ import { ref, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
+import { VueFlow, Handle, Position } from '@vue-flow/core'
+import { Background } from '@vue-flow/background'
+import { Controls } from '@vue-flow/controls'
+import '@vue-flow/core/dist/style.css'
 
 const { t } = useI18n()
 const API_BASE = import.meta.env.VITE_API_BASE || ''
+
+// 暴露Position给模板
+const { Top, Right, Bottom, Left } = Position
 
 // 初始化Mermaid
 mermaid.initialize({ 
@@ -331,8 +292,8 @@ const workflows = ref<any[]>([])
 const mermaidContainer = ref<HTMLElement | null>(null)
 const runMermaidContainer = ref<HTMLElement | null>(null)
 const loading = ref(false)
+const viewMode = ref('list') // 'list' or 'create'
 const showDetailDialog = ref(false)
-const showCreateDialog = ref(false)
 const showRunsDialog = ref(false)
 const showRunDetailDialog = ref(false)
 const currentDAG = ref<any>(null)
@@ -355,6 +316,14 @@ const visualForm = ref({
   edges: [] as any[],
   startNodes: [] as string[]
 })
+const flowElements = ref([])
+const flowForm = ref({ name: '' })
+let flowNodeCounter = 0
+const showNodeEdit = ref(false)
+const editingNode = ref<any>(null)
+const editingNodeId = ref('')
+const showConnectDialog = ref(false)
+const connectForm = ref({ source: '', target: '' })
 
 async function loadWorkflows() {
   loading.value = true
@@ -378,14 +347,133 @@ async function loadWorkflows() {
   }
 }
 
-function openCreateDialog() {
+function openCreateView() {
   // 重置表单和计数器
   createForm.value = { name: '', json: '' }
   visualForm.value = { name: '', nodes: [], edges: [], startNodes: [] }
+  flowElements.value = []
+  flowForm.value = { name: '' }
+  editingNode.value = null
+  editingNodeId.value = ''
   nodeUidCounter = 0
   edgeUidCounter = 0
-  createMode.value = 'visual'
-  showCreateDialog.value = true
+  flowNodeCounter = 0
+  createMode.value = 'flow'
+  viewMode.value = 'create'
+}
+
+function cancelCreate() {
+  viewMode.value = 'list'
+}
+
+// Vue Flow拖拽编辑
+function addFlowNode(type: string) {
+  flowNodeCounter++
+  const id = `node_${flowNodeCounter}`
+  flowElements.value.push({
+    id,
+    type: 'custom',
+    position: { x: 100 + flowNodeCounter * 50, y: 100 + flowNodeCounter * 50 },
+    data: {
+      label: `${type}_${flowNodeCounter}`,
+      type,
+      taskDefId: '',
+      payloadJson: '',
+      condition: null
+    }
+  })
+}
+
+function editFlowNodeProps(id: string, data: any) {
+  editingNodeId.value = id
+  editingNode.value = { ...data }
+}
+
+function saveNodeEdit() {
+  const node = (flowElements.value as any[]).find(el => el.id === editingNodeId.value)
+  if (node && editingNode.value) {
+    node.data = { ...editingNode.value }
+  }
+  ElMessage.success('已保存')
+}
+
+function onConnect(params: any) {
+  const edgeId = `e${params.source}-${params.target}-${Date.now()}`
+  (flowElements.value as any[]).push({
+    id: edgeId,
+    source: params.source,
+    target: params.target,
+    sourceHandle: params.sourceHandle,
+    targetHandle: params.targetHandle,
+    type: 'smoothstep',
+    markerEnd: 'arrowclosed'
+  })
+}
+
+function clearFlow() {
+  flowElements.value = []
+  flowNodeCounter = 0
+}
+
+function getFlowNodes() {
+  return (flowElements.value as any[]).filter(el => el.type === 'custom')
+}
+
+function addConnection() {
+  if (!connectForm.value.source || !connectForm.value.target) {
+    ElMessage.error('请选择源节点和目标节点')
+    return
+  }
+  onConnect({ source: connectForm.value.source, target: connectForm.value.target })
+  connectForm.value = { source: '', target: '' }
+  showConnectDialog.value = false
+}
+
+function flowToDAG() {
+  const nodes: Record<string, any> = {}
+  const edges: any[] = []
+  const startNodeIds: string[] = []
+  const hasIncoming = new Set<string>()
+  
+  // 收集所有边
+  for (const el of flowElements.value as any[]) {
+    if (el.source && el.target) {
+      edges.push({ from: el.source, to: el.target, edgeType: 'normal' })
+      hasIncoming.add(el.target)
+    }
+  }
+  
+  // 收集节点
+  for (const el of flowElements.value as any[]) {
+    if (el.type === 'custom') {
+      const node: any = {
+        nodeId: el.id,
+        type: el.data.type,
+        name: el.data.label,
+        triggerRule: 'all_success',
+        timeoutSec: 60
+      }
+      if (el.data.type === 'task') {
+        node.taskDefId = el.data.taskDefId || ''
+        if (el.data.payloadJson) {
+          node.payloadJson = el.data.payloadJson
+        }
+      }
+      nodes[el.id] = node
+      
+      // 没有入边的节点作为起始节点
+      if (!hasIncoming.has(el.id)) {
+        startNodeIds.push(el.id)
+      }
+    }
+  }
+  
+  return {
+    name: flowForm.value.name,
+    nodes,
+    edges,
+    startNodes: startNodeIds.length > 0 ? startNodeIds : [Object.keys(nodes)[0]]
+  }
 }
 
 async function viewDAG(workflow: any) {
@@ -519,6 +607,16 @@ async function createDAG() {
     if (createMode.value === 'json') {
       dagData = JSON.parse(createForm.value.json)
       dagData.name = createForm.value.name || dagData.name
+    } else if (createMode.value === 'flow') {
+      if (!flowForm.value.name) {
+        ElMessage.error('请输入工作流名称')
+        return
+      }
+      if (flowElements.value.length === 0) {
+        ElMessage.error('请至少添加一个节点')
+        return
+      }
+      dagData = flowToDAG()
     } else {
       // 可视化模式验证
       if (!visualForm.value.name) {
@@ -575,9 +673,7 @@ async function createDAG() {
     if (!res.ok) throw new Error(await res.text())
     
     ElMessage.success(t('dag.messages.createSuccess'))
-    showCreateDialog.value = false
-    createForm.value = { name: '', json: '' }
-    visualForm.value = { name: '', nodes: [], edges: [], startNodes: [] }
+    viewMode.value = 'list'
     loadWorkflows()
   } catch (e: any) {
     ElMessage.error(`${t('dag.messages.createFailed')}: ${e.message}`)
@@ -796,6 +892,74 @@ onMounted(() => {
 .edge-list {
   max-height: 300px;
   overflow-y: auto;
+}
+
+.custom-node {
+  padding: 8px 15px;
+  border-radius: 6px;
+  background: white;
+  border: 2px solid #409EFF;
+  min-width: 80px;
+  max-width: 150px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.node-task { border-color: #409EFF; }
+.node-parallel { border-color: #67C23A; }
+.node-branch { border-color: #E6A23C; }
+
+.node-label {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.node-type {
+  font-size: 12px;
+  color: #999;
+}
+
+.node-task {
+  font-size: 11px;
+  color: #67C23A;
+  margin-top: 2px;
+}
+
+/* Vue Flow连线样式 */
+:deep(.vue-flow__edge-path) {
+  stroke-width: 2px;
+}
+
+:deep(.vue-flow__handle) {
+  width: 10px;
+  height: 10px;
+  border-width: 2px;
+}
+
+/* Controls按钮样式 */
+:deep(.vue-flow__controls-button) {
+  width: 28px;
+  height: 28px;
+  background: white;
+  border: 1px solid #ccc;
+}
+
+:deep(.vue-flow__controls-zoomin)::before {
+  /* content: '+'; */
+  font-size: 18px;
+  font-weight: bold;
+}
+
+:deep(.vue-flow__controls-zoomout)::before {
+  /* content: '−'; */
+  font-size: 18px;
+  font-weight: bold;
+}
+
+:deep(.vue-flow__controls-fitview)::before {
+  /* content: '⊡'; */
+  font-size: 16px;
 }
 </style>
 
