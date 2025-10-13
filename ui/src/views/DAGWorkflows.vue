@@ -7,7 +7,7 @@
           <p class="subtitle">{{ t('dag.subtitle') }}</p>
         </div>
         <div class="actions">
-          <el-button type="primary" @click="showCreateDialog = true">
+          <el-button type="primary" @click="openCreateDialog">
             {{ t('dag.buttons.create') }}
           </el-button>
         </div>
@@ -115,7 +115,7 @@
             
             <el-divider>节点配置</el-divider>
             <div class="visual-editor">
-              <el-card v-for="(node, idx) in visualForm.nodes" :key="idx" class="node-card">
+              <el-card v-for="(node, idx) in visualForm.nodes" :key="node._uid || idx" class="node-card">
                 <template #header>
                   <div class="node-header">
                     <span><strong>节点 {{ idx + 1 }}</strong>: {{ node.name || '未命名' }}</span>
@@ -147,12 +147,12 @@
                   
                   <div v-if="node.type === 'task'">
                     <el-form-item label="任务定义">
-                      <el-select v-model="node.taskDefId" style="width: 100%">
+                      <el-select v-model="node.taskDefId" style="width: 100%" placeholder="请选择任务定义">
                         <el-option 
                           v-for="def in Object.values(taskDefs)" 
-                          :key="def.TaskDefID" 
+                          :key="def.DefID" 
                           :label="`${def.Name} (${def.Executor})`" 
-                          :value="def.TaskDefID" 
+                          :value="def.DefID" 
                         />
                       </el-select>
                     </el-form-item>
@@ -194,7 +194,7 @@
 
             <el-divider>连接配置</el-divider>
             <div class="edge-list">
-              <el-card v-for="(edge, idx) in visualForm.edges" :key="idx" shadow="hover" style="margin-bottom: 10px;">
+              <el-card v-for="(edge, idx) in visualForm.edges" :key="edge._uid || idx" shadow="hover" style="margin-bottom: 10px;">
                 <el-row :gutter="10" align="middle">
                   <el-col :span="10">
                     <el-select v-model="edge.from" placeholder="从" size="small" style="width: 100%">
@@ -378,6 +378,16 @@ async function loadWorkflows() {
   }
 }
 
+function openCreateDialog() {
+  // 重置表单和计数器
+  createForm.value = { name: '', json: '' }
+  visualForm.value = { name: '', nodes: [], edges: [], startNodes: [] }
+  nodeUidCounter = 0
+  edgeUidCounter = 0
+  createMode.value = 'visual'
+  showCreateDialog.value = true
+}
+
 async function viewDAG(workflow: any) {
   currentDAG.value = workflow
   showDetailDialog.value = true
@@ -418,8 +428,10 @@ async function deleteDAG(workflowId: string) {
 }
 
 // 可视化编辑器辅助函数
+let nodeUidCounter = 0
 function addNode() {
   visualForm.value.nodes.push({
+    _uid: ++nodeUidCounter, // 唯一ID，用于v-for的key
     nodeId: `node_${visualForm.value.nodes.length + 1}`,
     name: '',
     type: 'task',
@@ -440,8 +452,10 @@ function removeNode(idx: number) {
   visualForm.value.startNodes = visualForm.value.startNodes.filter(n => n !== nodeId)
 }
 
+let edgeUidCounter = 0
 function addEdge() {
   visualForm.value.edges.push({
+    _uid: ++edgeUidCounter, // 唯一ID，用于v-for的key
     from: '',
     to: '',
     edgeType: ''
@@ -483,6 +497,7 @@ function visualFormToDAG() {
     nodes[node.nodeId] = n
   }
   
+  // 过滤掉_uid字段
   const edges = visualForm.value.edges.map((e: any) => ({
     from: e.from,
     to: e.to,
@@ -505,7 +520,7 @@ async function createDAG() {
       dagData = JSON.parse(createForm.value.json)
       dagData.name = createForm.value.name || dagData.name
     } else {
-      // 可视化模式
+      // 可视化模式验证
       if (!visualForm.value.name) {
         ElMessage.error('请输入工作流名称')
         return
@@ -514,6 +529,35 @@ async function createDAG() {
         ElMessage.error('请至少添加一个节点')
         return
       }
+      
+      // 验证Task节点必须选择TaskDef
+      for (const node of visualForm.value.nodes) {
+        if (!node.nodeId) {
+          ElMessage.error(`节点 "${node.name || '未命名'}" 缺少节点ID`)
+          return
+        }
+        if (!node.name) {
+          ElMessage.error(`节点 "${node.nodeId}" 缺少名称`)
+          return
+        }
+        if (node.type === 'task' && !node.taskDefId) {
+          ElMessage.error(`Task节点 "${node.name}" 必须选择任务定义`)
+          return
+        }
+        if (node.type === 'branch' && (!node.conditionField || !node.conditionOp)) {
+          ElMessage.error(`Branch节点 "${node.name}" 必须配置完整的条件表达式`)
+          return
+        }
+      }
+      
+      // 验证边的完整性
+      for (const edge of visualForm.value.edges) {
+        if (!edge.from || !edge.to) {
+          ElMessage.error('存在未完成的连接配置')
+          return
+        }
+      }
+      
       if (visualForm.value.startNodes.length === 0) {
         ElMessage.error('请选择起始节点')
         return

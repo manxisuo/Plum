@@ -198,7 +198,7 @@ func (e *DAGExecutor) scheduleTaskNode(nodeID string, node store.WorkflowNode, s
 
 	// 创建Task
 	task := store.Task{
-		Name:        node.Name,
+		Name:        taskDef.Name, // 使用TaskDef的名称以支持builtin.* 任务
 		Executor:    taskDef.Executor,
 		TargetKind:  taskDef.TargetKind,
 		TargetRef:   taskDef.TargetRef,
@@ -208,8 +208,9 @@ func (e *DAGExecutor) scheduleTaskNode(nodeID string, node store.WorkflowNode, s
 		MaxRetries:  node.MaxRetries,
 		CreatedAt:   time.Now().Unix(),
 		Labels: map[string]string{
-			"dagRunId":  e.runID,
-			"dagNodeId": nodeID,
+			"dagRunId":    e.runID,
+			"dagNodeId":   nodeID,
+			"dagNodeName": node.Name, // 保存节点名称到Label
 		},
 	}
 
