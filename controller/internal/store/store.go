@@ -349,6 +349,7 @@ type Store interface {
 	GetWorkflow(id string) (Workflow, bool, error)
 	DeleteWorkflow(id string) error
 	CreateWorkflowRun(workflowID string) (string, error)
+	CreateWorkflowRunWithID(run WorkflowRun) error // 用于DAG运行
 	GetWorkflowRun(runID string) (WorkflowRun, bool, error)
 	ListWorkflowRuns() ([]WorkflowRun, error)
 	ListWorkflowRunsByWorkflow(workflowID string) ([]WorkflowRun, error)

@@ -985,6 +985,13 @@ func (s *sqliteStore) CreateWorkflowRun(workflowID string) (string, error) {
 	return runID, nil
 }
 
+func (s *sqliteStore) CreateWorkflowRunWithID(run store.WorkflowRun) error {
+	_, err := s.db.Exec(`INSERT INTO workflow_runs(run_id, workflow_id, state, created_at, started_at, finished_at) VALUES(?,?,?,?,?,?)`,
+		run.RunID, run.WorkflowID, run.State, run.CreatedAt, run.StartedAt, run.FinishedAt,
+	)
+	return err
+}
+
 func (s *sqliteStore) GetWorkflowRun(runID string) (store.WorkflowRun, bool, error) {
 	row := s.db.QueryRow(`SELECT run_id, workflow_id, state, created_at, started_at, finished_at FROM workflow_runs WHERE run_id=?`, runID)
 	var r store.WorkflowRun

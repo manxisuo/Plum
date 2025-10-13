@@ -63,6 +63,10 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/workflows/", withCORS(handleWorkflowByID))
 	mux.HandleFunc("/v1/workflow-runs", withCORS(handleWorkflowRuns))
 	mux.HandleFunc("/v1/workflow-runs/", withCORS(handleWorkflowRunByID))
+	// DAG workflows (v2)
+	mux.HandleFunc("/v1/dag/workflows", withCORS(handleDAGWorkflows))
+	mux.HandleFunc("/v1/dag/workflows/", withCORS(handleDAGWorkflowByID))
+	mux.HandleFunc("/v1/dag/runs/", withCORS(handleDAGRunStatus))
 	// task definitions
 	mux.HandleFunc("/v1/task-defs", withCORS(handleTaskDefs))
 	mux.HandleFunc("/v1/task-defs/", withCORS(handleTaskDefByID))

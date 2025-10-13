@@ -85,6 +85,8 @@ func main() {
 	failover.Start()
 	// start tasks scheduler (minimal)
 	tasks.Start()
+	// start DAG orchestrator
+	httpapi.InitDAGOrchestrator(store.Current)
 
 	// static file server for artifacts
 	dataDir := os.Getenv("CONTROLLER_DATA_DIR")
@@ -114,6 +116,9 @@ func main() {
 	// 等待信号
 	<-sigChan
 	log.Println("Received shutdown signal, gracefully shutting down...")
+
+	// 停止DAG编排器
+	httpapi.StopDAGOrchestrator()
 
 	// 这里可以添加更多的清理逻辑，比如停止任务调度器等
 
