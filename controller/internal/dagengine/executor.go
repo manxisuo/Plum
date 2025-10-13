@@ -207,7 +207,10 @@ func (e *DAGExecutor) scheduleTaskNode(nodeID string, node store.WorkflowNode, s
 		TimeoutSec:  node.TimeoutSec,
 		MaxRetries:  node.MaxRetries,
 		CreatedAt:   time.Now().Unix(),
-		Labels:      make(map[string]string),
+		Labels: map[string]string{
+			"dagRunId":  e.runID,
+			"dagNodeId": nodeID,
+		},
 	}
 
 	// 优先使用node的payload，否则使用taskDef的默认payload

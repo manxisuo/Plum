@@ -8,6 +8,7 @@ import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const router = useRouter()
+const route = router.currentRoute
 
 type TaskDef = { 
   defId?: string; DefID?: string; 
@@ -138,7 +139,7 @@ onBeforeUnmount(() => { try { es?.close() } catch {} })
 const { t } = useI18n()
 
 // 搜索和筛选
-const searchText = ref('')
+const searchText = ref(route.value.query.search as string || '')
 const selectedExecutor = ref('')
 const selectedState = ref('')
 

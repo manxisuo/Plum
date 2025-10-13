@@ -374,7 +374,9 @@ const messages = {
         create: 'Create DAG',
         view: 'View',
         run: 'Run',
-        delete: 'Delete'
+        runs: 'Runs',
+        delete: 'Delete',
+        detail: 'Detail'
       },
       table: {
         name: 'Name',
@@ -402,8 +404,27 @@ const messages = {
         json: 'DAG Definition (JSON)',
         jsonPlaceholder: 'Enter complete DAG JSON definition...'
       },
+      runs: {
+        title: 'Run History',
+        runId: 'Run ID',
+        state: 'State',
+        createdAt: 'Created At',
+        duration: 'Duration',
+        actions: 'Actions'
+      },
+      runDetail: {
+        title: 'Run Detail',
+        visualization: 'Execution Visualization',
+        nodeTasks: 'Node Tasks',
+        nodeId: 'Node ID',
+        taskId: 'Task ID',
+        taskName: 'Task Name',
+        state: 'State',
+        duration: 'Duration'
+      },
       messages: {
         loadFailed: 'Load failed',
+        loadRunsFailed: 'Load runs failed',
         runSuccess: 'Run success',
         runFailed: 'Run failed',
         deleteConfirm: 'Confirm delete this DAG workflow?',
@@ -787,7 +808,9 @@ const messages = {
         create: '创建DAG',
         view: '查看',
         run: '运行',
-        delete: '删除'
+        runs: '运行历史',
+        delete: '删除',
+        detail: '详情'
       },
       table: {
         name: '名称',
@@ -815,8 +838,27 @@ const messages = {
         json: 'DAG定义（JSON）',
         jsonPlaceholder: '请输入完整的DAG JSON定义...'
       },
+      runs: {
+        title: '运行历史',
+        runId: '运行ID',
+        state: '状态',
+        createdAt: '创建时间',
+        duration: '耗时',
+        actions: '操作'
+      },
+      runDetail: {
+        title: '运行详情',
+        visualization: '执行可视化',
+        nodeTasks: '节点任务',
+        nodeId: '节点ID',
+        taskId: '任务ID',
+        taskName: '任务名称',
+        state: '状态',
+        duration: '耗时'
+      },
       messages: {
         loadFailed: '加载失败',
+        loadRunsFailed: '加载运行历史失败',
         runSuccess: '运行成功',
         runFailed: '运行失败',
         deleteConfirm: '确认删除该DAG工作流？',
