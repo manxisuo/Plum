@@ -116,14 +116,41 @@ func (o *DAGOrchestrator) StartDAGRun(workflowID string) (string, error) {
 // GetRunStatus - 获取运行状态（包含节点状态）
 func (o *DAGOrchestrator) GetRunStatus(runID string) map[string]string {
 	o.mu.RLock()
-	defer o.mu.RUnlock()
-
 	executor, ok := o.executors[runID]
-	if !ok {
+	o.mu.RUnlock()
+
+	if ok {
+		// 运行中：从executor获取实时状态
+		return executor.GetNodeStates()
+	}
+
+	// 已完成：从Task记录重建节点状态
+	tasks, err := o.store.ListTasks()
+	if err != nil {
 		return nil
 	}
 
-	return executor.GetNodeStates()
+	nodeStates := make(map[string]string)
+	for _, task := range tasks {
+		if task.Labels != nil && task.Labels["dagRunId"] == runID {
+			nodeID := task.Labels["dagNodeId"]
+			if nodeID != "" {
+				// 映射Task状态到Node状态
+				switch task.State {
+				case "Succeeded":
+					nodeStates[nodeID] = "Succeeded"
+				case "Failed":
+					nodeStates[nodeID] = "Failed"
+				case "Running":
+					nodeStates[nodeID] = "Running"
+				default:
+					nodeStates[nodeID] = "Pending"
+				}
+			}
+		}
+	}
+
+	return nodeStates
 }
 
 func newRunID() string {

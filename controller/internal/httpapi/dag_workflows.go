@@ -154,30 +154,28 @@ func handleDAGRunStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 获取节点状态
 	nodeStates := dagOrch.GetRunStatus(runID)
-	if nodeStates == nil {
-		// 可能已经完成，从数据库查询
-		run, ok, err := store.Current.GetWorkflowRun(runID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if !ok {
-			http.Error(w, "run not found", http.StatusNotFound)
-			return
-		}
 
-		writeJSON(w, map[string]any{
-			"runId": runID,
-			"state": run.State,
-			"nodes": map[string]string{}, // 已完成的run不返回节点状态
-		})
+	// 从数据库获取Run信息
+	run, ok, err := store.Current.GetWorkflowRun(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if !ok {
+		http.Error(w, "run not found", http.StatusNotFound)
+		return
+	}
+
+	// 返回状态（节点状态可能为空或从Task重建）
+	if nodeStates == nil {
+		nodeStates = make(map[string]string)
 	}
 
 	writeJSON(w, map[string]any{
 		"runId": runID,
-		"state": "Running",
+		"state": run.State,
 		"nodes": nodeStates,
 	})
 }
