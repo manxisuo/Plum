@@ -28,6 +28,7 @@ const messages = {
       apps: 'Apps',
       services: 'Services',
       workflows: 'Workflows',
+      dagWorkflows: 'DAG Workflows',
       tasks: 'Tasks',
       deployments: 'Deployments',
       resources: 'Resources',
@@ -365,6 +366,52 @@ const messages = {
         rangeError: 'Value is out of range'
       },
       confirmDelete: 'Confirm delete this resource?'
+    },
+    dag: {
+      title: 'DAG Workflows',
+      subtitle: 'Complex Task Orchestration (Parallel, Branch, Condition)',
+      buttons: {
+        create: 'Create DAG',
+        view: 'View',
+        run: 'Run',
+        delete: 'Delete'
+      },
+      table: {
+        name: 'Name',
+        nodes: 'Nodes',
+        edges: 'Edges',
+        createdAt: 'Created At',
+        actions: 'Actions'
+      },
+      detail: {
+        workflowId: 'Workflow ID',
+        version: 'Version',
+        nodes: 'Nodes',
+        edges: 'Edges',
+        visualization: 'DAG Visualization (Mermaid Syntax)',
+        nodeId: 'Node ID',
+        nodeName: 'Node Name',
+        nodeType: 'Node Type',
+        trigger: 'Trigger Rule',
+        config: 'Configuration'
+      },
+      create: {
+        title: 'Create DAG Workflow',
+        name: 'Workflow Name',
+        namePlaceholder: 'Enter workflow name',
+        json: 'DAG Definition (JSON)',
+        jsonPlaceholder: 'Enter complete DAG JSON definition...'
+      },
+      messages: {
+        loadFailed: 'Load failed',
+        runSuccess: 'Run success',
+        runFailed: 'Run failed',
+        deleteConfirm: 'Confirm delete this DAG workflow?',
+        deleteSuccess: 'Delete success',
+        deleteFailed: 'Delete failed',
+        createSuccess: 'Create success',
+        createFailed: 'Create failed'
+      }
     }
   },
   zh: {
@@ -394,6 +441,7 @@ const messages = {
       apps: '应用',
       services: '服务',
       workflows: '工作流',
+      dagWorkflows: 'DAG工作流',
       tasks: '任务',
       deployments: '部署',
       resources: '资源',
@@ -731,6 +779,52 @@ const messages = {
         rangeError: '数值超出范围'
       },
       confirmDelete: '确认删除该资源？'
+    },
+    dag: {
+      title: 'DAG工作流',
+      subtitle: '复杂任务编排（支持并行、分支、条件）',
+      buttons: {
+        create: '创建DAG',
+        view: '查看',
+        run: '运行',
+        delete: '删除'
+      },
+      table: {
+        name: '名称',
+        nodes: '节点数',
+        edges: '边数',
+        createdAt: '创建时间',
+        actions: '操作'
+      },
+      detail: {
+        workflowId: '工作流ID',
+        version: '版本',
+        nodes: '节点数',
+        edges: '边数',
+        visualization: 'DAG可视化（Mermaid语法）',
+        nodeId: '节点ID',
+        nodeName: '节点名称',
+        nodeType: '节点类型',
+        trigger: '触发规则',
+        config: '配置'
+      },
+      create: {
+        title: '创建DAG工作流',
+        name: '工作流名称',
+        namePlaceholder: '请输入工作流名称',
+        json: 'DAG定义（JSON）',
+        jsonPlaceholder: '请输入完整的DAG JSON定义...'
+      },
+      messages: {
+        loadFailed: '加载失败',
+        runSuccess: '运行成功',
+        runFailed: '运行失败',
+        deleteConfirm: '确认删除该DAG工作流？',
+        deleteSuccess: '删除成功',
+        deleteFailed: '删除失败',
+        createSuccess: '创建成功',
+        createFailed: '创建失败'
+      }
     }
   }
 }

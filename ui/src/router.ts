@@ -26,6 +26,8 @@ import Resources from './views/Resources.vue'
 import Workers from './views/Workers.vue'
 // @ts-ignore
 import KVStore from './views/KVStore.vue'
+// @ts-ignore
+import DAGWorkflows from './views/DAGWorkflows.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -35,6 +37,7 @@ export const router = createRouter({
     { path: '/apps', component: Apps },
     { path: '/services', component: Services },
     { path: '/workflows', component: Workflows },
+    { path: '/dag-workflows', component: DAGWorkflows },
     { path: '/workflows/:workflowId/runs', component: WorkflowRuns, props: true },
     { path: '/workflow-runs/:id', component: WorkflowRunDetail, props: true },
     { path: '/task-defs', component: TaskDefs },
