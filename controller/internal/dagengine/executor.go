@@ -84,6 +84,20 @@ func (e *DAGExecutor) syncNodeStates(storeInst store.Store) {
 			if task.ResultJSON != "" {
 				var result map[string]any
 				if err := json.Unmarshal([]byte(task.ResultJSON), &result); err == nil {
+					// 如果结果包含stdout字段（os_process），尝试解析其中的JSON
+					if result != nil {
+						if stdoutVal, ok := result["stdout"]; ok {
+							if stdoutStr, ok := stdoutVal.(string); ok && stdoutStr != "" {
+								var stdoutJSON map[string]any
+								if err := json.Unmarshal([]byte(stdoutStr), &stdoutJSON); err == nil {
+									// 将stdout中的JSON字段合并到result根级别
+									for k, v := range stdoutJSON {
+										result[k] = v
+									}
+								}
+							}
+						}
+					}
 					e.results[taskID] = result
 				}
 			}
