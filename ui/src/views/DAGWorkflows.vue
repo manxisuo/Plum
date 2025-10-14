@@ -49,7 +49,7 @@
     <!-- 创建视图 -->
     <div v-if="viewMode === 'create'">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h2 style="margin:0;">创建DAG工作流</h2>
+        <h4 style="margin:0;">创建DAG工作流</h4>
         <div style="display:flex; gap:8px;">
           <el-button @click="cancelCreate">取消</el-button>
           <el-button type="primary" @click="createDAG">提交创建</el-button>
@@ -63,28 +63,26 @@
             <div style="display: flex; gap: 10px;">
               <div style="flex: 1; height: 500px; border: 1px solid #ddd; position: relative;">
                 <VueFlow 
-                  v-model="flowElements" 
-                  :default-zoom="1" 
+                  v-model:nodes="flowNodes"
+                  v-model:edges="flowEdges"
                   @connect="onConnect"
-                  :connect-on-click="false"
-                  :default-edge-options="{ type: 'smoothstep', markerEnd: 'arrowclosed' }"
                 >
-                  <Background pattern-color="#aaa" :gap="16" />
-                  <Controls position="bottom-left" :show-zoom="true" :show-fit-view="true" :show-interactive="false" />
+                  <Background />
+                  <Controls />
                   <template #node-custom="{ data, id }">
+                    <Handle type="target" :position="Top" />
                     <div :class="['custom-node', `node-${data.type}`]" @click="editFlowNodeProps(id, data)">
-                      <Handle type="target" :position="Top" />
-                      <Handle type="source" :position="Bottom" />
                       <div class="node-label">{{ data.label }}</div>
                       <div class="node-type">{{ data.type }}</div>
                       <div v-if="data.taskDefId" class="node-task">{{ taskDefs[data.taskDefId]?.Name }}</div>
                     </div>
+                    <Handle type="source" :position="Bottom" />
                   </template>
                 </VueFlow>
               </div>
               
               <!-- 右侧属性面板 -->
-              <div style="width: 300px; border: 1px solid #ddd; padding: 15px; background: #f5f7fa; overflow-y: auto; height: 500px;">
+              <div style="width: 300px; border: 1px solid #ddd; padding: 15px; background: #f5f7fa; overflow-y: auto; height: 470px;">
                 <h4 style="margin-top: 0;">属性编辑</h4>
                 <el-form v-if="editingNode" label-width="70px" size="small">
                   <el-form-item label="节点ID">
@@ -352,7 +350,8 @@ const visualForm = ref({
   edges: [] as any[],
   startNodes: [] as string[]
 })
-const flowElements = ref([])
+const flowNodes = ref([])
+const flowEdges = ref([])
 const flowForm = ref({ name: '' })
 let flowNodeCounter = 0
 const editingNode = ref<any>(null)
@@ -381,10 +380,10 @@ async function loadWorkflows() {
 }
 
 function openCreateView() {
-  // 重置表单和计数器
   createForm.value = { name: '', json: '' }
   visualForm.value = { name: '', nodes: [], edges: [], startNodes: [] }
-  flowElements.value = []
+  flowNodes.value = []
+  flowEdges.value = []
   flowForm.value = { name: '' }
   editingNode.value = null
   editingNodeId.value = ''
@@ -403,10 +402,10 @@ function cancelCreate() {
 function addFlowNode(type: string) {
   flowNodeCounter++
   const id = `node_${flowNodeCounter}`
-  flowElements.value.push({
+  flowNodes.value.push({
     id,
     type: 'custom',
-    position: { x: 100 + flowNodeCounter * 50, y: 100 + flowNodeCounter * 50 },
+    position: { x: 100 + flowNodeCounter * 80, y: 50 + flowNodeCounter * 100 },
     data: {
       label: `${type}_${flowNodeCounter}`,
       type,
@@ -425,7 +424,7 @@ function editFlowNodeProps(id: string, data: any) {
 }
 
 function saveNodeEdit() {
-  const node = (flowElements.value as any[]).find(el => el.id === editingNodeId.value)
+  const node = flowNodes.value.find((n: any) => n.id === editingNodeId.value)
   if (node && editingNode.value) {
     node.data = { ...editingNode.value }
   }
@@ -433,20 +432,17 @@ function saveNodeEdit() {
 }
 
 function onConnect(params: any) {
-  const edgeId = `e${params.source}-${params.target}-${Date.now()}`
-  (flowElements.value as any[]).push({
-    id: edgeId,
+  flowEdges.value.push({
+    id: `e${params.source}-${params.target}`,
     source: params.source,
     target: params.target,
-    sourceHandle: params.sourceHandle,
-    targetHandle: params.targetHandle,
-    type: 'smoothstep',
     markerEnd: 'arrowclosed'
   })
 }
 
 function clearFlow() {
-  flowElements.value = []
+  flowNodes.value = []
+  flowEdges.value = []
   flowNodeCounter = 0
   editingNode.value = null
   editingNodeId.value = ''
@@ -458,44 +454,39 @@ function flowToDAG() {
   const startNodeIds: string[] = []
   const hasIncoming = new Set<string>()
   
-  // 收集所有边
-  for (const el of flowElements.value as any[]) {
-    if (el.source && el.target) {
-      edges.push({ from: el.source, to: el.target, edgeType: 'normal' })
-      hasIncoming.add(el.target)
-    }
+  // 收集边
+  for (const edge of flowEdges.value as any[]) {
+    edges.push({ from: edge.source, to: edge.target, edgeType: 'normal' })
+    hasIncoming.add(edge.target)
   }
   
   // 收集节点
-  for (const el of flowElements.value as any[]) {
-    if (el.type === 'custom') {
-      const node: any = {
-        nodeId: el.id,
-        type: el.data.type,
-        name: el.data.label,
-        triggerRule: 'all_success',
-        timeoutSec: 60
+  for (const node of flowNodes.value as any[]) {
+    const n: any = {
+      nodeId: node.id,
+      type: node.data.type,
+      name: node.data.label,
+      triggerRule: 'all_success',
+      timeoutSec: 60
+    }
+    if (node.data.type === 'task') {
+      n.taskDefId = node.data.taskDefId || ''
+      if (node.data.payloadJson) {
+        n.payloadJson = node.data.payloadJson
       }
-      if (el.data.type === 'task') {
-        node.taskDefId = el.data.taskDefId || ''
-        if (el.data.payloadJson) {
-          node.payloadJson = el.data.payloadJson
-        }
-      } else if (el.data.type === 'branch') {
-        if (el.data.conditionField && el.data.conditionOp) {
-          node.condition = {
-            field: el.data.conditionField,
-            operator: el.data.conditionOp,
-            value: el.data.conditionValue
-          }
+    } else if (node.data.type === 'branch') {
+      if (node.data.conditionField && node.data.conditionOp) {
+        n.condition = {
+          field: node.data.conditionField,
+          operator: node.data.conditionOp,
+          value: node.data.conditionValue
         }
       }
-      nodes[el.id] = node
-      
-      // 没有入边的节点作为起始节点
-      if (!hasIncoming.has(el.id)) {
-        startNodeIds.push(el.id)
-      }
+    }
+    nodes[node.id] = n
+    
+    if (!hasIncoming.has(node.id)) {
+      startNodeIds.push(node.id)
     }
   }
   
@@ -939,15 +930,20 @@ onMounted(() => {
   margin-top: 2px;
 }
 
-/* Vue Flow连线样式 */
+/* Vue Flow样式 */
 :deep(.vue-flow__edge-path) {
   stroke-width: 2px;
 }
 
 :deep(.vue-flow__handle) {
-  width: 10px;
-  height: 10px;
-  border-width: 2px;
+  width: 12px;
+  height: 12px;
+  background: #555;
+  border: 2px solid white;
+}
+
+:deep(.vue-flow__handle:hover) {
+  background: #409EFF;
 }
 
 /* Controls按钮样式 */
