@@ -2,21 +2,21 @@
   <div class="dag-workflows">
     <!-- 列表视图 -->
     <div v-if="viewMode === 'list'">
-      <el-card class="header-card">
-        <div class="header-content">
-          <div class="title-section">
-            <h2>{{ t('dag.title') }}</h2>
-            <p class="subtitle">{{ t('dag.subtitle') }}</p>
-          </div>
-          <div class="actions">
-            <el-button type="primary" @click="openCreateView">
-              {{ t('dag.buttons.create') }}
-            </el-button>
-          </div>
+      <!-- 操作按钮和统计 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
+        <div style="display:flex; gap:8px; flex-shrink:0;">
+          <el-button type="primary" :loading="loading" @click="loadWorkflows">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+          <el-button type="success" @click="openCreateView">
+            <el-icon><Plus /></el-icon>
+            {{ t('dag.buttons.create') }}
+          </el-button>
         </div>
-      </el-card>
+      </div>
 
-      <el-card class="content-card">
+      <el-card>
         <el-table :data="workflows" v-loading="loading" style="width: 100%">
         <el-table-column prop="Name" :label="t('dag.table.name')" width="200" />
         <el-table-column :label="t('dag.table.nodes')" width="100">
@@ -48,19 +48,15 @@
 
     <!-- 创建视图 -->
     <div v-if="viewMode === 'create'">
-      <el-card class="header-card">
-        <div class="header-content">
-          <div class="title-section">
-            <h2>创建DAG工作流</h2>
-          </div>
-          <div class="actions">
-            <el-button @click="cancelCreate">取消</el-button>
-            <el-button type="primary" @click="createDAG">提交创建</el-button>
-          </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0;">创建DAG工作流</h2>
+        <div style="display:flex; gap:8px;">
+          <el-button @click="cancelCreate">取消</el-button>
+          <el-button type="primary" @click="createDAG">提交创建</el-button>
         </div>
-      </el-card>
+      </div>
 
-      <el-card class="content-card">
+      <el-card>
         <el-tabs v-model="createMode" type="border-card">
           <!-- 拖拽编辑 -->
           <el-tab-pane label="拖拽编辑" name="flow">
@@ -88,7 +84,7 @@
               </div>
               
               <!-- 右侧属性面板 -->
-              <div style="width: 280px; border: 1px solid #ddd; padding: 15px; background: #f5f7fa;">
+              <div style="width: 300px; border: 1px solid #ddd; padding: 15px; background: #f5f7fa; overflow-y: auto; height: 500px;">
                 <h4 style="margin-top: 0;">属性编辑</h4>
                 <el-form v-if="editingNode" label-width="70px" size="small">
                   <el-form-item label="节点ID">
@@ -108,6 +104,24 @@
                     </el-form-item>
                     <el-form-item label="Payload">
                       <el-input v-model="editingNode.payloadJson" type="textarea" :rows="4" />
+                    </el-form-item>
+                  </div>
+                  <div v-if="editingNode.type === 'branch'">
+                    <el-form-item label="字段">
+                      <el-input v-model="editingNode.conditionField" placeholder="score" />
+                    </el-form-item>
+                    <el-form-item label="操作符">
+                      <el-select v-model="editingNode.conditionOp" style="width: 100%">
+                        <el-option label=">" value=">" />
+                        <el-option label=">=" value=">=" />
+                        <el-option label="<" value="<" />
+                        <el-option label="<=" value="<=" />
+                        <el-option label="==" value="==" />
+                        <el-option label="!=" value="!=" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="值">
+                      <el-input v-model="editingNode.conditionValue" placeholder="60" />
                     </el-form-item>
                   </div>
                   <el-button type="primary" size="small" @click="saveNodeEdit" style="width: 100%">保存</el-button>
@@ -240,15 +254,36 @@
 
         <h3>{{ t('dag.runDetail.nodeTasks') }}</h3>
         <el-table :data="runTasks" v-loading="loadingRunTasks" size="small">
-          <el-table-column prop="NodeID" :label="t('dag.runDetail.nodeId')" width="150" />
-          <el-table-column prop="TaskID" :label="t('dag.runDetail.taskId')" width="200" />
-          <el-table-column prop="Name" :label="t('dag.runDetail.taskName')" width="150" />
+          <el-table-column prop="NodeID" :label="t('dag.runDetail.nodeId')" width="120" />
+          <el-table-column prop="Name" :label="t('dag.runDetail.taskName')" width="120" />
           <el-table-column prop="State" :label="t('dag.runDetail.state')" width="100">
             <template #default="{ row }">
               <el-tag :type="getStateColor(row.State)" size="small">{{ row.State }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="t('dag.runDetail.duration')" width="100">
+          <el-table-column label="输入" width="200">
+            <template #default="{ row }">
+              <el-popover trigger="hover" width="400" v-if="row.PayloadJSON">
+                <pre style="font-size: 11px; max-height: 200px; overflow: auto;">{{ formatJSON(row.PayloadJSON) }}</pre>
+                <template #reference>
+                  <el-button size="small" link>查看</el-button>
+                </template>
+              </el-popover>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="输出" width="200">
+            <template #default="{ row }">
+              <el-popover trigger="hover" width="400" v-if="row.ResultJSON">
+                <pre style="font-size: 11px; max-height: 200px; overflow: auto;">{{ formatJSON(row.ResultJSON) }}</pre>
+                <template #reference>
+                  <el-button size="small" link>查看</el-button>
+                </template>
+              </el-popover>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="t('dag.runDetail.duration')" width="80">
             <template #default="{ row }">
               <span v-if="row.FinishedAt">{{ row.FinishedAt - row.StartedAt }}s</span>
               <span v-else>-</span>
@@ -264,6 +299,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Refresh, Plus, Files } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import mermaid from 'mermaid'
 import { VueFlow, Handle, Position } from '@vue-flow/core'
@@ -319,11 +355,8 @@ const visualForm = ref({
 const flowElements = ref([])
 const flowForm = ref({ name: '' })
 let flowNodeCounter = 0
-const showNodeEdit = ref(false)
 const editingNode = ref<any>(null)
 const editingNodeId = ref('')
-const showConnectDialog = ref(false)
-const connectForm = ref({ source: '', target: '' })
 
 async function loadWorkflows() {
   loading.value = true
@@ -379,7 +412,9 @@ function addFlowNode(type: string) {
       type,
       taskDefId: '',
       payloadJson: '',
-      condition: null
+      conditionField: '',
+      conditionOp: '>',
+      conditionValue: ''
     }
   })
 }
@@ -413,20 +448,8 @@ function onConnect(params: any) {
 function clearFlow() {
   flowElements.value = []
   flowNodeCounter = 0
-}
-
-function getFlowNodes() {
-  return (flowElements.value as any[]).filter(el => el.type === 'custom')
-}
-
-function addConnection() {
-  if (!connectForm.value.source || !connectForm.value.target) {
-    ElMessage.error('请选择源节点和目标节点')
-    return
-  }
-  onConnect({ source: connectForm.value.source, target: connectForm.value.target })
-  connectForm.value = { source: '', target: '' }
-  showConnectDialog.value = false
+  editingNode.value = null
+  editingNodeId.value = ''
 }
 
 function flowToDAG() {
@@ -457,6 +480,14 @@ function flowToDAG() {
         node.taskDefId = el.data.taskDefId || ''
         if (el.data.payloadJson) {
           node.payloadJson = el.data.payloadJson
+        }
+      } else if (el.data.type === 'branch') {
+        if (el.data.conditionField && el.data.conditionOp) {
+          node.condition = {
+            field: el.data.conditionField,
+            operator: el.data.conditionOp,
+            value: el.data.conditionValue
+          }
         }
       }
       nodes[el.id] = node
@@ -753,6 +784,14 @@ function getStateColor(state: string) {
   return colors[state] || 'info'
 }
 
+function formatJSON(jsonStr: string) {
+  try {
+    return JSON.stringify(JSON.parse(jsonStr), null, 2)
+  } catch {
+    return jsonStr
+  }
+}
+
 async function viewRuns(workflowId: string) {
   loadingRuns.value = true
   showRunsDialog.value = true
@@ -798,7 +837,9 @@ async function viewRunDetail(run: any) {
       State: t.State,
       StartedAt: t.StartedAt,
       FinishedAt: t.FinishedAt,
-      NodeID: t.Labels?.dagNodeId || '-'
+      NodeID: t.Labels?.dagNodeId || '-',
+      PayloadJSON: t.PayloadJSON,
+      ResultJSON: t.ResultJSON
     }))
     
     // 渲染带状态的Mermaid图
@@ -822,34 +863,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.dag-workflows {
-  padding: 20px;
-}
-
-.header-card {
-  margin-bottom: 20px;
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.title-section h2 {
-  margin: 0 0 5px 0;
-  font-size: 24px;
-}
-
-.subtitle {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-}
-
-.content-card {
-  min-height: 400px;
-}
 
 .dag-detail {
   padding: 10px 0;
