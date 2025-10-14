@@ -71,7 +71,7 @@
                   <Controls />
                   <template #node-custom="{ data, id }">
                     <Handle type="target" :position="Top" />
-                    <div :class="['custom-node', `node-${data.type}`]" @click="editFlowNodeProps(id, data)">
+                    <div :class="['custom-node', `node-${data.type}`, { 'node-selected': editingNodeId === id }]" @click="editFlowNodeProps(id, data)">
                       <div class="node-label">{{ data.label }}</div>
                       <div class="node-type">{{ data.type }}</div>
                       <div v-if="data.taskDefId" class="node-task">{{ taskDefs[data.taskDefId]?.Name }}</div>
@@ -634,7 +634,7 @@ async function createDAG() {
         ElMessage.error('请输入工作流名称')
         return
       }
-      if (flowElements.value.length === 0) {
+      if (flowNodes.value.length === 0) {
         ElMessage.error('请至少添加一个节点')
         return
       }
@@ -913,6 +913,12 @@ onMounted(() => {
 .node-task { border-color: #409EFF; }
 .node-parallel { border-color: #67C23A; }
 .node-branch { border-color: #E6A23C; }
+
+.node-selected {
+  border-width: 3px !important;
+  box-shadow: 0 0 12px rgba(64, 158, 255, 0.5);
+  transform: scale(1.05);
+}
 
 .node-label {
   font-weight: bold;
