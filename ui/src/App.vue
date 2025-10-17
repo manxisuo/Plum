@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 
 type Assignment = {
 	instanceId: string
@@ -38,8 +38,12 @@ async function fetchAssignments() {
 fetchAssignments()
 
 const { t, locale } = useI18n()
+const router = useRouter()
 const lang = ref(locale.value)
 function switchLang(l: string){ locale.value = l; lang.value = l }
+function handleMenuSelect(index: string) {
+  router.push(index)
+}
 </script>
 
 <template>
@@ -47,19 +51,19 @@ function switchLang(l: string){ locale.value = l; lang.value = l }
     <el-header>
       <div style="display:flex; align-items:center; gap:16px;">
         <img src="/plum.png" alt="Plum" style="height:48px;" />
-        <el-menu mode="horizontal" :default-active="$route.path" :ellipsis="false" style="flex:1;">
-          <el-menu-item index="/"><RouterLink to="/">{{ t('nav.home') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/nodes"><RouterLink to="/nodes">{{ t('nav.nodes') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/apps"><RouterLink to="/apps">{{ t('nav.apps') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/deployments"><RouterLink to="/deployments">{{ t('nav.deployments') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/assignments"><RouterLink to="/assignments">{{ t('nav.assignments') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/services"><RouterLink to="/services">{{ t('nav.services') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/tasks"><RouterLink to="/tasks">{{ t('nav.tasks') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/workers"><RouterLink to="/workers">{{ t('nav.workers') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/workflows"><RouterLink to="/workflows">{{ t('nav.workflows') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/dag-workflows"><RouterLink to="/dag-workflows">{{ t('nav.dagWorkflows') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/kv-store"><RouterLink to="/kv-store">{{ t('nav.kvStore') }}</RouterLink></el-menu-item>
-          <el-menu-item index="/resources"><RouterLink to="/resources">{{ t('nav.resources') }}</RouterLink></el-menu-item>
+        <el-menu mode="horizontal" :default-active="$route.path" :ellipsis="false" style="flex:1;" @select="handleMenuSelect">
+          <el-menu-item index="/">{{ t('nav.home') }}</el-menu-item>
+          <el-menu-item index="/nodes">{{ t('nav.nodes') }}</el-menu-item>
+          <el-menu-item index="/apps">{{ t('nav.apps') }}</el-menu-item>
+          <el-menu-item index="/deployments">{{ t('nav.deployments') }}</el-menu-item>
+          <el-menu-item index="/assignments">{{ t('nav.assignments') }}</el-menu-item>
+          <el-menu-item index="/services">{{ t('nav.services') }}</el-menu-item>
+          <el-menu-item index="/tasks">{{ t('nav.tasks') }}</el-menu-item>
+          <el-menu-item index="/workers">{{ t('nav.workers') }}</el-menu-item>
+          <el-menu-item index="/workflows">{{ t('nav.workflows') }}</el-menu-item>
+          <el-menu-item index="/dag-workflows">{{ t('nav.dagWorkflows') }}</el-menu-item>
+          <el-menu-item index="/kv-store">{{ t('nav.kvStore') }}</el-menu-item>
+          <el-menu-item index="/resources">{{ t('nav.resources') }}</el-menu-item>
         </el-menu>
         <div style="display:flex; align-items:center; gap:8px;">
           <el-select v-model="lang" size="small" style="width:120px;" @change="switchLang">
