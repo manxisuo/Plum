@@ -66,17 +66,38 @@
                   v-model:nodes="flowNodes"
                   v-model:edges="flowEdges"
                   @connect="onConnect"
+                  @edge-click="onEdgeClick"
                 >
                   <Background />
                   <Controls />
                   <template #node-custom="{ data, id }">
-                    <Handle type="target" :position="Top" />
+                    <!-- Branch节点的特殊Handle配置 -->
+                    <template v-if="data.type === 'branch'">
+                      <Handle id="top-t" type="target" :position="Top" />
+                      <Handle id="left-t" type="target" :position="Left" />
+                      <Handle id="true-src" type="source" :position="Right" />
+                      <Handle id="false-src" type="source" :position="Bottom" />
+                    </template>
+                    <!-- 其他节点的标准Handle配置 -->
+                    <template v-else>
+                      <Handle id="top-s" type="source" :position="Top" />
+                      <Handle id="top-t" type="target" :position="Top" />
+                      <Handle id="right-s" type="source" :position="Right" />
+                      <Handle id="right-t" type="target" :position="Right" />
+                      <Handle id="bottom-s" type="source" :position="Bottom" />
+                      <Handle id="bottom-t" type="target" :position="Bottom" />
+                      <Handle id="left-s" type="source" :position="Left" />
+                      <Handle id="left-t" type="target" :position="Left" />
+                    </template>
                     <div :class="['custom-node', `node-${data.type}`, { 'node-selected': editingNodeId === id }]" @click="editFlowNodeProps(id, data)">
                       <div class="node-label">{{ data.label }}</div>
                       <div class="node-type">{{ data.type }}</div>
                       <div v-if="data.taskDefId" class="node-task">{{ taskDefs[data.taskDefId]?.Name }}</div>
+                      <div v-if="data.type === 'branch'" class="branch-labels">
+                        <div class="branch-true">True→</div>
+                        <div class="branch-false">False↓</div>
+                      </div>
                     </div>
-                    <Handle type="source" :position="Bottom" />
                   </template>
                 </VueFlow>
               </div>
@@ -121,6 +142,12 @@
                     <el-form-item label="值">
                       <el-input v-model="editingNode.conditionValue" placeholder="60" />
                     </el-form-item>
+                    <el-divider />
+                    <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                      <div>连线说明：</div>
+                      <div>• 从 <strong style="color: #67C23A;">绿色Handle（右侧）</strong> 拖出 → True分支</div>
+                      <div>• 从 <strong style="color: #F56C6C;">红色Handle（底部）</strong> 拖出 → False分支</div>
+                    </div>
                   </div>
                   <el-button type="primary" size="small" @click="saveNodeEdit" style="width: 100%">保存</el-button>
                 </el-form>
@@ -132,6 +159,9 @@
               <el-button @click="addFlowNode('task')" size="small">+ Task</el-button>
               <el-button @click="addFlowNode('parallel')" size="small">+ Parallel</el-button>
               <el-button @click="addFlowNode('branch')" size="small">+ Branch</el-button>
+              <el-button @click="showManualConnect = true" size="small" type="success">+ 手动连线</el-button>
+              <el-button @click="deleteSelectedNode" size="small" type="warning" :disabled="!editingNodeId">删除节点</el-button>
+              <el-button @click="deleteSelectedEdge" size="small" type="warning" :disabled="!selectedEdgeId">删除连线</el-button>
               <el-button @click="clearFlow" size="small" type="danger">清空</el-button>
             </div>
           </el-tab-pane>
@@ -199,6 +229,26 @@
       </div>
     </el-dialog>
 
+
+    <!-- 手动连线对话框 -->
+    <el-dialog v-model="showManualConnect" title="手动添加连线" width="400px">
+      <el-form label-width="60px">
+        <el-form-item label="从">
+          <el-select v-model="manualConnectForm.source" style="width: 100%">
+            <el-option v-for="n in flowNodes" :key="n.id" :label="n.data.label" :value="n.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="到">
+          <el-select v-model="manualConnectForm.target" style="width: 100%">
+            <el-option v-for="n in flowNodes" :key="n.id" :label="n.data.label" :value="n.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showManualConnect = false">取消</el-button>
+        <el-button type="primary" @click="addManualConnection">添加</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 运行历史对话框 -->
     <el-dialog v-model="showRunsDialog" :title="t('dag.runs.title')" width="70%">
@@ -356,6 +406,9 @@ const flowForm = ref({ name: '' })
 let flowNodeCounter = 0
 const editingNode = ref<any>(null)
 const editingNodeId = ref('')
+const selectedEdgeId = ref('')
+const showManualConnect = ref(false)
+const manualConnectForm = ref({ source: '', target: '' })
 
 async function loadWorkflows() {
   loading.value = true
@@ -421,6 +474,10 @@ function addFlowNode(type: string) {
 function editFlowNodeProps(id: string, data: any) {
   editingNodeId.value = id
   editingNode.value = { ...data }
+  
+  // 取消连线选中
+  selectedEdgeId.value = ''
+  flowEdges.value = flowEdges.value.map((e: any) => ({ ...e, selected: false }))
 }
 
 function saveNodeEdit() {
@@ -432,12 +489,93 @@ function saveNodeEdit() {
 }
 
 function onConnect(params: any) {
+  console.log('onConnect =', params)
+  
+  let src = params.source
+  let tgt = params.target
+  let srcHandle = params.sourceHandle
+  let tgtHandle = params.targetHandle
+  
+  // Branch节点特殊处理
+  const sourceNode = flowNodes.value.find((n: any) => n.id === src)
+  if (sourceNode && sourceNode.data.type === 'branch') {
+    console.log('Branch node connection:', srcHandle)
+    if (srcHandle === 'true-src') {
+      console.log('True branch connection')
+    } else if (srcHandle === 'false-src') {
+      console.log('False branch connection')
+    }
+  }
+  
+  // 如果从target型Handle拖出，交换方向
+  if (srcHandle && srcHandle.endsWith('-t')) {
+    [src, tgt] = [tgt, src]
+    ;[srcHandle, tgtHandle] = [tgtHandle, srcHandle]
+  }
+  
+  // 取消连线选中
+  selectedEdgeId.value = ''
+  
   flowEdges.value.push({
-    id: `e${params.source}-${params.target}`,
-    source: params.source,
-    target: params.target,
+    id: `e${src}-${tgt}-${Date.now()}`,
+    source: src,
+    target: tgt,
+    sourceHandle: srcHandle,
+    targetHandle: tgtHandle,
     markerEnd: 'arrowclosed'
   })
+}
+
+function addManualConnection() {
+  if (!manualConnectForm.value.source || !manualConnectForm.value.target) {
+    ElMessage.error('请选择源节点和目标节点')
+    return
+  }
+  flowEdges.value.push({
+    id: `e${manualConnectForm.value.source}-${manualConnectForm.value.target}-${Date.now()}`,
+    source: manualConnectForm.value.source,
+    target: manualConnectForm.value.target,
+    markerEnd: 'arrowclosed'
+  })
+  manualConnectForm.value = { source: '', target: '' }
+  showManualConnect.value = false
+}
+
+function onEdgeClick(event: any) {
+  const edgeId = event.edge.id
+  
+  // 更新选中状态
+  flowEdges.value = flowEdges.value.map((e: any) => ({
+    ...e,
+    selected: e.id === edgeId
+  }))
+  
+  selectedEdgeId.value = edgeId
+  
+  // 取消节点选中
+  editingNode.value = null
+  editingNodeId.value = ''
+}
+
+function deleteSelectedNode() {
+  if (!editingNodeId.value) return
+  
+  flowNodes.value = flowNodes.value.filter((n: any) => n.id !== editingNodeId.value)
+  flowEdges.value = flowEdges.value.filter((e: any) => 
+    e.source !== editingNodeId.value && e.target !== editingNodeId.value
+  )
+  
+  editingNode.value = null
+  editingNodeId.value = ''
+  ElMessage.success('已删除节点')
+}
+
+function deleteSelectedEdge() {
+  if (!selectedEdgeId.value) return
+  
+  flowEdges.value = flowEdges.value.filter((e: any) => e.id !== selectedEdgeId.value)
+  selectedEdgeId.value = ''
+  ElMessage.success('已删除连线')
 }
 
 function clearFlow() {
@@ -446,6 +584,7 @@ function clearFlow() {
   flowNodeCounter = 0
   editingNode.value = null
   editingNodeId.value = ''
+  selectedEdgeId.value = ''
 }
 
 function flowToDAG() {
@@ -456,7 +595,19 @@ function flowToDAG() {
   
   // 收集边
   for (const edge of flowEdges.value as any[]) {
-    edges.push({ from: edge.source, to: edge.target, edgeType: 'normal' })
+    let edgeType = 'normal'
+    
+    // 如果是Branch节点的输出，根据sourceHandle确定分支类型
+    const sourceNode = flowNodes.value.find((n: any) => n.id === edge.source)
+    if (sourceNode && sourceNode.data.type === 'branch') {
+      if (edge.sourceHandle === 'true-src') {
+        edgeType = 'true'
+      } else if (edge.sourceHandle === 'false-src') {
+        edgeType = 'false'
+      }
+    }
+    
+    edges.push({ from: edge.source, to: edge.target, edgeType })
     hasIncoming.add(edge.target)
   }
   
@@ -715,7 +866,14 @@ function generateMermaid(dag: any) {
   
   // 添加边
   for (const edge of dag.Edges || []) {
-    const label = edge.EdgeType && edge.EdgeType !== 'normal' ? `|${edge.EdgeType}|` : ''
+    let label = ''
+    if (edge.EdgeType === 'true') {
+      label = '|True|'
+    } else if (edge.EdgeType === 'false') {
+      label = '|False|'
+    } else if (edge.EdgeType && edge.EdgeType !== 'normal') {
+      label = `|${edge.EdgeType}|`
+    }
     lines.push(`  ${edge.From} --${label}--> ${edge.To}`)
   }
   
@@ -742,7 +900,14 @@ function generateMermaidWithStates(dag: any, states: Record<string, string>) {
   
   // 添加边
   for (const edge of dag.Edges || []) {
-    const label = edge.EdgeType && edge.EdgeType !== 'normal' ? `|${edge.EdgeType}|` : ''
+    let label = ''
+    if (edge.EdgeType === 'true') {
+      label = '|True|'
+    } else if (edge.EdgeType === 'false') {
+      label = '|False|'
+    } else if (edge.EdgeType && edge.EdgeType !== 'normal') {
+      label = `|${edge.EdgeType}|`
+    }
     lines.push(`  ${edge.From} --${label}--> ${edge.To}`)
   }
   
@@ -936,21 +1101,75 @@ onMounted(() => {
   margin-top: 2px;
 }
 
+.branch-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.branch-true {
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.branch-false {
+  color: #F56C6C;
+  font-weight: bold;
+}
+
 /* Vue Flow样式 */
 :deep(.vue-flow__edge-path) {
   stroke-width: 2px;
 }
 
+:deep(.vue-flow__edge.selected .vue-flow__edge-path) {
+  stroke-width: 4px;
+  stroke: #409EFF;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
 :deep(.vue-flow__handle) {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #555;
   border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 :deep(.vue-flow__handle:hover) {
   background: #409EFF;
+  transform: scale(1.2);
 }
+
+/* Branch节点Handle特殊样式 */
+/* :deep(.vue-flow__handle[id="true-src"]) {
+  background: #67C23A !important;
+  border: 2px solid white !important;
+  width: 16px !important;
+  height: 16px !important;
+  z-index: 100 !important;
+}
+
+:deep(.vue-flow__handle[id="false-src"]) {
+  background: #F56C6C !important;
+  border: 2px solid white !important;
+  width: 16px !important;
+  height: 16px !important;
+  z-index: 100 !important;
+}
+
+:deep(.vue-flow__handle[id="true-src"]:hover),
+:deep(.vue-flow__handle[id="false-src"]:hover) {
+  transform: scale(1.3) !important;
+  box-shadow: 0 0 8px rgba(0,0,0,0.5) !important;
+} */
 
 /* Controls按钮样式 */
 :deep(.vue-flow__controls-button) {
