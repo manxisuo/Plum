@@ -128,6 +128,7 @@ const (
 	NodeTypeTask     NodeType = "task"     // 任务节点
 	NodeTypeParallel NodeType = "parallel" // 并行节点
 	NodeTypeBranch   NodeType = "branch"   // 分支节点
+	NodeTypeLoop     NodeType = "loop"     // 循环节点
 )
 
 type TriggerRule string
@@ -143,6 +144,17 @@ type BranchCondition struct {
 	Field      string `json:"field"`      // 结果字段路径，如 "code"
 	Operator   string `json:"operator"`   // ==, !=, >, <, >=, <=
 	Value      string `json:"value"`      // 比较值
+}
+
+// 循环条件
+type LoopCondition struct {
+	Type        string `json:"type"`        // count | condition
+	Count       int    `json:"count"`       // 循环次数（type=count时使用）
+	SourceTask  string `json:"sourceTask"`  // 依赖的任务节点ID（type=condition时使用）
+	Field       string `json:"field"`       // 结果字段路径，如 "items.length"
+	Operator    string `json:"operator"`    // ==, !=, >, <, >=, <=
+	Value       string `json:"value"`       // 比较值
+	LoopVarName string `json:"loopVarName"` // 循环变量名，如 "i" 或 "item"
 }
 
 // DAG节点
@@ -163,6 +175,9 @@ type WorkflowNode struct {
 
 	// Parallel节点配置
 	WaitPolicy string // all | one
+
+	// Loop节点配置
+	LoopCondition *LoopCondition
 
 	// UI位置
 	PosX int

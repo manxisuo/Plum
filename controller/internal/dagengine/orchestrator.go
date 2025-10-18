@@ -163,7 +163,7 @@ func (o *DAGOrchestrator) GetRunStatus(runID string) map[string]string {
 		return nodeStates
 	}
 
-	// 计算Parallel节点状态
+	// 计算Parallel和Loop节点状态
 	for nodeID, node := range dag.Nodes {
 		if node.Type == store.NodeTypeParallel {
 			// 获取Parallel节点的所有子节点
@@ -172,6 +172,18 @@ func (o *DAGOrchestrator) GetRunStatus(runID string) map[string]string {
 				// 计算子节点状态来决定Parallel节点状态
 				parallelState := o.calculateParallelState(children, nodeStates)
 				nodeStates[nodeID] = parallelState
+			}
+		} else if node.Type == store.NodeTypeLoop {
+			// Loop节点状态计算：基于其所有子节点的最终状态
+			children := o.getChildren(nodeID, dag)
+			if len(children) > 0 {
+				loopState := o.calculateLoopState(children, nodeStates)
+				nodeStates[nodeID] = loopState
+			} else {
+				// 没有子节点的Loop节点默认为成功
+				if _, exists := nodeStates[nodeID]; !exists {
+					nodeStates[nodeID] = "Succeeded"
+				}
 			}
 		}
 	}
@@ -225,6 +237,45 @@ func (o *DAGOrchestrator) calculateParallelState(children []string, nodeStates m
 	}
 
 	// 所有子节点都成功，Parallel节点也成功
+	return "Succeeded"
+}
+
+// 根据子节点状态计算Loop节点状态
+func (o *DAGOrchestrator) calculateLoopState(children []string, nodeStates map[string]string) string {
+	if len(children) == 0 {
+		return "Succeeded"
+	}
+
+	hasFailed := false
+	hasRunning := false
+	hasPending := false
+
+	for _, childID := range children {
+		state, exists := nodeStates[childID]
+		if !exists {
+			state = "Pending"
+		}
+
+		switch state {
+		case "Failed":
+			hasFailed = true
+		case "Running":
+			hasRunning = true
+		case "Pending":
+			hasPending = true
+		}
+	}
+
+	// Loop节点的状态计算与Parallel节点相同
+	// 优先级：Failed > Running > Pending > Succeeded
+	if hasFailed {
+		return "Failed"
+	}
+	if hasRunning || hasPending {
+		return "Running"
+	}
+
+	// 所有子节点都成功，Loop节点也成功
 	return "Succeeded"
 }
 

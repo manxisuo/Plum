@@ -11,6 +11,14 @@ import (
 	"github.com/manxisuo/plum/controller/internal/store"
 )
 
+// Loop状态跟踪
+type LoopState struct {
+	CurrentIteration int                    // 当前迭代次数
+	MaxIterations    int                    // 最大迭代次数（-1表示无限制）
+	ConditionMet     bool                   // 循环条件是否满足
+	LoopVarValue     map[string]interface{} // 循环变量值
+}
+
 // DAG执行器
 type DAGExecutor struct {
 	runID      string
@@ -18,6 +26,7 @@ type DAGExecutor struct {
 	nodeStates map[string]NodeState      // 节点执行状态
 	taskIDs    map[string]string         // nodeID -> taskID
 	results    map[string]map[string]any // taskID -> result JSON
+	loopStates map[string]*LoopState     // nodeID -> loopState（Loop节点状态）
 	mu         sync.RWMutex              // 保护并发访问
 }
 
@@ -44,6 +53,7 @@ func NewDAGExecutor(runID string, dag store.WorkflowDAG) *DAGExecutor {
 		nodeStates: states,
 		taskIDs:    make(map[string]string),
 		results:    make(map[string]map[string]any),
+		loopStates: make(map[string]*LoopState),
 	}
 }
 
@@ -182,6 +192,8 @@ func (e *DAGExecutor) scheduleNode(nodeID string, node store.WorkflowNode, store
 		return e.scheduleBranchNode(nodeID, node, storeInst)
 	case store.NodeTypeParallel:
 		return e.scheduleParallelNode(nodeID, node, storeInst)
+	case store.NodeTypeLoop:
+		return e.scheduleLoopNode(nodeID, node, storeInst)
 	default:
 		return fmt.Errorf("unknown node type: %s", node.Type)
 	}
@@ -290,6 +302,139 @@ func (e *DAGExecutor) scheduleParallelNode(nodeID string, node store.WorkflowNod
 	e.nodeStates[nodeID] = NodeSucceeded
 	log.Printf("[DAGExecutor] Parallel node %s activated", nodeID)
 	return nil
+}
+
+// 调度Loop节点
+func (e *DAGExecutor) scheduleLoopNode(nodeID string, node store.WorkflowNode, storeInst store.Store) error {
+	if node.LoopCondition == nil {
+		e.nodeStates[nodeID] = NodeFailed
+		return fmt.Errorf("loop node missing condition")
+	}
+
+	// 初始化Loop状态
+	loopState, exists := e.loopStates[nodeID]
+	if !exists {
+		loopState = &LoopState{
+			CurrentIteration: 0,
+			MaxIterations:    -1,
+			ConditionMet:     true,
+			LoopVarValue:     make(map[string]interface{}),
+		}
+		e.loopStates[nodeID] = loopState
+	}
+
+	// 检查循环条件
+	shouldContinue, err := e.evaluateLoopCondition(nodeID, node.LoopCondition, loopState)
+	if err != nil {
+		e.nodeStates[nodeID] = NodeFailed
+		return err
+	}
+
+	if !shouldContinue {
+		// 循环结束
+		e.nodeStates[nodeID] = NodeSucceeded
+		log.Printf("[DAGExecutor] Loop node %s completed after %d iterations", nodeID, loopState.CurrentIteration)
+		return nil
+	}
+
+	// 更新循环状态
+	loopState.CurrentIteration++
+	if loopState.CurrentIteration >= 1 {
+		// 设置循环变量值
+		if node.LoopCondition.LoopVarName != "" {
+			loopState.LoopVarValue[node.LoopCondition.LoopVarName] = loopState.CurrentIteration - 1
+		}
+	}
+
+	// 重置循环体内节点的状态，让它们重新执行
+	successors := e.getSuccessors(nodeID)
+	for _, succID := range successors {
+		if succNode, ok := e.dag.Nodes[succID]; ok {
+			// 只重置循环体内的Task节点
+			if succNode.Type == store.NodeTypeTask {
+				e.nodeStates[succID] = NodePending
+				// 清除相关的Task ID，让它们重新创建
+				delete(e.taskIDs, succID)
+			}
+		}
+	}
+
+	log.Printf("[DAGExecutor] Loop node %s iteration %d started", nodeID, loopState.CurrentIteration)
+	return nil
+}
+
+// 评估Loop条件
+func (e *DAGExecutor) evaluateLoopCondition(nodeID string, condition *store.LoopCondition, loopState *LoopState) (bool, error) {
+	switch condition.Type {
+	case "count":
+		// 基于计数的循环
+		if condition.Count <= 0 {
+			return false, fmt.Errorf("invalid loop count: %d", condition.Count)
+		}
+		return loopState.CurrentIteration < condition.Count, nil
+
+	case "condition":
+		// 基于条件的循环
+		if condition.SourceTask == "" {
+			return false, fmt.Errorf("loop condition requires sourceTask")
+		}
+
+		// 获取源任务的结果
+		sourceTaskID := e.taskIDs[condition.SourceTask]
+		if sourceTaskID == "" {
+			return false, fmt.Errorf("source task not found: %s", condition.SourceTask)
+		}
+
+		result, ok := e.results[sourceTaskID]
+		if !ok {
+			return false, fmt.Errorf("source task result not available")
+		}
+
+		// 获取字段值
+		fieldValue, ok := result[condition.Field]
+		if !ok {
+			return false, fmt.Errorf("field not found: %s", condition.Field)
+		}
+
+		// 转换并比较
+		leftStr := fmt.Sprintf("%v", fieldValue)
+		rightStr := condition.Value
+
+		leftNum, leftIsNum := toFloat(leftStr)
+		rightNum, rightIsNum := toFloat(rightStr)
+
+		switch condition.Operator {
+		case "==":
+			return leftStr == rightStr, nil
+		case "!=":
+			return leftStr != rightStr, nil
+		case ">":
+			if leftIsNum && rightIsNum {
+				return leftNum > rightNum, nil
+			}
+			return false, fmt.Errorf("operator > requires numbers")
+		case ">=":
+			if leftIsNum && rightIsNum {
+				return leftNum >= rightNum, nil
+			}
+			return false, fmt.Errorf("operator >= requires numbers")
+		case "<":
+			if leftIsNum && rightIsNum {
+				return leftNum < rightNum, nil
+			}
+			return false, fmt.Errorf("operator < requires numbers")
+		case "<=":
+			if leftIsNum && rightIsNum {
+				return leftNum <= rightNum, nil
+			}
+			return false, fmt.Errorf("operator <= requires numbers")
+		default:
+			return false, fmt.Errorf("unknown operator: %s", condition.Operator)
+		}
+
+	default:
+		return false, fmt.Errorf("unknown loop condition type: %s", condition.Type)
+	}
 }
 
 // 条件求值（简化版：仅支持基本比较）

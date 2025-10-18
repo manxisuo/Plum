@@ -96,6 +96,13 @@
                       <Handle id="left-s" type="source" :position="Left" />
                       <Handle id="left-t" type="target" :position="Left" />
                     </template>
+                    <!-- Loop节点Handle配置 -->
+                    <template v-else-if="data.type === 'loop'">
+                      <Handle id="top-t" type="target" :position="Top" />
+                      <Handle id="left-t" type="target" :position="Left" />
+                      <Handle id="bottom-s" type="source" :position="Bottom" />
+                      <Handle id="right-s" type="source" :position="Right" />
+                    </template>
                     <div class="node-wrapper">
                       <div :class="['custom-node', `node-${data.type}`, { 'node-selected': editingNodeId === id }]" @click="editFlowNodeProps(id, data)">
                         <div class="node-label">{{ data.label }}</div>
@@ -158,6 +165,50 @@
                       <div>• 从 <strong style="color: #F56C6C;">红色Handle（右侧）</strong> 拖出 → False分支</div>
                     </div>
                   </div>
+                  <div v-if="editingNode.type === 'loop'">
+                    <el-form-item label="循环类型">
+                      <el-select v-model="editingNode.loopType" style="width: 100%" @change="onLoopTypeChange">
+                        <el-option label="固定次数" value="count" />
+                        <el-option label="条件循环" value="condition" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item v-if="editingNode.loopType === 'count'" label="循环次数">
+                      <el-input-number v-model="editingNode.loopCount" :min="1" :max="1000" style="width: 100%" />
+                    </el-form-item>
+                    <template v-if="editingNode.loopType === 'condition'">
+                      <el-form-item label="源任务">
+                        <el-select v-model="editingNode.loopSourceTask" style="width: 100%" placeholder="选择提供条件数据的任务">
+                          <el-option v-for="node in flowNodes.filter(n => n.data.type === 'task')" 
+                                     :key="node.id" :label="node.data.label" :value="node.id" />
+                        </el-select>
+                      </el-form-item>
+                      <el-form-item label="条件字段">
+                        <el-input v-model="editingNode.loopConditionField" placeholder="items.length" />
+                      </el-form-item>
+                      <el-form-item label="操作符">
+                        <el-select v-model="editingNode.loopConditionOp" style="width: 100%">
+                          <el-option label=">" value=">" />
+                          <el-option label=">=" value=">=" />
+                          <el-option label="<" value="<" />
+                          <el-option label="<=" value="<=" />
+                          <el-option label="==" value="==" />
+                          <el-option label="!=" value="!=" />
+                        </el-select>
+                      </el-form-item>
+                      <el-form-item label="条件值">
+                        <el-input v-model="editingNode.loopConditionValue" placeholder="10" />
+                      </el-form-item>
+                    </template>
+                    <el-form-item label="循环变量">
+                      <el-input v-model="editingNode.loopVarName" placeholder="i" />
+                    </el-form-item>
+                    <el-divider />
+                    <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                      <div>Loop节点说明：</div>
+                      <div>• 将需要循环执行的任务连接到Loop节点下方</div>
+                      <div>• 循环体任务会在每次迭代中重新执行</div>
+                    </div>
+                  </div>
                   <el-button type="primary" size="small" @click="saveNodeEdit" style="width: 100%">保存</el-button>
                 </el-form>
                 <el-empty v-else description="点击节点编辑属性" :image-size="80" />
@@ -167,6 +218,7 @@
               <el-input v-model="flowForm.name" placeholder="工作流名称" style="width: 200px; margin-right: 10px;" />
               <el-button @click="addFlowNode('task')" size="small">+ Task</el-button>
               <el-button @click="addFlowNode('branch')" size="small">+ Branch</el-button>
+              <el-button @click="addFlowNode('loop')" size="small">+ Loop</el-button>
               <el-button @click="showManualConnect = true" size="small" type="success">+ 手动连线</el-button>
               <el-button @click="deleteSelectedNode" size="small" type="warning" :disabled="!editingNodeId">删除节点</el-button>
               <el-button @click="deleteSelectedEdge" size="small" type="warning" :disabled="!selectedEdgeId">删除连线</el-button>
@@ -231,6 +283,14 @@
                 Condition: {{ row.Condition?.field }} {{ row.Condition?.operator }} {{ row.Condition?.value }}
               </span>
               <span v-else-if="row.Type === 'parallel'">WaitPolicy: {{ row.WaitPolicy || 'all' }}</span>
+              <span v-else-if="row.Type === 'loop'">
+                <span v-if="row.LoopCondition?.type === 'count'">
+                  Count: {{ row.LoopCondition?.count }} times
+                </span>
+                <span v-else-if="row.LoopCondition?.type === 'condition'">
+                  Condition: {{ row.LoopCondition?.field }} {{ row.LoopCondition?.operator }} {{ row.LoopCondition?.value }}
+                </span>
+              </span>
             </template>
           </el-table-column>
         </el-table>
@@ -463,19 +523,32 @@ function cancelCreate() {
 function addFlowNode(type: string) {
   flowNodeCounter++
   const id = `node_${flowNodeCounter}`
+  const nodeData: any = {
+    label: `${type}_${flowNodeCounter}`,
+    type,
+    taskDefId: '',
+    payloadJson: '',
+    conditionField: '',
+    conditionOp: '>',
+    conditionValue: ''
+  }
+  
+  // Loop节点特有属性
+  if (type === 'loop') {
+    nodeData.loopType = 'count'
+    nodeData.loopCount = 3
+    nodeData.loopConditionField = ''
+    nodeData.loopConditionOp = '<'
+    nodeData.loopConditionValue = ''
+    nodeData.loopVarName = 'i'
+    nodeData.loopSourceTask = ''
+  }
+  
   flowNodes.value.push({
     id,
     type: 'custom',
     position: { x: 100 + flowNodeCounter * 80, y: 50 + flowNodeCounter * 100 },
-    data: {
-      label: `${type}_${flowNodeCounter}`,
-      type,
-      taskDefId: '',
-      payloadJson: '',
-      conditionField: '',
-      conditionOp: '>',
-      conditionValue: ''
-    }
+    data: nodeData
   })
 }
 
@@ -486,6 +559,20 @@ function editFlowNodeProps(id: string, data: any) {
   // 取消连线选中
   selectedEdgeId.value = ''
   flowEdges.value = flowEdges.value.map((e: any) => ({ ...e, selected: false }))
+}
+
+function onLoopTypeChange() {
+  if (editingNode.value) {
+    if (editingNode.value.loopType === 'count') {
+      // 切换到计数模式，清空条件相关字段
+      editingNode.value.loopSourceTask = ''
+      editingNode.value.loopConditionField = ''
+      editingNode.value.loopConditionValue = ''
+    } else if (editingNode.value.loopType === 'condition') {
+      // 切换到条件模式，设置默认循环次数为0
+      editingNode.value.loopCount = 0
+    }
+  }
 }
 
 function saveNodeEdit() {
@@ -706,6 +793,18 @@ function flowToDAG() {
           field: node.data.conditionField,
           operator: node.data.conditionOp,
           value: node.data.conditionValue
+        }
+      }
+    } else if (node.data.type === 'loop') {
+      if (node.data.loopType) {
+        n.loopCondition = {
+          type: node.data.loopType,
+          count: node.data.loopCount || 0,
+          sourceTask: node.data.loopSourceTask || '',
+          field: node.data.loopConditionField || '',
+          operator: node.data.loopConditionOp || '<',
+          value: node.data.loopConditionValue || '',
+          loopVarName: node.data.loopVarName || 'i'
         }
       }
     }
@@ -953,6 +1052,9 @@ function generateMermaid(dag: any) {
     } else if (n.Type === 'parallel') {
       shape = '[[' 
       endShape = ']]'
+    } else if (n.Type === 'loop') {
+      shape = '((' 
+      endShape = '))'
     }
     
     // 确保节点ID是有效的Mermaid标识符
@@ -1055,6 +1157,9 @@ function generateMermaidWithStates(dag: any, states: Record<string, string>) {
     } else if (n.Type === 'parallel') {
       shape = '[[' 
       endShape = ']]'
+    } else if (n.Type === 'loop') {
+      shape = '((' 
+      endShape = '))'
     }
     
     // 确保节点ID是有效的Mermaid标识符
@@ -1158,7 +1263,8 @@ function getNodeTypeColor(type: string) {
   const colors: Record<string, string> = {
     task: 'primary',
     branch: 'warning',
-    parallel: 'success'
+    parallel: 'success',
+    loop: 'info'
   }
   return colors[type] || 'info'
 }
@@ -1318,6 +1424,7 @@ onMounted(() => {
 .node-task { border-color: #409EFF; }
 .node-parallel { border-color: #67C23A; }
 .node-branch { border-color: #E6A23C; }
+.node-loop { border-color: #9C27B0; }
 
 .node-selected {
   border-width: 3px !important;
