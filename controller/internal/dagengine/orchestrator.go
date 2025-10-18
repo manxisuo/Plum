@@ -131,6 +131,8 @@ func (o *DAGOrchestrator) GetRunStatus(runID string) map[string]string {
 	}
 
 	nodeStates := make(map[string]string)
+
+	// 先收集所有Task节点的状态
 	for _, task := range tasks {
 		if task.Labels != nil && task.Labels["dagRunId"] == runID {
 			nodeID := task.Labels["dagNodeId"]
@@ -150,7 +152,80 @@ func (o *DAGOrchestrator) GetRunStatus(runID string) map[string]string {
 		}
 	}
 
+	// 获取DAG定义来计算Parallel节点状态
+	run, ok, err := o.store.GetWorkflowRun(runID)
+	if err != nil || !ok {
+		return nodeStates
+	}
+
+	dag, ok, err := o.store.GetWorkflowDAG(run.WorkflowID)
+	if err != nil || !ok {
+		return nodeStates
+	}
+
+	// 计算Parallel节点状态
+	for nodeID, node := range dag.Nodes {
+		if node.Type == store.NodeTypeParallel {
+			// 获取Parallel节点的所有子节点
+			children := o.getChildren(nodeID, dag)
+			if len(children) > 0 {
+				// 计算子节点状态来决定Parallel节点状态
+				parallelState := o.calculateParallelState(children, nodeStates)
+				nodeStates[nodeID] = parallelState
+			}
+		}
+	}
+
 	return nodeStates
+}
+
+// 获取节点的直接子节点
+func (o *DAGOrchestrator) getChildren(nodeID string, dag store.WorkflowDAG) []string {
+	var children []string
+	for _, edge := range dag.Edges {
+		if edge.From == nodeID {
+			children = append(children, edge.To)
+		}
+	}
+	return children
+}
+
+// 根据子节点状态计算Parallel节点状态
+func (o *DAGOrchestrator) calculateParallelState(children []string, nodeStates map[string]string) string {
+	if len(children) == 0 {
+		return "Succeeded"
+	}
+
+	hasFailed := false
+	hasRunning := false
+	hasPending := false
+
+	for _, childID := range children {
+		state, exists := nodeStates[childID]
+		if !exists {
+			state = "Pending"
+		}
+
+		switch state {
+		case "Failed":
+			hasFailed = true
+		case "Running":
+			hasRunning = true
+		case "Pending":
+			hasPending = true
+		}
+	}
+
+	// 优先级：Failed > Running > Pending > Succeeded
+	if hasFailed {
+		return "Failed"
+	}
+	if hasRunning || hasPending {
+		return "Running"
+	}
+
+	// 所有子节点都成功，Parallel节点也成功
+	return "Succeeded"
 }
 
 func newRunID() string {

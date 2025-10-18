@@ -71,15 +71,22 @@
                   <Background />
                   <Controls />
                   <template #node-custom="{ data, id }">
-                    <!-- Branch节点的特殊Handle配置 -->
-                    <template v-if="data.type === 'branch'">
+                    <!-- Task节点Handle配置 -->
+                    <template v-if="data.type === 'task'">
                       <Handle id="top-t" type="target" :position="Top" />
                       <Handle id="left-t" type="target" :position="Left" />
-                      <Handle id="true-src" type="source" :position="Right" />
-                      <Handle id="false-src" type="source" :position="Bottom" />
+                      <Handle id="right-s" type="source" :position="Right" />
+                      <Handle id="bottom-s" type="source" :position="Bottom" />
                     </template>
-                    <!-- 其他节点的标准Handle配置 -->
-                    <template v-else>
+                    <!-- Branch节点Handle配置 -->
+                    <template v-else-if="data.type === 'branch'">
+                      <Handle id="top-t" type="target" :position="Top" />
+                      <Handle id="left-t" type="target" :position="Left" />
+                      <Handle id="true-src" type="source" :position="Bottom" />
+                      <Handle id="false-src" type="source" :position="Right" />
+                    </template>
+                    <!-- Parallel节点Handle配置（暂时保持原样） -->
+                    <template v-else-if="data.type === 'parallel'">
                       <Handle id="top-s" type="source" :position="Top" />
                       <Handle id="top-t" type="target" :position="Top" />
                       <Handle id="right-s" type="source" :position="Right" />
@@ -89,16 +96,18 @@
                       <Handle id="left-s" type="source" :position="Left" />
                       <Handle id="left-t" type="target" :position="Left" />
                     </template>
-                    <div :class="['custom-node', `node-${data.type}`, { 'node-selected': editingNodeId === id }]" @click="editFlowNodeProps(id, data)">
-                      <div class="node-label">{{ data.label }}</div>
-                      <div class="node-type">{{ data.type }}</div>
-                      <div v-if="data.taskDefId" class="node-task">{{ taskDefs[data.taskDefId]?.Name }}</div>
-                      <div v-if="data.type === 'branch'" class="branch-labels">
-                        <div class="branch-true">True→</div>
-                        <div class="branch-false">False↓</div>
+                    <div class="node-wrapper">
+                      <div :class="['custom-node', `node-${data.type}`, { 'node-selected': editingNodeId === id }]" @click="editFlowNodeProps(id, data)">
+                        <div class="node-label">{{ data.label }}</div>
+                        <div class="node-type">{{ data.type }}</div>
+                        <div v-if="data.taskDefId" class="node-task">{{ taskDefs[data.taskDefId]?.Name }}</div>
+                        <div v-if="data.type === 'branch'" class="branch-labels">
+                          <div class="branch-true">True↓</div>
+                          <div class="branch-false">False→</div>
+                        </div>
                       </div>
                     </div>
-                  </template>
+                  </template>  
                 </VueFlow>
               </div>
               
@@ -145,8 +154,8 @@
                     <el-divider />
                     <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
                       <div>连线说明：</div>
-                      <div>• 从 <strong style="color: #67C23A;">绿色Handle（右侧）</strong> 拖出 → True分支</div>
-                      <div>• 从 <strong style="color: #F56C6C;">红色Handle（底部）</strong> 拖出 → False分支</div>
+                      <div>• 从 <strong style="color: #67C23A;">绿色Handle（底部）</strong> 拖出 → True分支</div>
+                      <div>• 从 <strong style="color: #F56C6C;">红色Handle（右侧）</strong> 拖出 → False分支</div>
                     </div>
                   </div>
                   <el-button type="primary" size="small" @click="saveNodeEdit" style="width: 100%">保存</el-button>
@@ -157,7 +166,6 @@
             <div style="margin-top: 10px;">
               <el-input v-model="flowForm.name" placeholder="工作流名称" style="width: 200px; margin-right: 10px;" />
               <el-button @click="addFlowNode('task')" size="small">+ Task</el-button>
-              <el-button @click="addFlowNode('parallel')" size="small">+ Parallel</el-button>
               <el-button @click="addFlowNode('branch')" size="small">+ Branch</el-button>
               <el-button @click="showManualConnect = true" size="small" type="success">+ 手动连线</el-button>
               <el-button @click="deleteSelectedNode" size="small" type="warning" :disabled="!editingNodeId">删除节点</el-button>
@@ -607,8 +615,75 @@ function flowToDAG() {
       }
     }
     
-    edges.push({ from: edge.source, to: edge.target, edgeType })
-    hasIncoming.add(edge.target)
+    console.log('Processing edge:', edge)
+    if (edge.source && edge.target) {
+      edges.push({ from: edge.source, to: edge.target, edgeType })
+      hasIncoming.add(edge.target)
+    } else {
+      console.warn('Skipping invalid edge in flowToDAG:', edge)
+    }
+  }
+  
+  // 检测并行关系并自动插入Parallel节点
+  const parallelNodes = new Map<string, string>() // 原节点ID -> Parallel节点ID
+  const newEdges: any[] = []
+  
+  // 按源节点分组边
+  const edgesBySource = new Map<string, any[]>()
+  for (const edge of edges) {
+    if (!edgesBySource.has(edge.from)) {
+      edgesBySource.set(edge.from, [])
+    }
+    edgesBySource.get(edge.from)!.push(edge)
+  }
+  
+  // 检测需要并行处理的节点
+  const processedEdges = new Set<string>() // 记录已处理的边，避免重复
+  
+  for (const [sourceId, sourceEdges] of edgesBySource) {
+    if (sourceEdges.length > 1) {
+      // 需要并行，创建Parallel节点
+      const parallelId = `parallel_${sourceId}`
+      parallelNodes.set(sourceId, parallelId)
+      
+      // 添加Parallel节点
+      nodes[parallelId] = {
+        nodeId: parallelId,
+        type: 'parallel',
+        name: `Parallel_${sourceId}`,
+        triggerRule: 'all_success',
+        timeoutSec: 60,
+        waitPolicy: 'all'
+      }
+      
+      // 原节点连接到Parallel节点
+      newEdges.push({ from: sourceId, to: parallelId, edgeType: 'normal' })
+      
+      // Parallel节点连接到所有目标
+      for (const edge of sourceEdges) {
+        const edgeKey = `${edge.from}-${edge.to}`
+        if (!processedEdges.has(edgeKey)) {
+          newEdges.push({ from: parallelId, to: edge.to, edgeType: edge.edgeType })
+          processedEdges.add(edgeKey)
+        }
+      }
+    } else {
+      // 单条边，直接保留
+      const edge = sourceEdges[0]
+      const edgeKey = `${edge.from}-${edge.to}`
+      if (!processedEdges.has(edgeKey)) {
+        newEdges.push(edge)
+        processedEdges.add(edgeKey)
+      }
+    }
+  }
+  
+  // 处理没有多条输出的节点边（可能被遗漏的边）
+  for (const edge of edges) {
+    const edgeKey = `${edge.from}-${edge.to}`
+    if (!processedEdges.has(edgeKey) && !parallelNodes.has(edge.from)) {
+      newEdges.push(edge)
+    }
   }
   
   // 收集节点
@@ -641,10 +716,13 @@ function flowToDAG() {
     }
   }
   
+  console.log('flowToDAG - Original edges:', edges)
+  console.log('flowToDAG - New edges after parallel processing:', newEdges)
+  
   return {
     name: flowForm.value.name,
     nodes,
-    edges,
+    edges: newEdges,
     startNodes: startNodeIds.length > 0 ? startNodeIds : [Object.keys(nodes)[0]]
   }
 }
@@ -656,10 +734,17 @@ async function viewDAG(workflow: any) {
   // 渲染Mermaid图
   await nextTick()
   if (mermaidContainer.value) {
+    console.log('DAG workflow data:', workflow)
     const mermaidCode = generateMermaid(workflow)
+    console.log('Generated Mermaid code:', mermaidCode)
     mermaidContainer.value.innerHTML = ''
-    const { svg } = await mermaid.render('mermaid-graph-' + Date.now(), mermaidCode)
-    mermaidContainer.value.innerHTML = svg
+    try {
+      const { svg } = await mermaid.render('mermaid-graph-' + Date.now(), mermaidCode)
+      mermaidContainer.value.innerHTML = svg
+    } catch (error) {
+      console.error('Mermaid render error:', error)
+      mermaidContainer.value.innerHTML = `<pre>${mermaidCode}</pre>`
+    }
   }
 }
 
@@ -859,13 +944,69 @@ function generateMermaid(dag: any) {
   // 添加节点
   for (const [nodeId, node] of Object.entries(dag.Nodes || {})) {
     const n = node as any
-    const shape = n.Type === 'branch' ? '{' : n.Type === 'parallel' ? '[[' : '['
-    const endShape = n.Type === 'branch' ? '}' : n.Type === 'parallel' ? ']]' : ']'
-    lines.push(`  ${nodeId}${shape}"${n.Name}<br/>${n.Type}"${endShape}`)
+    let shape = '['
+    let endShape = ']'
+    
+    if (n.Type === 'branch') {
+      shape = '{'
+      endShape = '}'
+    } else if (n.Type === 'parallel') {
+      shape = '[[' 
+      endShape = ']]'
+    }
+    
+    // 确保节点ID是有效的Mermaid标识符
+    const safeNodeId = nodeId.replace(/[^a-zA-Z0-9_]/g, '_')
+    lines.push(`  ${safeNodeId}${shape}"${n.Name}<br/>${n.Type}"${endShape}`)
+  }
+  
+  // 收集有效的边
+  const validEdges = (dag.Edges || []).filter((edge: any) => edge.From && edge.To)
+  
+  // 找到Parallel节点及其连接关系
+  const parallelTargets = new Map<string, string[]>() // parallel节点ID -> 目标节点列表
+  
+  // 先收集所有指向Parallel节点的目标
+  for (const parallelNodeId of Object.keys(dag.Nodes || {})) {
+    if (parallelNodeId.startsWith('parallel_')) {
+      // 找到所有从这个Parallel节点出发的有效边
+      const outgoing = validEdges.filter((edge: any) => edge.From === parallelNodeId)
+      if (outgoing.length > 0) {
+        parallelTargets.set(parallelNodeId, outgoing.map((e: any) => e.To))
+      } else {
+        // 如果没有有效边，尝试从节点结构中推断
+        // 根据Parallel节点的命名规则：parallel_node_1 应该连接到 node_2, node_3 等
+        const sourceNodeId = parallelNodeId.replace('parallel_', '')
+        const allTaskNodes = Object.keys(dag.Nodes || {}).filter(id => 
+          id.startsWith('node_') && id !== sourceNodeId && dag.Nodes[id]?.Type === 'task'
+        )
+        if (allTaskNodes.length > 0) {
+          parallelTargets.set(parallelNodeId, allTaskNodes)
+        }
+      }
+    }
+  }
+  
+  // 特别处理：如果有指向Parallel节点的边，但Parallel没有输出边，尝试推断连接
+  for (const edge of validEdges) {
+    if (edge.To.startsWith('parallel_') && !parallelTargets.has(edge.To)) {
+      const sourceNodeId = edge.To.replace('parallel_', '')
+      const targetNodes = Object.keys(dag.Nodes || {}).filter(id => 
+        id.startsWith('node_') && id !== sourceNodeId && dag.Nodes[id]?.Type === 'task'
+      )
+      if (targetNodes.length > 0) {
+        parallelTargets.set(edge.To, targetNodes)
+      }
+    }
   }
   
   // 添加边
-  for (const edge of dag.Edges || []) {
+  for (const edge of validEdges) {
+    // 跳过Parallel节点的输出边，我们稍后处理
+    if (edge.From.startsWith('parallel_')) {
+      continue
+    }
+    
     let label = ''
     if (edge.EdgeType === 'true') {
       label = '|True|'
@@ -874,7 +1015,25 @@ function generateMermaid(dag: any) {
     } else if (edge.EdgeType && edge.EdgeType !== 'normal') {
       label = `|${edge.EdgeType}|`
     }
-    lines.push(`  ${edge.From} --${label}--> ${edge.To}`)
+    
+    const safeFrom = edge.From.replace(/[^a-zA-Z0-9_]/g, '_')
+    
+    if (edge.To.startsWith('parallel_')) {
+      // 这是指向Parallel节点的边
+      const safeTo = edge.To.replace(/[^a-zA-Z0-9_]/g, '_')
+      lines.push(`  ${safeFrom} --${label}--> ${safeTo}`)
+      
+      // 添加Parallel节点到其目标的边
+      const targets = parallelTargets.get(edge.To) || []
+      for (const target of targets) {
+        const safeTarget = target.replace(/[^a-zA-Z0-9_]/g, '_')
+        lines.push(`  ${safeTo} --> ${safeTarget}`)
+      }
+    } else {
+      // 普通边
+      const safeTo = edge.To.replace(/[^a-zA-Z0-9_]/g, '_')
+      lines.push(`  ${safeFrom} --${label}--> ${safeTo}`)
+    }
   }
   
   return lines.join('\n')
@@ -887,19 +1046,75 @@ function generateMermaidWithStates(dag: any, states: Record<string, string>) {
   for (const [nodeId, node] of Object.entries(dag.Nodes || {})) {
     const n = node as any
     const state = states[nodeId] || 'Pending'
-    const shape = n.Type === 'branch' ? '{' : n.Type === 'parallel' ? '[[' : '['
-    const endShape = n.Type === 'branch' ? '}' : n.Type === 'parallel' ? ']]' : ']'
+    let shape = '['
+    let endShape = ']'
+    
+    if (n.Type === 'branch') {
+      shape = '{'
+      endShape = '}'
+    } else if (n.Type === 'parallel') {
+      shape = '[[' 
+      endShape = ']]'
+    }
+    
+    // 确保节点ID是有效的Mermaid标识符
+    const safeNodeId = nodeId.replace(/[^a-zA-Z0-9_]/g, '_')
     
     // 节点文本包含状态
-    lines.push(`  ${nodeId}${shape}"${n.Name}<br/>${state}"${endShape}`)
+    lines.push(`  ${safeNodeId}${shape}"${n.Name}<br/>${state}"${endShape}`)
     
     // 根据状态添加样式类
     const stateClass = state.toLowerCase()
-    lines.push(`  class ${nodeId} ${stateClass}`)
+    lines.push(`  class ${safeNodeId} ${stateClass}`)
+  }
+  
+  // 收集有效的边
+  const validEdges = (dag.Edges || []).filter((edge: any) => edge.From && edge.To)
+  
+  // 找到Parallel节点及其连接关系
+  const parallelTargets = new Map<string, string[]>() // parallel节点ID -> 目标节点列表
+  
+  // 先收集所有指向Parallel节点的目标
+  for (const parallelNodeId of Object.keys(dag.Nodes || {})) {
+    if (parallelNodeId.startsWith('parallel_')) {
+      // 找到所有从这个Parallel节点出发的有效边
+      const outgoing = validEdges.filter((edge: any) => edge.From === parallelNodeId)
+      if (outgoing.length > 0) {
+        parallelTargets.set(parallelNodeId, outgoing.map((e: any) => e.To))
+      } else {
+        // 如果没有有效边，尝试从节点结构中推断
+        // 根据Parallel节点的命名规则：parallel_node_1 应该连接到 node_2, node_3 等
+        const sourceNodeId = parallelNodeId.replace('parallel_', '')
+        const allTaskNodes = Object.keys(dag.Nodes || {}).filter(id => 
+          id.startsWith('node_') && id !== sourceNodeId && dag.Nodes[id]?.Type === 'task'
+        )
+        if (allTaskNodes.length > 0) {
+          parallelTargets.set(parallelNodeId, allTaskNodes)
+        }
+      }
+    }
+  }
+  
+  // 特别处理：如果有指向Parallel节点的边，但Parallel没有输出边，尝试推断连接
+  for (const edge of validEdges) {
+    if (edge.To.startsWith('parallel_') && !parallelTargets.has(edge.To)) {
+      const sourceNodeId = edge.To.replace('parallel_', '')
+      const targetNodes = Object.keys(dag.Nodes || {}).filter(id => 
+        id.startsWith('node_') && id !== sourceNodeId && dag.Nodes[id]?.Type === 'task'
+      )
+      if (targetNodes.length > 0) {
+        parallelTargets.set(edge.To, targetNodes)
+      }
+    }
   }
   
   // 添加边
-  for (const edge of dag.Edges || []) {
+  for (const edge of validEdges) {
+    // 跳过Parallel节点的输出边，我们稍后处理
+    if (edge.From.startsWith('parallel_')) {
+      continue
+    }
+    
     let label = ''
     if (edge.EdgeType === 'true') {
       label = '|True|'
@@ -908,7 +1123,25 @@ function generateMermaidWithStates(dag: any, states: Record<string, string>) {
     } else if (edge.EdgeType && edge.EdgeType !== 'normal') {
       label = `|${edge.EdgeType}|`
     }
-    lines.push(`  ${edge.From} --${label}--> ${edge.To}`)
+    
+    const safeFrom = edge.From.replace(/[^a-zA-Z0-9_]/g, '_')
+    
+    if (edge.To.startsWith('parallel_')) {
+      // 这是指向Parallel节点的边
+      const safeTo = edge.To.replace(/[^a-zA-Z0-9_]/g, '_')
+      lines.push(`  ${safeFrom} --${label}--> ${safeTo}`)
+      
+      // 添加Parallel节点到其目标的边
+      const targets = parallelTargets.get(edge.To) || []
+      for (const target of targets) {
+        const safeTarget = target.replace(/[^a-zA-Z0-9_]/g, '_')
+        lines.push(`  ${safeTo} --> ${safeTarget}`)
+      }
+    } else {
+      // 普通边
+      const safeTo = edge.To.replace(/[^a-zA-Z0-9_]/g, '_')
+      lines.push(`  ${safeFrom} --${label}--> ${safeTo}`)
+    }
   }
   
   // 添加样式定义
@@ -1063,6 +1296,12 @@ onMounted(() => {
   overflow-y: auto;
 }
 
+.node-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .custom-node {
   padding: 8px 15px;
   border-radius: 6px;
@@ -1073,6 +1312,7 @@ onMounted(() => {
   text-align: center;
   cursor: pointer;
   position: relative;
+  pointer-events: auto;
 }
 
 .node-task { border-color: #409EFF; }
@@ -1141,11 +1381,14 @@ onMounted(() => {
   background: #555;
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  z-index: 1000 !important;
+  pointer-events: auto !important;
 }
 
 :deep(.vue-flow__handle:hover) {
   background: #409EFF;
-  transform: scale(1.2);
+  z-index: 1001 !important;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.6);
 }
 
 /* Branch节点Handle特殊样式 */
