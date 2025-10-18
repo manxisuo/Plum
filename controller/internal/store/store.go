@@ -136,6 +136,10 @@ type TriggerRule string
 const (
 	TriggerAllSuccess TriggerRule = "all_success" // 所有前驱成功（默认）
 	TriggerOneSuccess TriggerRule = "one_success" // 任一前驱成功
+	TriggerAllFailed  TriggerRule = "all_failed"  // 所有前驱失败
+	TriggerOneFailed  TriggerRule = "one_failed"  // 任一前驱失败
+	TriggerAllDone    TriggerRule = "all_done"    // 所有前驱完成（成功或失败）
+	TriggerNoneFailed TriggerRule = "none_failed" // 没有前驱失败（所有前驱成功或跳过）
 )
 
 // 分支条件

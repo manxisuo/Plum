@@ -131,6 +131,16 @@
                   <el-form-item label="类型">
                     <el-tag>{{ editingNode.type }}</el-tag>
                   </el-form-item>
+                  <el-form-item label="触发规则">
+                    <el-select v-model="editingNode.triggerRule" style="width: 100%" size="small">
+                      <el-option label="所有前驱成功" value="all_success" />
+                      <el-option label="任一前驱成功" value="one_success" />
+                      <el-option label="所有前驱失败" value="all_failed" />
+                      <el-option label="任一前驱失败" value="one_failed" />
+                      <el-option label="所有前驱完成" value="all_done" />
+                      <el-option label="没有前驱失败" value="none_failed" />
+                    </el-select>
+                  </el-form-item>
                   <div v-if="editingNode.type === 'task'">
                     <el-form-item label="任务定义">
                       <el-select v-model="editingNode.taskDefId" style="width: 100%" size="small">
@@ -270,7 +280,11 @@
               <el-tag :type="getNodeTypeColor(row.Type)" size="small">{{ row.Type }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="TriggerRule" :label="t('dag.detail.trigger')" width="120" />
+          <el-table-column prop="TriggerRule" :label="t('dag.detail.trigger')" width="120">
+            <template #default="{ row }">
+              {{ getTriggerRuleLabel(row.TriggerRule) }}
+            </template>
+          </el-table-column>
           <el-table-column :label="t('dag.detail.config')" show-overflow-tooltip>
             <template #default="{ row }">
               <span v-if="row.Type === 'task'">
@@ -371,6 +385,7 @@
         <h3>{{ t('dag.runDetail.nodeTasks') }}</h3>
         <el-table :data="runTasks" v-loading="loadingRunTasks" size="small">
           <el-table-column prop="NodeID" :label="t('dag.runDetail.nodeId')" width="120" />
+          <el-table-column prop="NodeName" :label="t('dag.detail.nodeName')" width="120" />
           <el-table-column prop="Name" :label="t('dag.runDetail.taskName')" width="120" />
           <el-table-column prop="State" :label="t('dag.runDetail.state')" width="100">
             <template #default="{ row }">
@@ -526,6 +541,7 @@ function addFlowNode(type: string) {
   const nodeData: any = {
     label: `${type}_${flowNodeCounter}`,
     type,
+    triggerRule: 'all_success',
     taskDefId: '',
     payloadJson: '',
     conditionField: '',
@@ -779,7 +795,7 @@ function flowToDAG() {
       nodeId: node.id,
       type: node.data.type,
       name: node.data.label,
-      triggerRule: 'all_success',
+      triggerRule: node.data.triggerRule || 'all_success',
       timeoutSec: 60
     }
     if (node.data.type === 'task') {
@@ -922,7 +938,7 @@ function visualFormToDAG() {
       nodeId: node.nodeId,
       type: node.type,
       name: node.name,
-      triggerRule: 'all_success',
+      triggerRule: node.triggerRule || 'all_success',
       timeoutSec: 60
     }
     
@@ -1287,6 +1303,18 @@ function formatJSON(jsonStr: string) {
   }
 }
 
+function getTriggerRuleLabel(rule: string) {
+  const labels: Record<string, string> = {
+    'all_success': '所有前驱成功',
+    'one_success': '任一前驱成功',
+    'all_failed': '所有前驱失败',
+    'one_failed': '任一前驱失败',
+    'all_done': '所有前驱完成',
+    'none_failed': '没有前驱失败'
+  }
+  return labels[rule] || rule
+}
+
 async function viewRuns(workflowId: string) {
   loadingRuns.value = true
   showRunsDialog.value = true
@@ -1333,6 +1361,7 @@ async function viewRunDetail(run: any) {
       StartedAt: t.StartedAt,
       FinishedAt: t.FinishedAt,
       NodeID: t.Labels?.dagNodeId || '-',
+      NodeName: t.Labels?.dagNodeName || '-',
       PayloadJSON: t.PayloadJSON,
       ResultJSON: t.ResultJSON
     }))

@@ -136,6 +136,14 @@ func (e *DAGExecutor) isReady(nodeID string, node store.WorkflowNode) bool {
 	switch node.TriggerRule {
 	case store.TriggerOneSuccess:
 		return e.oneSucceeded(predecessors)
+	case store.TriggerAllFailed:
+		return e.allFailed(predecessors)
+	case store.TriggerOneFailed:
+		return e.oneFailed(predecessors)
+	case store.TriggerAllDone:
+		return e.allDone(predecessors)
+	case store.TriggerNoneFailed:
+		return e.noneFailed(predecessors)
 	default: // all_success
 		return e.allSucceeded(predecessors)
 	}
@@ -181,6 +189,52 @@ func (e *DAGExecutor) oneSucceeded(nodeIDs []string) bool {
 		}
 	}
 	return false
+}
+
+// 所有前驱都失败
+func (e *DAGExecutor) allFailed(nodeIDs []string) bool {
+	for _, id := range nodeIDs {
+		if e.nodeStates[id] != NodeFailed {
+			return false
+		}
+	}
+	return len(nodeIDs) > 0
+}
+
+// 至少一个前驱失败
+func (e *DAGExecutor) oneFailed(nodeIDs []string) bool {
+	for _, id := range nodeIDs {
+		if e.nodeStates[id] == NodeFailed {
+			return true
+		}
+	}
+	return false
+}
+
+// 所有前驱都完成（成功或失败）
+func (e *DAGExecutor) allDone(nodeIDs []string) bool {
+	for _, id := range nodeIDs {
+		state := e.nodeStates[id]
+		if state != NodeSucceeded && state != NodeFailed && state != NodeSkipped {
+			return false
+		}
+	}
+	return len(nodeIDs) > 0
+}
+
+// 没有前驱失败（所有前驱成功或跳过）
+func (e *DAGExecutor) noneFailed(nodeIDs []string) bool {
+	for _, id := range nodeIDs {
+		state := e.nodeStates[id]
+		if state == NodeFailed {
+			return false
+		}
+		// 确保至少有成功的节点，不能全部都是跳过
+		if len(nodeIDs) == 1 && state == NodeSkipped {
+			return false
+		}
+	}
+	return len(nodeIDs) > 0
 }
 
 // 调度节点
