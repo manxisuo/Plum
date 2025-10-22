@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -139,6 +140,45 @@ func handleDiscover(w http.ResponseWriter, r *http.Request) {
 		if n, err := strconv.Atoi(lim); err == nil && n < len(out) {
 			out = out[:n]
 		}
+	}
+	writeJSON(w, out)
+}
+
+func handleDiscoverRandom(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	service := r.URL.Query().Get("service")
+	if service == "" {
+		http.Error(w, "service required", http.StatusBadRequest)
+		return
+	}
+	version := r.URL.Query().Get("version")
+	protocol := r.URL.Query().Get("protocol")
+	eps, err := store.Current.ListEndpointsByService(service, version, protocol)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if len(eps) == 0 {
+		http.Error(w, "no endpoints found", http.StatusNotFound)
+		return
+	}
+	// 随机选择一个端点
+	rand.Seed(time.Now().UnixNano())
+	selected := eps[rand.Intn(len(eps))]
+	out := EndpointDTO{
+		ServiceName: selected.ServiceName,
+		InstanceID:  selected.InstanceID,
+		NodeID:      selected.NodeID,
+		IP:          selected.IP,
+		Port:        selected.Port,
+		Protocol:    selected.Protocol,
+		Version:     selected.Version,
+		Labels:      selected.Labels,
+		Healthy:     selected.Healthy,
+		LastSeen:    selected.LastSeen,
 	}
 	writeJSON(w, out)
 }
