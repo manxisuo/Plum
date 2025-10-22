@@ -11,6 +11,9 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/swagger", handleSwaggerUI)
 	mux.HandleFunc("/swagger/", handleSwaggerUI)
 	mux.HandleFunc("/swagger/openapi.json", withCORS(handleOpenAPI))
+	// Swagger UI static files - 必须在通配符路由之前
+	mux.HandleFunc("/swagger/swagger-ui.css", handleSwaggerCSS)
+	mux.HandleFunc("/swagger/swagger-ui-bundle.js", handleSwaggerJS)
 	// nodes & health
 	mux.HandleFunc("/v1/stream", withCORS(handleSSEStream))
 	mux.HandleFunc("/v1/nodes/heartbeat", withCORS(handleHeartbeat))
