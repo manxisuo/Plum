@@ -98,7 +98,37 @@ demo:
 	@echo "3) create task: curl -s -XPOST http://127.0.0.1:8080/v1/tasks -H 'Content-Type: application/json' -d '{"name":"app1","artifactUrl":"http://127.0.0.1:8000/app1.zip","startCmd":"echo hello","replicas":{"nodeA":1}}' | jq ."
 
 ui:
-	cd ui && npm i --silent
+	@if [ ! -d "ui/node_modules" ]; then \
+		echo "📦 node_modules 不存在，开始安装依赖..."; \
+		cd ui && npm install --include=optional --silent; \
+	else \
+		echo "✅ node_modules 已存在，跳过安装"; \
+		echo "   💡 可用选项:"; \
+		echo "      make ui-update    - 增量更新依赖（推荐）"; \
+		echo "      make ui-reinstall - 完全重新安装"; \
+		echo "      make ui-clean     - 仅删除node_modules"; \
+	fi
+
+ui-update:
+	@echo "📦 更新UI依赖（增量安装）..."
+	cd ui && npm install --include=optional --silent
+
+ui-reinstall:
+	@echo "🔄 完全重新安装UI依赖..."
+	@if [ -d "ui/node_modules" ]; then \
+		echo "🗑️  删除现有 node_modules..."; \
+		rm -rf ui/node_modules; \
+	fi
+	cd ui && npm install --include=optional --silent
+
+ui-clean:
+	@echo "🗑️  清理UI依赖..."
+	@if [ -d "ui/node_modules" ]; then \
+		rm -rf ui/node_modules; \
+		echo "✅ node_modules 已删除"; \
+	else \
+		echo "⚠️  node_modules 目录不存在"; \
+	fi
 
 ui-dev:
 	cd ui && npm run dev
@@ -110,6 +140,11 @@ ui-build:
 # SDK C++ (library and examples)
 sdk_cpp:
 	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake --build sdk/cpp/build --config Release -j
+
+# SDK C++ (离线模式，不使用网络下载依赖)
+sdk_cpp_offline:
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release -DUSE_OFFLINE_DEPS=ON
 	cmake --build sdk/cpp/build --config Release -j
 
 # SDK C++ (使用GitHub镜像，适合中国网络)

@@ -1,0 +1,99 @@
+# Plum 离线部署包
+
+这个目录包含了Plum项目离线部署到银河麒麟V10 ARM64环境的所有必要文件。
+
+## 📁 目录结构
+
+```
+plum-offline-deploy/
+├── README.md                          # 本文件 - 部署包说明
+├── docs/                              # 部署相关文档
+│   ├── OFFLINE_DEPLOYMENT_SUMMARY.md  # 离线部署总结
+│   ├── ENVIRONMENT_COMPARISON.md      # 环境对比分析
+│   ├── FILE_COMPARISON_TABLE.md       # 文件对比表格
+│   └── GO_TOOLS_REQUIREMENT.md        # Go工具需求说明
+├── scripts-prepare/                   # WSL2环境准备脚本
+│   ├── prepare-offline-deploy.sh      # 主准备脚本
+│   ├── prepare-arm64-go-tools.sh     # ARM64工具准备脚本
+│   └── fix-permissions.sh            # 权限修复脚本
+├── scripts/                           # 目标环境部署脚本
+│   ├── install-deps.sh               # 依赖安装脚本
+│   ├── build-all.sh                  # 构建脚本
+│   └── deploy.sh                     # 部署脚本
+├── tools/                            # 构建工具（ARM64版本）
+│   ├── go1.23.12.linux-arm64.tar.gz # Go ARM64版本
+│   ├── node-v18.20.4-linux-arm64.tar.xz # Node.js ARM64版本
+│   └── go-arm64-tools/               # Go protobuf工具（ARM64）
+├── source/                           # 项目源码（包含依赖）
+│   └── Plum/                        # 完整项目源码
+│       ├── controller/               # Controller源码+vendor依赖
+│       ├── agent-go/                 # Agent源码+vendor依赖
+│       ├── ui/                       # Web UI源码+node_modules
+│       └── ...                       # 其他源码文件
+└── go-vendor-backup/                 # Go依赖包备份
+    ├── controller-vendor/            # Controller依赖备份
+    └── agent-vendor/                 # Agent依赖备份
+```
+
+## 🚀 使用说明
+
+### 在WSL2环境中准备（已完成）
+```bash
+# 在项目根目录运行
+./plum-offline-deploy/scripts-prepare/prepare-offline-deploy.sh
+```
+
+### 在目标环境部署
+```bash
+cd plum-offline-deploy/scripts
+
+# 1. 安装依赖
+./install-deps.sh
+
+# 2. 构建项目
+./build-all.sh
+
+# 3. 部署服务
+./deploy.sh
+```
+
+## 📋 文件说明
+
+### 准备脚本（scripts-prepare/）
+- **prepare-offline-deploy.sh**: 主要准备脚本，复制源码和依赖
+- **prepare-arm64-go-tools.sh**: ARM64工具交叉编译脚本
+- **fix-permissions.sh**: 权限修复脚本
+
+### 部署脚本（scripts/）
+- **install-deps.sh**: 在目标环境安装Go、Node.js和系统依赖
+- **build-all.sh**: 构建Controller、Agent和Web UI
+- **deploy.sh**: 部署为systemd服务并配置nginx
+
+### 工具文件（tools/）
+- **go1.23.12.linux-arm64.tar.gz**: Go 1.23.12 ARM64版本
+- **node-v18.20.4-linux-arm64.tar.xz**: Node.js 18.x ARM64版本
+- **go-arm64-tools/**: 预编译的protobuf工具（ARM64）
+
+### 源码（source/）
+- **Plum/**: 完整的项目源码，包含所有vendor和node_modules依赖
+
+## 🎯 关键特性
+
+1. **完全离线**: 所有依赖都已预下载，无需网络连接
+2. **架构匹配**: 所有工具和构建产物都是ARM64版本
+3. **依赖完整**: 包含Go vendor和Node.js node_modules
+4. **文档齐全**: 详细的部署文档和说明
+
+## 🔧 故障排除
+
+1. **Go工具问题**: 确保使用了ARM64版本的Go和protobuf工具
+2. **依赖缺失**: 检查vendor和node_modules目录是否存在
+3. **权限问题**: 确保脚本有执行权限，服务用户有适当权限
+4. **网络问题**: 如果遇到网络依赖，使用预下载的工具文件
+
+## 📞 支持
+
+如遇问题，请参考：
+- `docs/OFFLINE_DEPLOYMENT_SUMMARY.md` - 详细部署指南
+- `docs/ENVIRONMENT_COMPARISON.md` - 环境对比说明
+- `docs/GO_TOOLS_REQUIREMENT.md` - Go工具需求说明

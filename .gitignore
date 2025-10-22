@@ -90,3 +90,28 @@ agent.log
 # Temporary test files
 test_*.html
 test_*.sh
+
+# Offline deployment related files and directories
+# 直接指定要忽略的内容（这是最可靠的方法）
+plum-offline-deploy/source/
+plum-offline-deploy/tools/
+plum-offline-deploy/go-vendor-backup/
+
+# 根目录的部署相关文件（已移动到 plum-offline-deploy/）
+/ENVIRONMENT_COMPARISON.md
+/FILE_COMPARISON_TABLE.md
+/GO_TOOLS_REQUIREMENT.md
+/OFFLINE_DEPLOYMENT_SUMMARY.md
+
+# Temporary build artifacts from deployment preparation
+*.tar.gz
+*.tar.xz
+go-arm64-tools/
+temp-go-arm64/
+
+# Go vendor directories (can be regenerated with 'go mod vendor')
+controller/vendor/
+agent-go/vendor/
+
+# Keep main deployment documentation for reference
+# OFFLINE_DEPLOYMENT_SUMMARY.md - keep this file
