@@ -7,8 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(plumworker)
 add_subdirectory(plumresource)
 add_subdirectory(plumkv)
+add_subdirectory(plumclient)
 add_subdirectory(examples/echo_worker)
 add_subdirectory(examples/grpc_echo_worker)
 add_subdirectory(examples/radar_sensor)
+add_subdirectory(examples/service_client_example)
 
 
