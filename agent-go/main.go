@@ -112,8 +112,8 @@ func main() {
 		}
 	}()
 
-	// 主循环
-	ticker := time.NewTicker(5 * time.Second)
+	// 主循环 - 优化：降低到1秒以提高故障检测速度
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {

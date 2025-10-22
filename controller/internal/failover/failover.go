@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/manxisuo/plum/controller/internal/notify"
@@ -25,7 +26,8 @@ func ttlSeconds() int64 {
 			return int64(n)
 		}
 	}
-	return 15
+	// 优化：降低心跳TTL从15秒到3秒，实现快速故障检测
+	return 3
 }
 
 func intervalSeconds() int {
@@ -34,7 +36,8 @@ func intervalSeconds() int {
 			return n
 		}
 	}
-	return 5
+	// 优化：降低故障转移间隔从5秒到1秒，实现快速迁移
+	return 1
 }
 
 func enabled() bool {
@@ -105,38 +108,65 @@ func migrateNode(badNode string, healthySet map[string]bool) {
 		}
 		return healthyNodes[rand.Intn(len(healthyNodes))], true
 	}
+	// 优化：并行迁移多个应用，减少迁移延迟
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 5) // 限制并发数为5，避免过载
+
 	for _, a := range assigns {
 		// Only migrate Desired=Running
 		if a.Desired != store.DesiredRunning {
 			continue
 		}
-		// Stop old assignment first (idempotent)
-		_ = store.Current.UpdateAssignmentDesired(a.InstanceID, store.DesiredStopped)
-		target, ok := pick()
-		if !ok || target == badNode {
-			continue
-		}
-		// Create new assignment on target
-		newIID := store.Current.NewInstanceID(a.DeploymentID)
-		err := store.Current.AddAssignment(target, store.Assignment{
-			InstanceID:   newIID,
-			DeploymentID: a.DeploymentID,
-			NodeID:       target,
-			Desired:      store.DesiredRunning,
-			ArtifactURL:  a.ArtifactURL,
-			StartCmd:     a.StartCmd,
-			AppName:      a.AppName,    // 复制应用名称
-			AppVersion:   a.AppVersion, // 复制应用版本
-		})
-		if err != nil {
-			log.Printf("failover: add assignment %s->%s error: %v", a.InstanceID, target, err)
-		} else {
-			log.Printf("failover: migrated instance %s (deployment %s) from %s to %s as %s", a.InstanceID, a.DeploymentID, badNode, target, newIID)
-			notify.Publish(target)
-		}
-		// small jitter to avoid burst
-		time.Sleep(time.Duration(50+rand.Intn(200)) * time.Millisecond)
+
+		wg.Add(1)
+		go func(assignment store.Assignment) {
+			defer wg.Done()
+
+			// 性能监控：记录迁移开始时间
+			migrationStart := time.Now()
+
+			// 获取信号量，限制并发
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// Stop old assignment first (idempotent)
+			_ = store.Current.UpdateAssignmentDesired(assignment.InstanceID, store.DesiredStopped)
+			target, ok := pick()
+			if !ok || target == badNode {
+				return
+			}
+			// Create new assignment on target
+			newIID := store.Current.NewInstanceID(assignment.DeploymentID)
+			err := store.Current.AddAssignment(target, store.Assignment{
+				InstanceID:   newIID,
+				DeploymentID: assignment.DeploymentID,
+				NodeID:       target,
+				Desired:      store.DesiredRunning,
+				ArtifactURL:  assignment.ArtifactURL,
+				StartCmd:     assignment.StartCmd,
+				AppName:      assignment.AppName,    // 复制应用名称
+				AppVersion:   assignment.AppVersion, // 复制应用版本
+			})
+			if err != nil {
+				log.Printf("failover: add assignment %s->%s error: %v", assignment.InstanceID, target, err)
+			} else {
+				// 性能监控：记录迁移完成时间
+				migrationDuration := time.Since(migrationStart)
+				log.Printf("性能监控: 实例 %s 迁移耗时 %v", assignment.InstanceID, migrationDuration)
+
+				// 检查是否超过2秒阈值
+				if migrationDuration > 2*time.Second {
+					log.Printf("⚠️  性能警告: 实例 %s 迁移时间 %v 超过2秒阈值", assignment.InstanceID, migrationDuration)
+				}
+
+				log.Printf("failover: migrated instance %s (deployment %s) from %s to %s as %s", assignment.InstanceID, assignment.DeploymentID, badNode, target, newIID)
+				notify.Publish(target)
+			}
+		}(a)
 	}
+
+	// 等待所有迁移完成
+	wg.Wait()
 }
 
 // ComputeHealth returns nodeId -> health for current nodes.

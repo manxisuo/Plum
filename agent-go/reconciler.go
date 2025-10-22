@@ -19,19 +19,21 @@ type ProcessState struct {
 
 // Reconciler 协调器
 type Reconciler struct {
-	baseDir    string
-	http       *HTTPClient
-	controller string
-	instances  map[string]*ProcessState
+	baseDir           string
+	http              *HTTPClient
+	controller        string
+	instances         map[string]*ProcessState
+	restartStartTimes map[string]time.Time // 性能监控：记录重启开始时间
 }
 
 func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconciler {
 	EnsureDir(baseDir)
 	return &Reconciler{
-		baseDir:    baseDir,
-		http:       http,
-		controller: controller,
-		instances:  make(map[string]*ProcessState),
+		baseDir:           baseDir,
+		http:              http,
+		controller:        controller,
+		instances:         make(map[string]*ProcessState),
+		restartStartTimes: make(map[string]time.Time),
 	}
 }
 
@@ -57,18 +59,36 @@ func (r *Reconciler) Sync(assignments []Assignment) {
 
 // ensureRunning 确保实例运行
 func (r *Reconciler) ensureRunning(a Assignment) {
-	// 检查是否已运行
+	// 检查是否已运行 - 优化：使用更快的进程检测机制
 	if state, exists := r.instances[a.InstanceID]; exists {
-		// 用Signal(0)检查进程是否真的还活着
+		// 使用/proc/pid/stat进行快速进程检测
 		if state.Cmd.Process != nil {
-			err := state.Cmd.Process.Signal(syscall.Signal(0))
+			pid := state.Cmd.Process.Pid
+			statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 			if err == nil {
-				return // 进程仍在运行
+				// 解析进程状态
+				statStr := string(statData)
+				if idx := strings.LastIndex(statStr, ")"); idx != -1 && idx+2 < len(statStr) {
+					state := statStr[idx+2]
+					// Z = 僵尸进程，其他状态认为进程还活着
+					if state != 'Z' {
+						return // 进程仍在运行
+					}
+				}
+			} else {
+				// 如果无法读取/proc/pid/stat，回退到Signal(0)检测
+				err := state.Cmd.Process.Signal(syscall.Signal(0))
+				if err == nil {
+					return // 进程仍在运行
+				}
 			}
 		}
 		// 进程已死，清理状态
 		delete(r.instances, a.InstanceID)
 		log.Printf("Instance %s process died, will restart", a.InstanceID)
+
+		// 性能监控：记录重启开始时间
+		r.restartStartTimes[a.InstanceID] = time.Now()
 	}
 
 	instDir := filepath.Join(r.baseDir, a.InstanceID)
@@ -136,6 +156,13 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 	log.Printf("Started instance %s, PID=%d", a.InstanceID, cmd.Process.Pid)
 	r.instances[a.InstanceID] = &ProcessState{Cmd: cmd}
 	r.postStatus(a.InstanceID, "Running", 0, true)
+
+	// 性能监控：记录重启时间
+	if startTime, exists := r.restartStartTimes[a.InstanceID]; exists {
+		restartDuration := time.Since(startTime)
+		log.Printf("性能监控: 实例 %s 重启耗时 %v", a.InstanceID, restartDuration)
+		delete(r.restartStartTimes, a.InstanceID)
+	}
 }
 
 // ensureStoppedExcept 停止不需要的实例
