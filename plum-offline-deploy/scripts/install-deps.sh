@@ -116,37 +116,18 @@ if command -v apt &> /dev/null; then
         echo "⚠️  以下工具缺失: $MISSING_TOOLS"
         echo "   尝试安装缺失的依赖..."
         
-        # 尝试安装缺失的依赖 (plumclient现在使用httplib，不再需要libcurl)
-        if echo "$MISSING_TOOLS" | grep -q "libpthread-stubs0-dev"; then
-            echo "📦 安装C++ SDK依赖..."
-            sudo apt-get update
-            sudo apt-get install -y libpthread-stubs0-dev build-essential
-            echo "✅ C++ SDK依赖安装完成"
-        fi
-        
-        if echo "$MISSING_TOOLS" | grep -q "cmake"; then
-            echo "📦 安装CMake..."
-            sudo apt-get install -y cmake
-            echo "✅ CMake安装完成"
-        fi
-        
-        if echo "$MISSING_TOOLS" | grep -q "pkg-config"; then
-            echo "📦 安装pkg-config..."
-            sudo apt-get install -y pkg-config
-            echo "✅ pkg-config安装完成"
-        fi
-        
-        if echo "$MISSING_TOOLS" | grep -q "make"; then
-            echo "📦 安装make..."
-            sudo apt-get install -y make
-            echo "✅ make安装完成"
-        fi
-        
-        if echo "$MISSING_TOOLS" | grep -q "gcc\|g++"; then
-            echo "📦 安装编译工具..."
-            sudo apt-get install -y build-essential
-            echo "✅ 编译工具安装完成"
-        fi
+        # 离线模式：跳过网络安装，仅检查已安装的工具
+        echo "⚠️  离线模式：以下工具缺失但无法自动安装："
+        echo "   $MISSING_TOOLS"
+        echo ""
+        echo "💡 建议解决方案："
+        echo "1. 在联网环境中预先安装这些依赖包"
+        echo "2. 或者手动下载对应的.deb包并安装"
+        echo "3. 对于libpthread-stubs0-dev，通常不是必需的，可以忽略"
+        echo ""
+        echo "🔧 如果必须安装，可以尝试："
+        echo "   sudo dpkg -i <package.deb>"
+        echo "   sudo apt-get install -f  # 修复依赖（需要网络）"
     fi
     echo "✅ 系统依赖检查完成"
 else
@@ -245,11 +226,15 @@ if [ -d "$GRPC_DEPS_DIR" ] && ls "$GRPC_DEPS_DIR"/*.deb 1> /dev/null 2>&1; then
     # 安装所有包
     echo "📥 安装gRPC开发包..."
     sudo dpkg -i *.deb 2>/dev/null || {
-        echo "⚠️  部分包安装失败，尝试修复依赖..."
-        sudo apt-get install -f -y 2>/dev/null || {
-            echo "⚠️  无法自动修复依赖，请手动处理"
-            echo "   可以尝试: sudo apt-get install -f"
-        }
+        echo "⚠️  部分包安装失败，离线模式无法自动修复依赖"
+        echo "💡 如果安装失败，请检查："
+        echo "1. 包是否已损坏"
+        echo "2. 依赖关系是否正确"
+        echo "3. 系统是否缺少基础库"
+        echo ""
+        echo "🔧 手动修复建议："
+        echo "   sudo dpkg --configure -a  # 配置未完成的包"
+        echo "   sudo apt-get install -f  # 修复依赖（需要网络）"
     }
     
     # 验证安装
