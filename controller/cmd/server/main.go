@@ -14,6 +14,7 @@ import (
 	"github.com/manxisuo/plum/controller/internal/store"
 	sqlitestore "github.com/manxisuo/plum/controller/internal/store/sqlite"
 	"github.com/manxisuo/plum/controller/internal/tasks"
+	"github.com/manxisuo/plum/controller/internal/weaknetwork"
 )
 
 func getExeDir() string {
@@ -79,8 +80,24 @@ func main() {
 		log.Printf("Warning: failed to init builtin tasks: %v", err)
 	}
 
+	// 初始化弱网环境管理器
+	weakNetworkConfig := weaknetwork.LoadConfigFromEnv()
+	weakNetworkManager := weaknetwork.NewWeakNetworkManager(weakNetworkConfig)
+	if err := weakNetworkManager.Start(); err != nil {
+		log.Printf("Warning: failed to start weak network manager: %v", err)
+	}
+	defer weakNetworkManager.Stop()
+
 	mux := http.NewServeMux()
 	httpapi.RegisterRoutes(mux)
+
+	// 使用弱网环境管理器包装路由
+	mux = http.NewServeMux()
+	httpapi.RegisterRoutes(mux)
+
+	// 包装所有路由以支持弱网环境
+	wrappedMux := weakNetworkManager.WrapMiddleware(mux)
+
 	// start failover loop
 	failover.Start()
 	// start tasks scheduler (minimal)
@@ -103,7 +120,7 @@ func main() {
 	// 启动服务器
 	server := &http.Server{
 		Addr:    addr,
-		Handler: mux,
+		Handler: wrappedMux, // 使用包装后的处理器
 	}
 
 	go func() {
