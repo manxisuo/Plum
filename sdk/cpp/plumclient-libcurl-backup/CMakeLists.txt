@@ -8,7 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
-# 使用httplib (header-only库，无需查找)
+# 查找libcurl
+pkg_check_modules(CURL REQUIRED libcurl)
 
 # 查找nlohmann/json (已通过主CMakeLists.txt处理)
 
@@ -27,26 +28,6 @@ if(NOT NLOHMANN_JSON_INCLUDE_DIR)
     set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/json-src/include")
 endif()
 
-# 查找httplib
-find_path(HTTPLIB_INCLUDE_DIR
-    NAMES httplib.h
-    PATHS 
-        /usr/include 
-        /usr/local/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/cpp-httplib
-)
-
-if(NOT HTTPLIB_INCLUDE_DIR)
-    message(WARNING "httplib not found, trying to use from build directory")
-    set(HTTPLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src")
-endif()
-
-# 确保路径正确
-if(NOT EXISTS "${HTTPLIB_INCLUDE_DIR}/httplib.h")
-    message(FATAL_ERROR "httplib.h not found at ${HTTPLIB_INCLUDE_DIR}")
-endif()
-
 # 创建库
 add_library(plumclient SHARED
     src/plum_client.cpp
@@ -60,14 +41,21 @@ add_library(plumclient SHARED
 target_include_directories(plumclient
     PUBLIC
         include
+        ${CURL_INCLUDE_DIRS}
         ${NLOHMANN_JSON_INCLUDE_DIR}
-        ${HTTPLIB_INCLUDE_DIR}
 )
 
 # 链接库
 target_link_libraries(plumclient
     PUBLIC
+        ${CURL_LIBRARIES}
         Threads::Threads
+)
+
+# 设置编译选项
+target_compile_options(plumclient
+    PRIVATE
+        ${CURL_CFLAGS_OTHER}
 )
 
 # 安装规则

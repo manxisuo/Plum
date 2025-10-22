@@ -11,7 +11,6 @@
 #include <thread>
 #include <optional>
 #include <nlohmann/json.hpp>
-#include <httplib.h>
 
 namespace plumclient {
 

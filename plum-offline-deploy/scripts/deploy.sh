@@ -41,7 +41,59 @@ else
     exit 1
 fi
 
-# 3. 部署Web UI
+# 3. 部署C++ SDK和Plum Client库
+echo "📦 部署C++ SDK和Plum Client库..."
+
+# 创建SDK目录
+sudo mkdir -p $DEPLOY_ROOT/sdk/{lib,include,examples}
+
+# 部署Plum Client库
+if [ -f "sdk/cpp/build/plumclient/libplumclient.so" ]; then
+    sudo cp sdk/cpp/build/plumclient/libplumclient.so $DEPLOY_ROOT/sdk/lib/
+    sudo chmod 755 $DEPLOY_ROOT/sdk/lib/libplumclient.so
+    echo "✅ Plum Client库已部署"
+else
+    echo "⚠️  Plum Client库未找到，跳过部署"
+fi
+
+# 部署Plum Client头文件
+if [ -d "sdk/cpp/plumclient/include" ]; then
+    sudo cp -r sdk/cpp/plumclient/include $DEPLOY_ROOT/sdk/
+    sudo chown -R $SERVICE_USER:$SERVICE_GROUP $DEPLOY_ROOT/sdk/include
+    echo "✅ Plum Client头文件已部署"
+else
+    echo "⚠️  Plum Client头文件未找到，跳过部署"
+fi
+
+# 部署Service Client示例
+if [ -f "sdk/cpp/build/examples/service_client_example/service_client_example" ]; then
+    sudo cp sdk/cpp/build/examples/service_client_example/service_client_example $DEPLOY_ROOT/sdk/examples/
+    sudo chmod +x $DEPLOY_ROOT/sdk/examples/service_client_example
+    echo "✅ Service Client示例已部署"
+else
+    echo "⚠️  Service Client示例未找到，跳过部署"
+fi
+
+# 部署其他C++示例
+if [ -f "sdk/cpp/build/examples/echo_worker/echo_worker" ]; then
+    sudo cp sdk/cpp/build/examples/echo_worker/echo_worker $DEPLOY_ROOT/sdk/examples/
+    sudo chmod +x $DEPLOY_ROOT/sdk/examples/echo_worker
+    echo "✅ Echo Worker示例已部署"
+fi
+
+if [ -f "sdk/cpp/build/examples/radar_sensor/radar_sensor" ]; then
+    sudo cp sdk/cpp/build/examples/radar_sensor/radar_sensor $DEPLOY_ROOT/sdk/examples/
+    sudo chmod +x $DEPLOY_ROOT/sdk/examples/radar_sensor
+    echo "✅ Radar Sensor示例已部署"
+fi
+
+if [ -f "sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker" ]; then
+    sudo cp sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker $DEPLOY_ROOT/sdk/examples/
+    sudo chmod +x $DEPLOY_ROOT/sdk/examples/grpc_echo_worker
+    echo "✅ gRPC Echo Worker示例已部署"
+fi
+
+# 4. 部署Web UI
 echo "📦 部署Web UI..."
 if [ -d "ui/dist" ]; then
     sudo cp -r ui/dist/* $DEPLOY_ROOT/ui/
@@ -181,6 +233,16 @@ echo ""
 echo "访问地址："
 echo "- Web UI: http://localhost (如果配置了nginx)"
 echo "- API: http://localhost:8080/v1/"
+echo ""
+echo "C++ SDK部署："
+echo "- Plum Client库: $DEPLOY_ROOT/sdk/lib/libplumclient.so"
+echo "- 头文件: $DEPLOY_ROOT/sdk/include/"
+echo "- 示例程序: $DEPLOY_ROOT/sdk/examples/"
+echo ""
+echo "C++ SDK使用："
+echo "- 编译时链接: -L$DEPLOY_ROOT/sdk/lib -lplumclient"
+echo "- 包含头文件: -I$DEPLOY_ROOT/sdk/include"
+echo "- 运行示例: $DEPLOY_ROOT/sdk/examples/service_client_example"
 echo ""
 echo "日志查看："
 echo "- Controller: sudo journalctl -u plum-controller -f"

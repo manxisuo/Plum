@@ -1,11 +1,18 @@
 #include "plum_client.hpp"
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <random>
 
 namespace plumclient {
 
-// 不再需要WriteCallback函数，httplib会自动处理响应
+// 静态回调函数
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::string* str = static_cast<std::string*>(userp);
+    str->append(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
 
 DiscoveryClient::DiscoveryClient(const std::string& controllerUrl,
                                std::shared_ptr<WeakNetworkSupport> weakNetworkSupport,
@@ -149,130 +156,76 @@ std::optional<Endpoint> DiscoveryClient::discoverRandomService(const DiscoveryRe
 }
 
 std::vector<Endpoint> DiscoveryClient::makeDiscoveryRequest(const std::string& path) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        return {};
+    }
+    
+    std::string responseBody;
+    long httpCode = 0;
+    
+    // 设置URL
+    curl_easy_setopt(curl, CURLOPT_URL, path.c_str());
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    
+    // 设置响应处理
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    
+    // 执行请求
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    
+    curl_easy_cleanup(curl);
+    
+    // 检查结果
+    if (res != CURLE_OK || httpCode != 200) {
+        return {};
+    }
+    
+    // 解析JSON响应
     try {
-        // 解析URL
-        std::string host, urlPath;
-        int port = 80;
-        
-        // 简单的URL解析
-        if (path.find("https://") == 0) {
-            port = 443;
-            size_t start = 8; // "https://"
-            size_t slashPos = path.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = path.substr(start, slashPos - start);
-                urlPath = path.substr(slashPos);
-            } else {
-                host = path.substr(start);
-                urlPath = "/";
-            }
-        } else if (path.find("http://") == 0) {
-            size_t start = 7; // "http://"
-            size_t slashPos = path.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = path.substr(start, slashPos - start);
-                urlPath = path.substr(slashPos);
-            } else {
-                host = path.substr(start);
-                urlPath = "/";
-            }
-        } else {
-            return {};
-        }
-        
-        // 检查端口
-        size_t colonPos = host.find(':');
-        if (colonPos != std::string::npos) {
-            port = std::stoi(host.substr(colonPos + 1));
-            host = host.substr(0, colonPos);
-        }
-        
-        // 创建httplib客户端
-        httplib::Client client(host, port);
-        client.set_connection_timeout(10, 0);
-        client.set_read_timeout(30, 0);
-        
-        // 执行GET请求
-        auto res = client.Get(urlPath);
-        
-        // 检查结果
-        if (!res || res->status != 200) {
-            return {};
-        }
-        
-        // 解析JSON响应
-        try {
-            nlohmann::json root = nlohmann::json::parse(res->body);
-            return parseEndpointsFromJson(root);
-        } catch (const std::exception& e) {
-            return {};
-        }
-        
+        nlohmann::json root = nlohmann::json::parse(responseBody);
+        return parseEndpointsFromJson(root);
     } catch (const std::exception& e) {
         return {};
     }
 }
 
 std::optional<Endpoint> DiscoveryClient::makeRandomDiscoveryRequest(const std::string& path) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        return std::nullopt;
+    }
+    
+    std::string responseBody;
+    long httpCode = 0;
+    
+    // 设置URL
+    curl_easy_setopt(curl, CURLOPT_URL, path.c_str());
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    
+    // 设置响应处理
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    
+    // 执行请求
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    
+    curl_easy_cleanup(curl);
+    
+    // 检查结果
+    if (res != CURLE_OK || httpCode != 200) {
+        return std::nullopt;
+    }
+    
+    // 解析JSON响应
     try {
-        // 解析URL
-        std::string host, urlPath;
-        int port = 80;
-        
-        // 简单的URL解析
-        if (path.find("https://") == 0) {
-            port = 443;
-            size_t start = 8; // "https://"
-            size_t slashPos = path.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = path.substr(start, slashPos - start);
-                urlPath = path.substr(slashPos);
-            } else {
-                host = path.substr(start);
-                urlPath = "/";
-            }
-        } else if (path.find("http://") == 0) {
-            size_t start = 7; // "http://"
-            size_t slashPos = path.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = path.substr(start, slashPos - start);
-                urlPath = path.substr(slashPos);
-            } else {
-                host = path.substr(start);
-                urlPath = "/";
-            }
-        } else {
-            return std::nullopt;
-        }
-        
-        // 检查端口
-        size_t colonPos = host.find(':');
-        if (colonPos != std::string::npos) {
-            port = std::stoi(host.substr(colonPos + 1));
-            host = host.substr(0, colonPos);
-        }
-        
-        // 创建httplib客户端
-        httplib::Client client(host, port);
-        client.set_connection_timeout(10, 0);
-        client.set_read_timeout(30, 0);
-        
-        // 执行GET请求
-        auto res = client.Get(urlPath);
-        
-        // 检查结果
-        if (!res || res->status != 200) {
-            return std::nullopt;
-        }
-        
-        // 解析JSON响应
-        try {
-            nlohmann::json root = nlohmann::json::parse(res->body);
-            return parseEndpointFromJson(root);
-        } catch (const std::exception& e) {
-            return std::nullopt;
-        }
-        
+        nlohmann::json root = nlohmann::json::parse(responseBody);
+        return parseEndpointFromJson(root);
     } catch (const std::exception& e) {
         return std::nullopt;
     }

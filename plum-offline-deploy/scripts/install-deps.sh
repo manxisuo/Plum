@@ -93,6 +93,16 @@ if command -v apt &> /dev/null; then
         echo "✅ pkg-config已安装: $(pkg-config --version)"
     fi
     
+    # 检查C++ SDK依赖 (plumclient现在使用httplib，不再需要libcurl)
+    echo "✅ C++ SDK依赖: plumclient使用httplib，无需额外依赖"
+    
+    if ! pkg-config --exists pthread; then
+        MISSING_TOOLS="$MISSING_TOOLS libpthread-stubs0-dev"
+        echo "❌ pthread开发包: 未找到"
+    else
+        echo "✅ pthread开发包已安装"
+    fi
+    
     # 检查protobuf工具（先检查，稍后安装）
     if ! command -v protoc &> /dev/null; then
         MISSING_TOOLS="$MISSING_TOOLS protoc"
@@ -104,7 +114,39 @@ if command -v apt &> /dev/null; then
     # 报告结果
     if [ -n "$MISSING_TOOLS" ]; then
         echo "⚠️  以下工具缺失: $MISSING_TOOLS"
-        echo "   将在后续步骤中尝试安装protoc等工具"
+        echo "   尝试安装缺失的依赖..."
+        
+        # 尝试安装缺失的依赖 (plumclient现在使用httplib，不再需要libcurl)
+        if echo "$MISSING_TOOLS" | grep -q "libpthread-stubs0-dev"; then
+            echo "📦 安装C++ SDK依赖..."
+            sudo apt-get update
+            sudo apt-get install -y libpthread-stubs0-dev build-essential
+            echo "✅ C++ SDK依赖安装完成"
+        fi
+        
+        if echo "$MISSING_TOOLS" | grep -q "cmake"; then
+            echo "📦 安装CMake..."
+            sudo apt-get install -y cmake
+            echo "✅ CMake安装完成"
+        fi
+        
+        if echo "$MISSING_TOOLS" | grep -q "pkg-config"; then
+            echo "📦 安装pkg-config..."
+            sudo apt-get install -y pkg-config
+            echo "✅ pkg-config安装完成"
+        fi
+        
+        if echo "$MISSING_TOOLS" | grep -q "make"; then
+            echo "📦 安装make..."
+            sudo apt-get install -y make
+            echo "✅ make安装完成"
+        fi
+        
+        if echo "$MISSING_TOOLS" | grep -q "gcc\|g++"; then
+            echo "📦 安装编译工具..."
+            sudo apt-get install -y build-essential
+            echo "✅ 编译工具安装完成"
+        fi
     fi
     echo "✅ 系统依赖检查完成"
 else

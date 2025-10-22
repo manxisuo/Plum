@@ -8,8 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 
-# 查找libcurl
-pkg_check_modules(CURL REQUIRED libcurl)
+# 使用httplib (header-only库，无需查找)
 
 # 查找nlohmann/json
 find_path(NLOHMANN_JSON_INCLUDE_DIR
@@ -23,6 +22,20 @@ find_path(NLOHMANN_JSON_INCLUDE_DIR
 
 if(NOT NLOHMANN_JSON_INCLUDE_DIR)
     set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/json-src/include")
+endif()
+
+# 查找httplib
+find_path(HTTPLIB_INCLUDE_DIR
+    NAMES httplib.h
+    PATHS 
+        /usr/include 
+        /usr/local/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/cpp-httplib
+)
+
+if(NOT HTTPLIB_INCLUDE_DIR)
+    set(HTTPLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src")
 endif()
 
 # 创建示例程序
@@ -39,19 +52,12 @@ add_executable(service_client_example
 target_include_directories(service_client_example
     PRIVATE
         ../../plumclient/include
-        ${CURL_INCLUDE_DIRS}
         ${NLOHMANN_JSON_INCLUDE_DIR}
+        ${HTTPLIB_INCLUDE_DIR}
 )
 
 # 链接库
 target_link_libraries(service_client_example
     PRIVATE
-        ${CURL_LIBRARIES}
         Threads::Threads
-)
-
-# 设置编译选项
-target_compile_options(service_client_example
-    PRIVATE
-        ${CURL_CFLAGS_OTHER}
 )

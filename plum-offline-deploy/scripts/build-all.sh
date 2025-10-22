@@ -121,7 +121,57 @@ else
 fi
 cd ..
 
-# 4. 构建Web UI
+# 4. 构建C++ SDK和Plum Client库
+echo "📦 构建C++ SDK和Plum Client库..."
+
+# 检查CMake是否可用
+if ! command -v cmake &> /dev/null; then
+    echo "❌ CMake未安装，跳过C++ SDK构建"
+    echo "   如需构建C++ SDK，请安装CMake: sudo apt-get install cmake"
+else
+    echo "🔧 检查C++依赖..."
+    
+    # 检查httplib (plumclient现在使用httplib，不再需要libcurl)
+    if [ -f "/usr/include/httplib.h" ] || [ -f "/usr/local/include/httplib.h" ]; then
+        echo "✅ httplib头文件已找到"
+    else
+        echo "ℹ️  httplib头文件未在系统路径找到，将使用项目内置版本"
+    fi
+    
+    # 检查pthread
+    if ! pkg-config --exists pthread; then
+        echo "⚠️  pthread未找到，C++ SDK构建可能失败"
+        echo "   请安装: sudo apt-get install libpthread-stubs0-dev"
+    else
+        echo "✅ pthread已安装"
+    fi
+    
+    # 构建C++ SDK
+    echo "🚀 开始构建C++ SDK..."
+    if make sdk_cpp_offline; then
+        echo "✅ C++ SDK构建完成"
+        
+        # 构建Plum Client库
+        echo "🚀 开始构建Plum Client库..."
+        if make plumclient; then
+            echo "✅ Plum Client库构建完成"
+            
+            # 构建Service Client示例
+            echo "🚀 开始构建Service Client示例..."
+            if make service_client_example; then
+                echo "✅ Service Client示例构建完成"
+            else
+                echo "⚠️  Service Client示例构建失败，但库构建成功"
+            fi
+        else
+            echo "⚠️  Plum Client库构建失败"
+        fi
+    else
+        echo "⚠️  C++ SDK构建失败，跳过Plum Client库构建"
+    fi
+fi
+
+# 5. 构建Web UI
 echo "📦 构建Web UI..."
 cd ui
 
@@ -169,5 +219,17 @@ echo "构建结果:"
 echo "- Controller: controller/bin/controller"
 echo "- Agent: agent-go/plum-agent"  
 echo "- Web UI: ui/dist/"
+
+# 检查C++ SDK构建结果
+if [ -f "sdk/cpp/build/plumclient/libplumclient.so" ]; then
+    echo "- Plum Client库: sdk/cpp/build/plumclient/libplumclient.so"
+    echo "  库大小: $(du -h sdk/cpp/build/plumclient/libplumclient.so | cut -f1)"
+fi
+
+if [ -f "sdk/cpp/build/examples/service_client_example/service_client_example" ]; then
+    echo "- Service Client示例: sdk/cpp/build/examples/service_client_example/service_client_example"
+    echo "  示例大小: $(du -h sdk/cpp/build/examples/service_client_example/service_client_example | cut -f1)"
+fi
+
 echo ""
 echo "下一步: 运行部署脚本"

@@ -1,10 +1,17 @@
 #include "plum_client.hpp"
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
 namespace plumclient {
 
-// 不再需要WriteCallback函数，httplib会自动处理响应
+// 静态回调函数
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::string* str = static_cast<std::string*>(userp);
+    str->append(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
 
 ServiceClient::ServiceClient(const std::string& controllerUrl,
                            std::shared_ptr<WeakNetworkSupport> weakNetworkSupport,
@@ -86,87 +93,66 @@ bool ServiceClient::makeRequest(const std::string& method,
                                const std::string& path,
                                const std::string& body,
                                const std::map<std::string, std::string>& headers) {
-    try {
-        // 解析URL
-        std::string host, urlPath;
-        int port = 80;
-        bool isHttps = false;
-        
-        // 简单的URL解析
-        if (path.find("https://") == 0) {
-            isHttps = true;
-            port = 443;
-            size_t start = 8; // "https://"
-            size_t slashPos = path.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = path.substr(start, slashPos - start);
-                urlPath = path.substr(slashPos);
-            } else {
-                host = path.substr(start);
-                urlPath = "/";
-            }
-        } else if (path.find("http://") == 0) {
-            size_t start = 7; // "http://"
-            size_t slashPos = path.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = path.substr(start, slashPos - start);
-                urlPath = path.substr(slashPos);
-            } else {
-                host = path.substr(start);
-                urlPath = "/";
-            }
-        } else {
-            return false;
-        }
-        
-        // 检查端口
-        size_t colonPos = host.find(':');
-        if (colonPos != std::string::npos) {
-            port = std::stoi(host.substr(colonPos + 1));
-            host = host.substr(0, colonPos);
-        }
-        
-        // 创建httplib客户端
-        httplib::Client client(host, port);
-        client.set_connection_timeout(10, 0);
-        client.set_read_timeout(30, 0);
-        
-        // 设置头部
-        httplib::Headers httplibHeaders;
-        for (const auto& header : headers) {
-            httplibHeaders.insert({header.first, header.second});
-        }
-        
-        // 执行请求
-        httplib::Result res;
-        if (method == "GET") {
-            res = client.Get(urlPath, httplibHeaders);
-        } else if (method == "POST") {
-            res = client.Post(urlPath, httplibHeaders, body, "application/json");
-        } else if (method == "PUT") {
-            res = client.Put(urlPath, httplibHeaders, body, "application/json");
-        } else if (method == "DELETE") {
-            res = client.Delete(urlPath, httplibHeaders);
-        } else {
-            return false;
-        }
-        
-        // 检查结果
-        bool success = res && (res->status >= 200 && res->status < 300);
-        
-        // 记录请求（用于弱网环境支持）
-        if (weakNetworkSupport_) {
-            weakNetworkSupport_->recordRequest();
-            if (!success) {
-                // 记录错误
-            }
-        }
-        
-        return success;
-        
-    } catch (const std::exception& e) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
         return false;
     }
+    
+    // 设置URL
+    curl_easy_setopt(curl, CURLOPT_URL, path.c_str());
+    
+    // 设置HTTP方法
+    if (method == "POST") {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+    } else if (method == "PUT") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+    } else if (method == "DELETE") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+    }
+    
+    // 设置超时
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    
+    // 设置头部
+    struct curl_slist* headerList = nullptr;
+    for (const auto& header : headers) {
+        std::string headerStr = header.first + ": " + header.second;
+        headerList = curl_slist_append(headerList, headerStr.c_str());
+    }
+    if (headerList) {
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerList);
+    }
+    
+    // 设置响应处理
+    std::string responseBody;
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    
+    // 执行请求
+    CURLcode res = curl_easy_perform(curl);
+    long httpCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    
+    // 清理
+    if (headerList) {
+        curl_slist_free_all(headerList);
+    }
+    curl_easy_cleanup(curl);
+    
+    // 检查结果
+    bool success = (res == CURLE_OK) && (httpCode >= 200 && httpCode < 300);
+    
+    // 记录请求（用于弱网环境支持）
+    if (weakNetworkSupport_) {
+        weakNetworkSupport_->recordRequest();
+        if (!success) {
+            // 记录错误
+        }
+    }
+    
+    return success;
 }
 
 } // namespace plumclient

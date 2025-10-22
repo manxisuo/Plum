@@ -19,6 +19,9 @@ plum-offline-deploy/
 ├── scripts/                           # 目标环境部署脚本
 │   ├── install-deps.sh               # 依赖安装脚本
 │   ├── build-all.sh                  # 构建脚本
+│   ├── build-cpp-sdk.sh              # C++ SDK构建脚本
+│   ├── check-cpp-deps.sh             # C++依赖检查脚本
+│   ├── install-cpp-sdk.sh            # C++ SDK安装脚本
 │   └── deploy.sh                     # 部署脚本
 ├── tools/                            # 构建工具（ARM64版本）
 │   ├── go1.23.12.linux-arm64.tar.gz # Go ARM64版本
@@ -50,11 +53,37 @@ cd plum-offline-deploy/scripts
 # 1. 安装依赖
 ./install-deps.sh
 
-# 2. 构建项目
+# 2. 构建项目（包含C++ SDK）
 ./build-all.sh
 
 # 3. 部署服务
 ./deploy.sh
+```
+
+### 单独构建C++ SDK
+```bash
+cd plum-offline-deploy/scripts
+
+# 1. 检查C++依赖
+./check-cpp-deps.sh
+
+# 2. 构建C++ SDK
+./build-cpp-sdk.sh
+
+# 3. 安装C++ SDK到系统（可选）
+sudo ./install-cpp-sdk.sh
+```
+
+### C++ SDK依赖问题
+如果遇到C++ SDK依赖问题，可以运行：
+```bash
+cd plum-offline-deploy/scripts
+
+# 检查C++ SDK依赖
+./check-cpp-deps.sh
+
+# 或者安装完整的C++ SDK依赖
+./install-cpp-deps.sh
 ```
 
 ## 📋 文件说明
@@ -66,7 +95,11 @@ cd plum-offline-deploy/scripts
 
 ### 部署脚本（scripts/）
 - **install-deps.sh**: 在目标环境安装Go、Node.js和系统依赖
-- **build-all.sh**: 构建Controller、Agent和Web UI
+- **build-all.sh**: 构建Controller、Agent、Web UI和C++ SDK
+- **build-cpp-sdk.sh**: 专门构建C++ SDK和Plum Client库
+- **check-cpp-deps.sh**: 检查C++ SDK依赖（CMake、httplib、pthread等）
+- **install-cpp-deps.sh**: 安装C++ SDK依赖（httplib、pthread等）
+- **install-cpp-sdk.sh**: 将C++ SDK安装到系统目录
 - **deploy.sh**: 部署为systemd服务并配置nginx
 
 ### 工具文件（tools/）
@@ -82,14 +115,16 @@ cd plum-offline-deploy/scripts
 1. **完全离线**: 所有依赖都已预下载，无需网络连接
 2. **架构匹配**: 所有工具和构建产物都是ARM64版本
 3. **依赖完整**: 包含Go vendor和Node.js node_modules
-4. **文档齐全**: 详细的部署文档和说明
+4. **C++ SDK支持**: 包含Plum Client库和示例程序
+5. **文档齐全**: 详细的部署文档和说明
 
 ## 🔧 故障排除
 
 1. **Go工具问题**: 确保使用了ARM64版本的Go和protobuf工具
 2. **依赖缺失**: 检查vendor和node_modules目录是否存在
-3. **权限问题**: 确保脚本有执行权限，服务用户有适当权限
-4. **网络问题**: 如果遇到网络依赖，使用预下载的工具文件
+3. **C++ SDK问题**: 确保安装了CMake、httplib和pthread开发包
+4. **权限问题**: 确保脚本有执行权限，服务用户有适当权限
+5. **网络问题**: 如果遇到网络依赖，使用预下载的工具文件
 
 ## 📞 支持
 

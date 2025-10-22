@@ -1,4 +1,5 @@
 #include "plum_client.hpp"
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <random>
@@ -7,7 +8,13 @@
 
 namespace plumclient {
 
-// 不再需要WriteCallback函数，httplib会自动处理响应
+// 静态回调函数
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t totalSize = size * nmemb;
+    std::string* str = static_cast<std::string*>(userp);
+    str->append(static_cast<char*>(contents), totalSize);
+    return totalSize;
+}
 
 // PlumClient 实现
 PlumClient::PlumClient(const std::string& controllerUrl) 
@@ -25,6 +32,9 @@ PlumClient::~PlumClient() {
 }
 
 void PlumClient::initializeComponents() {
+    // 初始化curl
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    
     // 创建组件
     weakNetworkSupport_ = std::make_unique<WeakNetworkSupport>(config_);
     cache_ = std::make_unique<Cache>(config_);
@@ -73,7 +83,8 @@ void PlumClient::stop() {
     
     running_.store(false);
     
-    // 不再需要清理curl，httplib会自动管理
+    // 清理curl
+    curl_global_cleanup();
 }
 
 bool PlumClient::isRunning() const {
@@ -339,92 +350,66 @@ ServiceCallResult PlumClient::makeHttpRequest(const std::string& method,
     ServiceCallResult result;
     auto start = std::chrono::high_resolution_clock::now();
     
-    try {
-        // 解析URL
-        std::string host, path;
-        int port = 80;
-        bool isHttps = false;
-        
-        // 简单的URL解析
-        if (url.find("https://") == 0) {
-            isHttps = true;
-            port = 443;
-            size_t start = 8; // "https://"
-            size_t slashPos = url.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = url.substr(start, slashPos - start);
-                path = url.substr(slashPos);
-            } else {
-                host = url.substr(start);
-                path = "/";
-            }
-        } else if (url.find("http://") == 0) {
-            size_t start = 7; // "http://"
-            size_t slashPos = url.find('/', start);
-            if (slashPos != std::string::npos) {
-                host = url.substr(start, slashPos - start);
-                path = url.substr(slashPos);
-            } else {
-                host = url.substr(start);
-                path = "/";
-            }
-        } else {
-            result.error = "Invalid URL format";
-            return result;
-        }
-        
-        // 检查端口
-        size_t colonPos = host.find(':');
-        if (colonPos != std::string::npos) {
-            port = std::stoi(host.substr(colonPos + 1));
-            host = host.substr(0, colonPos);
-        }
-        
-        // 创建httplib客户端
-        httplib::Client client(host, port);
-        client.set_connection_timeout(static_cast<int>(config_.connectTimeout.count()), 0);
-        client.set_read_timeout(static_cast<int>(config_.requestTimeout.count()), 0);
-        
-        // 设置头部
-        httplib::Headers httplibHeaders;
-        for (const auto& header : headers) {
-            httplibHeaders.insert({header.first, header.second});
-        }
-        
-        // 执行请求
-        httplib::Result res;
-        if (method == "GET") {
-            res = client.Get(path, httplibHeaders);
-        } else if (method == "POST") {
-            res = client.Post(path, httplibHeaders, body, "application/json");
-        } else if (method == "PUT") {
-            res = client.Put(path, httplibHeaders, body, "application/json");
-        } else if (method == "DELETE") {
-            res = client.Delete(path, httplibHeaders);
-        } else {
-            result.error = "Unsupported HTTP method: " + method;
-            return result;
-        }
-        
-        auto end = std::chrono::high_resolution_clock::now();
-        result.latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        
-        if (res) {
-            result.statusCode = res->status;
-            result.body = res->body;
-            result.success = (res->status >= 200 && res->status < 300);
-            
-            if (!result.success) {
-                result.error = "HTTP request failed: " + std::to_string(res->status);
-            }
-        } else {
-            result.error = "HTTP request failed: " + httplib::to_string(res.error());
-            result.success = false;
-        }
-        
-    } catch (const std::exception& e) {
-        result.error = "Exception in HTTP request: " + std::string(e.what());
-        result.success = false;
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        result.error = "Failed to initialize curl";
+        return result;
+    }
+    
+    std::string responseBody;
+    long httpCode = 0;
+    
+    // 设置URL
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    
+    // 设置HTTP方法
+    if (method == "POST") {
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+    } else if (method == "PUT") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+    } else if (method == "DELETE") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+    }
+    
+    // 设置超时
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, static_cast<long>(config_.requestTimeout.count()));
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, static_cast<long>(config_.connectTimeout.count()));
+    
+    // 设置回调函数
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    
+    // 设置头部
+    struct curl_slist* headerList = nullptr;
+    for (const auto& header : headers) {
+        std::string headerStr = header.first + ": " + header.second;
+        headerList = curl_slist_append(headerList, headerStr.c_str());
+    }
+    if (headerList) {
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerList);
+    }
+    
+    // 执行请求
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    result.latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    
+    // 清理
+    if (headerList) {
+        curl_slist_free_all(headerList);
+    }
+    curl_easy_cleanup(curl);
+    
+    // 设置结果
+    result.statusCode = static_cast<int>(httpCode);
+    result.body = responseBody;
+    result.success = (res == CURLE_OK) && (httpCode >= 200 && httpCode < 300);
+    
+    if (!result.success) {
+        result.error = "HTTP request failed: " + std::to_string(httpCode);
     }
     
     return result;
