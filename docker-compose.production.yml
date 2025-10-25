@@ -1,0 +1,39 @@
+# Plum 生产环境配置 - 单节点部署
+# 每个物理节点只运行一个Agent
+
+version: '3.8'
+
+services:
+  # Plum Agent 服务 - 生产环境
+  plum-agent:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    container_name: plum-agent
+    volumes:
+      - plum-data:/app/data
+      - ./agent-go/.env:/app/.env:ro
+    environment:
+      # 节点ID从环境变量获取，或使用主机名
+      - AGENT_NODE_ID=${AGENT_NODE_ID:-${HOSTNAME}}
+      - CONTROLLER_BASE=${CONTROLLER_BASE:-http://plum-controller:8080}
+      - AGENT_DATA_DIR=/app/data
+    networks:
+      - plum-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "plum-agent"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# 网络配置
+networks:
+  plum-network:
+    driver: bridge
+
+# 数据卷配置
+volumes:
+  plum-data:
+    driver: local

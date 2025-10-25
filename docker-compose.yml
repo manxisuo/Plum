@@ -1,0 +1,178 @@
+# Plum 容器化部署配置
+# 使用 docker-compose up -d 启动所有服务
+
+# 指定项目名称
+name: plum
+
+services:
+  # Plum Controller 服务
+  plum-controller:
+    build:
+      context: .
+      dockerfile: docker/controller/Dockerfile
+    container_name: plum-controller
+    ports:
+      - "8080:8080"
+    volumes:
+      - plum-data:/app/data
+      - ./controller/.env:/app/.env:ro
+    environment:
+      - CONTROLLER_ADDR=:8080
+      - CONTROLLER_DB=file:/app/data/controller.db?_pragma=busy_timeout(5000)
+      - CONTROLLER_DATA_DIR=/app/data
+      - HEARTBEAT_TTL_SEC=3
+      - FAILOVER_ENABLED=true
+    networks:
+      - plum-network
+    restart: unless-stopped
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/nodes"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Plum Agent 服务 (节点A)
+  plum-agent-a:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    container_name: plum-agent-a
+    volumes:
+      - plum-data:/app/data
+      - ./agent-go/.env:/app/.env:ro
+    environment:
+      - AGENT_NODE_ID=nodeA
+      - CONTROLLER_BASE=http://plum-controller:8080
+      - AGENT_DATA_DIR=/app/data
+    networks:
+      - plum-network
+    depends_on:
+      plum-controller:
+        condition: service_healthy
+    restart: unless-stopped
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "pgrep", "plum-agent"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Plum Agent 服务 (节点B)
+  plum-agent-b:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    container_name: plum-agent-b
+    volumes:
+      - plum-data:/app/data
+      - ./agent-go/.env:/app/.env:ro
+    environment:
+      - AGENT_NODE_ID=nodeB
+      - CONTROLLER_BASE=http://plum-controller:8080
+      - AGENT_DATA_DIR=/app/data
+    networks:
+      - plum-network
+    depends_on:
+      plum-controller:
+        condition: service_healthy
+    restart: unless-stopped
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "pgrep", "plum-agent"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Plum Agent 服务 (节点C)
+  plum-agent-c:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    container_name: plum-agent-c
+    volumes:
+      - plum-data:/app/data
+      - ./agent-go/.env:/app/.env:ro
+    environment:
+      - AGENT_NODE_ID=nodeC
+      - CONTROLLER_BASE=http://plum-controller:8080
+      - AGENT_DATA_DIR=/app/data
+    networks:
+      - plum-network
+    depends_on:
+      plum-controller:
+        condition: service_healthy
+    restart: unless-stopped
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "pgrep", "plum-agent"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Nginx 反向代理 (可选)
+  plum-nginx:
+    image: nginx:alpine
+    container_name: plum-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ui/dist:/usr/share/nginx/html:ro
+    networks:
+      - plum-network
+    depends_on:
+      - plum-controller
+    restart: unless-stopped
+    profiles:
+      - nginx
+
+# 网络配置
+networks:
+  plum-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# 数据卷配置
+volumes:
+  plum-data:
+    driver: local
