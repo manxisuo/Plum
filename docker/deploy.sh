@@ -39,11 +39,11 @@ Plum Docker 部署脚本
 
 环境:
     test        - 测试环境（Controller + 3个Agent）
-    test-simple - 简单测试环境（仅Controller）
     test-nginx  - 测试环境（包含nginx）
     production  - 生产环境
     controller  - 仅启动Controller
-    agent       - 仅启动Agent
+    controller-nginx - 启动Controller + nginx
+    agent       - 仅启动Agent（使用production.yml配置）
 
 操作:
     start       - 启动服务（默认）
@@ -58,7 +58,7 @@ Plum Docker 部署脚本
 示例:
     $0 test start          # 启动测试环境
     $0 production stop     # 停止生产环境
-    $0 test-simple status  # 查看简单测试环境状态
+    $0 controller status   # 查看Controller状态
     $0 test logs           # 查看测试环境日志
     $0 clean               # 清理所有资源
 
@@ -92,9 +92,6 @@ start_services() {
         "test")
             docker-compose up -d
             ;;
-        "test-simple")
-            docker-compose -f docker-compose.controller-test-simple.yml up -d
-            ;;
         "test-nginx")
             docker-compose --profile nginx up -d
             ;;
@@ -104,8 +101,11 @@ start_services() {
         "controller")
             docker-compose up -d plum-controller
             ;;
+        "controller-nginx")
+            docker-compose --profile nginx up -d plum-controller plum-nginx
+            ;;
         "agent")
-            docker-compose up -d plum-agent-a plum-agent-b plum-agent-c
+            docker-compose -f docker-compose.production.yml up -d
             ;;
         *)
             print_error "未知环境: $env"
@@ -125,9 +125,6 @@ stop_services() {
         "test")
             docker-compose down
             ;;
-        "test-simple")
-            docker-compose -f docker-compose.controller-test-simple.yml down
-            ;;
         "test-nginx")
             docker-compose --profile nginx down
             ;;
@@ -137,8 +134,11 @@ stop_services() {
         "controller")
             docker-compose stop plum-controller
             ;;
+        "controller-nginx")
+            docker-compose --profile nginx stop plum-controller plum-nginx
+            ;;
         "agent")
-            docker-compose stop plum-agent-a plum-agent-b plum-agent-c
+            docker-compose -f docker-compose.production.yml down
             ;;
         *)
             print_error "未知环境: $env"
@@ -167,9 +167,6 @@ show_status() {
         "test")
             docker-compose ps
             ;;
-        "test-simple")
-            docker-compose -f docker-compose.controller-test-simple.yml ps
-            ;;
         "test-nginx")
             docker-compose --profile nginx ps
             ;;
@@ -179,8 +176,11 @@ show_status() {
         "controller")
             docker-compose ps plum-controller
             ;;
+        "controller-nginx")
+            docker-compose --profile nginx ps plum-controller plum-nginx
+            ;;
         "agent")
-            docker-compose ps plum-agent-a plum-agent-b plum-agent-c
+            docker-compose -f docker-compose.production.yml ps
             ;;
         *)
             print_error "未知环境: $env"
@@ -198,9 +198,6 @@ show_logs() {
         "test")
             docker-compose logs -f
             ;;
-        "test-simple")
-            docker-compose -f docker-compose.controller-test-simple.yml logs -f
-            ;;
         "test-nginx")
             docker-compose --profile nginx logs -f
             ;;
@@ -210,8 +207,11 @@ show_logs() {
         "controller")
             docker-compose logs -f plum-controller
             ;;
+        "controller-nginx")
+            docker-compose --profile nginx logs -f plum-controller plum-nginx
+            ;;
         "agent")
-            docker-compose logs -f plum-agent-a plum-agent-b plum-agent-c
+            docker-compose -f docker-compose.production.yml logs -f
             ;;
         *)
             print_error "未知环境: $env"
@@ -226,7 +226,6 @@ clean_resources() {
 
     # 停止所有相关容器
     docker-compose down 2>/dev/null || true
-    docker-compose -f docker-compose.controller-test-simple.yml down 2>/dev/null || true
     docker-compose --profile nginx down 2>/dev/null || true
     docker-compose -f docker-compose.production.yml down 2>/dev/null || true
 

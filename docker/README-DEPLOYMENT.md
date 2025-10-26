@@ -153,15 +153,16 @@ curl http://localhost:8080/v1/nodes
 
 #### Agent节点部署
 ```bash
-# 在Agent节点执行（修改node_id）
+# 在Agent节点执行
 export AGENT_NODE_ID=node1
-docker-compose -f docker-compose.yml up -d plum-agent-a
+export CONTROLLER_BASE=http://192.168.1.100:8080  # 替换为实际Controller IP
+docker-compose -f docker-compose.production.yml up -d
 
 # 检查Agent状态
-docker-compose ps plum-agent-a
+docker-compose -f docker-compose.production.yml ps
 
 # 查看Agent日志
-docker-compose logs plum-agent-a
+docker-compose -f docker-compose.production.yml logs -f
 ```
 
 **特点**:

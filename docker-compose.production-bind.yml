@@ -1,5 +1,5 @@
-# Plum 生产环境配置 - 单节点部署
-# 每个物理节点只运行一个Agent
+# Plum 生产环境配置 - 使用绑定挂载
+# 数据将存储在宿主机的 ./data 目录中
 
 name: plum-production
 
@@ -11,7 +11,8 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent
     volumes:
-      - plum-agent-data:/app/data
+      # 使用绑定挂载，数据存储在 ./data 目录
+      - ./data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       # 节点ID从环境变量获取，或使用默认值
@@ -33,7 +34,4 @@ networks:
   plum-network:
     driver: bridge
 
-# 数据卷配置
-volumes:
-  plum-agent-data:
-    driver: local
+# 注意：使用绑定挂载时不需要定义volumes

@@ -119,6 +119,8 @@ curl http://localhost:8080/v1/nodes
 #### Agent节点
 ```bash
 # 在Agent节点执行
+export AGENT_NODE_ID=node1
+export CONTROLLER_BASE=http://192.168.1.100:8080  # 替换为实际Controller IP
 ./deploy.sh agent start
 
 # 检查Agent状态

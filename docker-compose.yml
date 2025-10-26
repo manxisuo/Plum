@@ -48,7 +48,7 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent-a
     volumes:
-      - plum-data:/app/data
+      - plum-agent-a-data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       - AGENT_NODE_ID=nodeA
@@ -56,9 +56,6 @@ services:
       - AGENT_DATA_DIR=/app/data
     networks:
       - plum-network
-    depends_on:
-      plum-controller:
-        condition: service_healthy
     restart: unless-stopped
     # 资源限制
     deploy:
@@ -83,7 +80,7 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent-b
     volumes:
-      - plum-data:/app/data
+      - plum-agent-b-data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       - AGENT_NODE_ID=nodeB
@@ -91,9 +88,6 @@ services:
       - AGENT_DATA_DIR=/app/data
     networks:
       - plum-network
-    depends_on:
-      plum-controller:
-        condition: service_healthy
     restart: unless-stopped
     # 资源限制
     deploy:
@@ -118,7 +112,7 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent-c
     volumes:
-      - plum-data:/app/data
+      - plum-agent-c-data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       - AGENT_NODE_ID=nodeC
@@ -126,9 +120,6 @@ services:
       - AGENT_DATA_DIR=/app/data
     networks:
       - plum-network
-    depends_on:
-      plum-controller:
-        condition: service_healthy
     restart: unless-stopped
     # 资源限制
     deploy:
@@ -175,4 +166,10 @@ networks:
 # 数据卷配置
 volumes:
   plum-data:
+    driver: local
+  plum-agent-a-data:
+    driver: local
+  plum-agent-b-data:
+    driver: local
+  plum-agent-c-data:
     driver: local

@@ -5,7 +5,7 @@
 ### 测试环境
 ```bash
 # 1. 单Controller测试
-docker-compose -f docker-compose.controller-test-simple.yml up -d
+docker-compose up -d plum-controller
 
 # 2. 完整测试环境（Controller + 3个Agent）
 docker-compose up -d
@@ -22,9 +22,13 @@ docker-compose -f docker-compose.production.yml up -d
 # 2. 多节点部署（Controller节点）
 docker-compose up -d plum-controller
 
-# 3. 多节点部署（Agent节点）
+# 3. 多节点部署（Controller + nginx节点）
+docker-compose --profile nginx up -d plum-controller plum-nginx
+
+# 4. 多节点部署（Agent节点）
 export AGENT_NODE_ID=node1
-docker-compose up -d plum-agent-a
+export CONTROLLER_BASE=http://192.168.1.100:8080  # 替换为实际Controller IP
+docker-compose -f docker-compose.production.yml up -d
 ```
 
 ## 🔧 服务管理
@@ -87,11 +91,13 @@ docker system prune
 
 | 场景 | 推荐命令 | 说明 |
 |------|----------|------|
-| 功能测试 | `docker-compose -f docker-compose.controller-test-simple.yml up -d` | 只启动Controller |
+| 功能测试 | `docker-compose up -d plum-controller` | 只启动Controller |
 | 集成测试 | `docker-compose up -d` | Controller + 3个Agent |
 | UI测试 | `docker-compose --profile nginx up -d` | 包含Web界面 |
 | 生产部署 | `docker-compose -f docker-compose.production.yml up -d` | 生产级配置 |
-| 分布式部署 | 分别在不同节点启动Controller和Agent | 大规模部署 |
+| Controller节点 | `docker-compose up -d plum-controller` | 只启动Controller |
+| Controller+nginx节点 | `docker-compose --profile nginx up -d plum-controller plum-nginx` | Controller + nginx |
+| Agent节点 | `docker-compose -f docker-compose.production.yml up -d` | 只启动Agent |
 
 ## 💡 小贴士
 
