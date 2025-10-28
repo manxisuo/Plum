@@ -2,6 +2,8 @@
 
 这个目录包含了Plum项目离线部署到银河麒麟V10 ARM64环境的所有必要文件。
 
+> **📚 详细部署指南**: 请参考 `source/Plum/docker/DEPLOYMENT-GUIDE.md` 获取完整的部署说明，包括Docker和传统两种部署方式。
+
 ## 📁 目录结构
 
 ```
@@ -47,6 +49,21 @@ plum-offline-deploy/
 ```
 
 ### 在目标环境部署
+
+#### 方案1：Docker容器部署（推荐）
+```bash
+cd plum-offline-deploy/source/Plum
+
+# 方案A：使用预构建镜像包
+./docker/load-offline-images.sh
+docker-compose -f docker-compose.offline.yml up -d
+
+# 方案B：在目标环境构建镜像
+./docker/build-static-offline-fixed.sh
+docker-compose -f docker-compose.offline.yml up -d
+```
+
+#### 方案2：传统源码部署
 ```bash
 cd plum-offline-deploy/scripts
 
@@ -59,6 +76,8 @@ cd plum-offline-deploy/scripts
 # 3. 部署服务
 ./deploy.sh
 ```
+
+**详细部署指南请参考**: `source/Plum/docker/DEPLOYMENT-GUIDE.md`
 
 ### 单独构建C++ SDK
 ```bash

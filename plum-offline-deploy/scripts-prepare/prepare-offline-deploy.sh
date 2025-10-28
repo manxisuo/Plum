@@ -141,6 +141,23 @@ if command -v rsync &> /dev/null; then
             cp "$file" "$DEPLOY_DIR/source/Plum/"
         fi
     done
+    
+    # 复制Docker相关文件
+    if [ -d "docker" ]; then
+        echo "复制: docker/"
+        rsync -av --exclude='build/' \
+                  --exclude='*.log' \
+                  --exclude='*.db*' \
+                  "docker/" "$DEPLOY_DIR/source/Plum/docker/"
+    fi
+    
+    # 复制Docker Compose文件
+    for file in docker-compose*.yml; do
+        if [ -e "$file" ]; then
+            echo "复制: $file"
+            cp "$file" "$DEPLOY_DIR/source/Plum/"
+        fi
+    done
 else
     echo "rsync不可用，使用cp并手动清理..."
     for dir in controller agent-go ui proto sdk examples docs tools; do
@@ -152,6 +169,20 @@ else
     
     # 复制单个文件
     for file in Makefile README.md .gitignore; do
+        if [ -e "$file" ]; then
+            echo "复制: $file"
+            cp "$file" $DEPLOY_DIR/source/Plum/
+        fi
+    done
+    
+    # 复制Docker相关文件
+    if [ -d "docker" ]; then
+        echo "复制: docker/"
+        cp -r docker $DEPLOY_DIR/source/Plum/
+    fi
+    
+    # 复制Docker Compose文件
+    for file in docker-compose*.yml; do
         if [ -e "$file" ]; then
             echo "复制: $file"
             cp "$file" $DEPLOY_DIR/source/Plum/
@@ -363,6 +394,35 @@ else
     echo "⚠️  未找到prepare-arm64-go-tools.sh，请手动运行"
 fi
 
+# 6. 构建Docker镜像（可选）
+echo "🐳 构建Docker镜像（可选）..."
+if [ -d "docker" ] && command -v docker &> /dev/null && docker info > /dev/null 2>&1; then
+    echo "检测到Docker环境，是否构建Docker镜像？"
+    echo "这将创建预构建的镜像文件，避免在目标环境重新构建。"
+    echo ""
+    if [ -t 0 ] && [ -t 1 ]; then
+        read -p "是否构建Docker镜像？(y/N): " build_docker
+    else
+        echo "非交互式环境，跳过Docker镜像构建"
+        build_docker="n"
+    fi
+    
+    if [[ $build_docker =~ ^[Yy]$ ]]; then
+        echo "构建Docker镜像..."
+        if [ -f "docker/generate-offline-images.sh" ]; then
+            # 构建镜像到部署包目录
+            docker/generate-offline-images.sh
+            echo "✅ Docker镜像已构建到 $DEPLOY_DIR/source/Plum/offline-images/"
+        else
+            echo "⚠️  Docker构建脚本不存在，跳过镜像构建"
+        fi
+    else
+        echo "跳过Docker镜像构建"
+    fi
+else
+    echo "⚠️  Docker环境不可用，跳过镜像构建"
+fi
+
 echo "✅ 准备完成！"
 echo ""
 echo "部署包已准备就绪，包含："
@@ -370,5 +430,8 @@ echo "✓ 源代码 (source/Plum/)"
 echo "✓ Go依赖 (vendor/)"
 echo "✓ Node.js依赖 (node_modules/)"
 echo "✓ ARM64构建工具 (tools/)"
+if [ -d "$DEPLOY_DIR/source/Plum/offline-images" ]; then
+    echo "✓ Docker镜像 (offline-images/)"
+fi
 echo ""
 echo "下一步：将整个 $DEPLOY_DIR 目录传输到目标ARM64环境"

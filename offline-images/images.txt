@@ -1,0 +1,3 @@
+nginx:alpine arch=arm64
+plum-controller:offline arch=amd64
+plum-agent:offline arch=amd64

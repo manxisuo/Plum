@@ -280,7 +280,53 @@ else
     done
 fi
 
-# 6. 验证安装
+# 6. 安装esbuild ARM64依赖
+echo "🔧 安装esbuild ARM64依赖..."
+if [ -f "../tools/esbuild-linux-arm64-0.21.5.tgz" ]; then
+    echo "📦 发现esbuild ARM64包，开始安装..."
+    cd ../source/Plum
+    
+    # 运行esbuild安装脚本
+    if [ -f "scripts/install-esbuild-arm64-0.21.5.sh" ]; then
+        bash scripts/install-esbuild-arm64-0.21.5.sh || {
+            echo "⚠️  esbuild ARM64安装失败"
+            echo "💡 请检查esbuild包是否完整"
+        }
+    else
+        echo "⚠️  未找到install-esbuild-arm64-0.21.5.sh脚本"
+        echo "💡 请确保脚本已正确复制到部署包中"
+    fi
+    
+    cd ../../scripts
+else
+    echo "📋 未找到esbuild ARM64包，跳过安装"
+    echo "💡 如需安装，请将esbuild-linux-arm64-0.21.5.tgz放到tools目录"
+fi
+
+# 7. 安装rollup ARM64依赖
+echo "🔧 安装rollup ARM64依赖..."
+if [ -f "../tools/rollup-linux-arm64-gnu-4.52.5.tgz" ]; then
+    echo "📦 发现rollup ARM64包，开始安装..."
+    cd ../source/Plum
+    
+    # 运行rollup修复脚本
+    if [ -f "scripts/fix-rollup-arm64.sh" ]; then
+        bash scripts/fix-rollup-arm64.sh || {
+            echo "⚠️  rollup ARM64安装失败"
+            echo "💡 请检查rollup包是否完整"
+        }
+    else
+        echo "⚠️  未找到fix-rollup-arm64.sh脚本"
+        echo "💡 请确保脚本已正确复制到部署包中"
+    fi
+    
+    cd ../../scripts
+else
+    echo "📋 未找到rollup ARM64包，跳过安装"
+    echo "💡 如需安装，请将rollup-linux-arm64-gnu-4.52.5.tgz放到tools目录"
+fi
+
+# 8. 验证安装
 echo "🔍 验证安装结果..."
 echo "Go版本: $(go version)"
 echo "Node.js版本: $(node --version)"
