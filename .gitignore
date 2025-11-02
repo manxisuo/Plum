@@ -108,6 +108,7 @@ plum-offline-deploy/go-vendor-backup/
 *.tar.xz
 go-arm64-tools/
 temp-go-arm64/
+offline-images/
 
 # Go vendor directories (can be regenerated with 'go mod vendor')
 controller/vendor/
