@@ -4,36 +4,49 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
-
-// ProcessState 进程状态
-type ProcessState struct {
-	Cmd          *exec.Cmd
-	StopSentTime int64
-}
 
 // Reconciler 协调器
 type Reconciler struct {
 	baseDir           string
 	http              *HTTPClient
 	controller        string
-	instances         map[string]*ProcessState
+	appManager        AppManager           // 应用管理器（统一接口）
+	stopSentTimes     map[string]int64     // 停止信号发送时间（用于优雅停止）
 	restartStartTimes map[string]time.Time // 性能监控：记录重启开始时间
+	knownInstances    map[string]bool      // 已知实例列表（用于故障检测）
 }
 
 func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconciler {
 	EnsureDir(baseDir)
+
+	// 根据环境变量选择运行模式
+	runMode := GetRunMode()
+	log.Printf("Using app run mode: %s", runMode)
+
+	config := ManagerConfig{
+		BaseDir:    baseDir,
+		HTTP:       http,
+		Controller: controller,
+	}
+
+	appManager, err := NewAppManager(runMode, config)
+	if err != nil {
+		log.Printf("Failed to create app manager, falling back to process mode: %v", err)
+		appManager = NewProcessManager(config)
+	}
+
 	return &Reconciler{
 		baseDir:           baseDir,
 		http:              http,
 		controller:        controller,
-		instances:         make(map[string]*ProcessState),
+		appManager:        appManager,
+		stopSentTimes:     make(map[string]int64),
 		restartStartTimes: make(map[string]time.Time),
+		knownInstances:    make(map[string]bool),
 	}
 }
 
@@ -41,15 +54,32 @@ func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconci
 func (r *Reconciler) Sync(assignments []Assignment) {
 	keep := make(map[string]bool)
 	runningCount := 0
+
+	// 更新已知实例列表
+	newKnownInstances := make(map[string]bool)
 	for _, a := range assignments {
+		newKnownInstances[a.InstanceID] = true
 		if a.Desired == "Running" {
 			keep[a.InstanceID] = true
 			runningCount++
 		}
 	}
+	r.knownInstances = newKnownInstances
 
-	r.reapExited()
+	// 标记需要停止的实例
+	for _, a := range assignments {
+		if a.Desired != "Running" {
+			r.markForStop(a.InstanceID)
+		}
+	}
+
+	// 检测已退出的进程（故障检测）
+	r.reapExited(assignments)
+
+	// 停止不需要的实例
 	r.ensureStoppedExcept(keep)
+
+	// 启动需要的实例
 	for _, a := range assignments {
 		if a.Desired == "Running" {
 			r.ensureRunning(a)
@@ -59,37 +89,13 @@ func (r *Reconciler) Sync(assignments []Assignment) {
 
 // ensureRunning 确保实例运行
 func (r *Reconciler) ensureRunning(a Assignment) {
-	// 检查是否已运行 - 优化：使用更快的进程检测机制
-	if state, exists := r.instances[a.InstanceID]; exists {
-		// 使用/proc/pid/stat进行快速进程检测
-		if state.Cmd.Process != nil {
-			pid := state.Cmd.Process.Pid
-			statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-			if err == nil {
-				// 解析进程状态
-				statStr := string(statData)
-				if idx := strings.LastIndex(statStr, ")"); idx != -1 && idx+2 < len(statStr) {
-					state := statStr[idx+2]
-					// Z = 僵尸进程，其他状态认为进程还活着
-					if state != 'Z' {
-						return // 进程仍在运行
-					}
-				}
-			} else {
-				// 如果无法读取/proc/pid/stat，回退到Signal(0)检测
-				err := state.Cmd.Process.Signal(syscall.Signal(0))
-				if err == nil {
-					return // 进程仍在运行
-				}
-			}
-		}
-		// 进程已死，清理状态
-		delete(r.instances, a.InstanceID)
-		log.Printf("Instance %s process died, will restart", a.InstanceID)
-
-		// 性能监控：记录重启开始时间
-		r.restartStartTimes[a.InstanceID] = time.Now()
+	// 检查是否已运行
+	if r.appManager.IsRunning(a.InstanceID) {
+		return // 应用已在运行
 	}
+
+	// 实例未运行，需要启动
+	log.Printf("Instance %s not running, will start", a.InstanceID)
 
 	instDir := filepath.Join(r.baseDir, a.InstanceID)
 	EnsureDir(instDir)
@@ -131,30 +137,30 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 		}
 	}
 
-	// 启动进程
-	os.Chmod(startSh, 0755)
-	cmdline := strings.TrimSpace(a.StartCmd)
-	if cmdline == "" {
-		cmdline = "./start.sh"
+	// 确保start.sh有执行权限（容器模式也需要）
+	if FileExists(startSh) {
+		if err := os.Chmod(startSh, 0755); err != nil {
+			log.Printf("Warning: failed to chmod start.sh: %v", err)
+		}
 	}
 
-	cmd := exec.Command("sh", "-c", cmdline)
-	cmd.Dir = appDir
-	cmd.Env = append(os.Environ(),
-		"PLUM_INSTANCE_ID="+a.InstanceID,
-		"PLUM_APP_NAME="+a.AppName,
-		"PLUM_APP_VERSION="+a.AppVersion,
-	)
-	// 创建新的进程组
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// 确保应用可执行文件有执行权限
+	// 遍历应用目录，找到所有没有扩展名的文件（很可能是可执行文件）
+	// 或者检查文件是否是ELF可执行文件
+	if err := ensureExecutablePermissions(appDir); err != nil {
+		log.Printf("Warning: failed to set executable permissions: %v", err)
+	}
 
-	if err := cmd.Start(); err != nil {
-		log.Printf("Failed to start process: %v", err)
+	// 性能监控：记录启动开始时间
+	r.restartStartTimes[a.InstanceID] = time.Now()
+
+	// 使用AppManager启动应用
+	if err := r.appManager.StartApp(a.InstanceID, a, appDir); err != nil {
+		log.Printf("Failed to start app: %v", err)
 		return
 	}
 
-	log.Printf("Started instance %s, PID=%d", a.InstanceID, cmd.Process.Pid)
-	r.instances[a.InstanceID] = &ProcessState{Cmd: cmd}
+	log.Printf("Started instance %s", a.InstanceID)
 	r.postStatus(a.InstanceID, "Running", 0, true)
 
 	// 性能监控：记录重启时间
@@ -168,100 +174,136 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 // ensureStoppedExcept 停止不需要的实例
 func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 	now := time.Now().Unix()
-	for id, state := range r.instances {
-		if keep[id] {
+
+	// 获取所有运行中的实例（通过AppManager）
+	// 由于接口限制，我们需要通过状态检查来确定哪些实例在运行
+	// 这里简化处理：通过检查已知的实例ID
+	// 更好的方式是AppManager提供ListRunning()方法，但为了最小改动，先这样实现
+
+	// 检查需要停止的实例
+	for instanceID := range r.stopSentTimes {
+		if keep[instanceID] {
+			// 仍在keep列表中，清除停止标记
+			delete(r.stopSentTimes, instanceID)
 			continue
 		}
 
-		if state.StopSentTime == 0 {
-			// 发送SIGTERM到进程组
-			pgid := -state.Cmd.Process.Pid
-			syscall.Kill(pgid, syscall.SIGTERM)
-			state.StopSentTime = now
-			log.Printf("Sent SIGTERM to instance %s", id)
-		} else if now-state.StopSentTime >= 5 {
-			// 5秒后强制SIGKILL
-			pgid := -state.Cmd.Process.Pid
-			syscall.Kill(pgid, syscall.SIGKILL)
-			state.Cmd.Wait()
-			r.postStatus(id, "Stopped", 0, true)
-			r.deleteServices(id)
-			delete(r.instances, id)
-			log.Printf("Killed instance %s", id)
+		if !r.appManager.IsRunning(instanceID) {
+			// 已经停止，清理状态
+			delete(r.stopSentTimes, instanceID)
+			r.postStatus(instanceID, "Stopped", 0, true)
+			r.deleteServices(instanceID)
+			continue
+		}
+
+		// 应用还在运行，需要停止
+		if r.stopSentTimes[instanceID] == 0 {
+			// 第一次尝试停止
+			if err := r.appManager.StopApp(instanceID); err != nil {
+				log.Printf("Failed to stop app %s: %v", instanceID, err)
+			} else {
+				r.stopSentTimes[instanceID] = now
+				log.Printf("Sent stop signal to instance %s", instanceID)
+			}
+		} else if now-r.stopSentTimes[instanceID] >= 5 {
+			// 5秒后强制停止（DockerManager已经处理了强制停止）
+			// 这里只需要清理状态
+			if !r.appManager.IsRunning(instanceID) {
+				delete(r.stopSentTimes, instanceID)
+				r.postStatus(instanceID, "Stopped", 0, true)
+				r.deleteServices(instanceID)
+				log.Printf("Stopped instance %s", instanceID)
+			}
+		}
+	}
+
+	// 对于不在stopSentTimes中但需要停止的实例，也需要处理
+	// 检查所有运行中的实例，如果不在keep列表中，也需要停止
+	// 这主要是为了处理容器模式，因为容器的生命周期由Docker管理
+	// 我们需要主动检查并清理不需要的容器
+	for instanceID := range r.knownInstances {
+		if keep[instanceID] {
+			continue // 应该在运行，跳过
+		}
+
+		// 这个实例不应该运行，检查是否真的在运行
+		if r.appManager.IsRunning(instanceID) {
+			// 实例在运行，但不在keep列表中，需要停止
+			if _, exists := r.stopSentTimes[instanceID]; !exists {
+				// 还没有标记停止，现在标记
+				r.markForStop(instanceID)
+				log.Printf("Found running instance %s that should be stopped, marking for stop", instanceID)
+			}
 		}
 	}
 }
 
-// reapExited 清理已退出的进程
-func (r *Reconciler) reapExited() {
-	for id, state := range r.instances {
-		// 检查进程是否还活着
-		if state.Cmd.Process == nil {
-			log.Printf("Instance %s has nil Process, skipping", id)
-			continue
+// markForStop 标记需要停止的实例
+func (r *Reconciler) markForStop(instanceID string) {
+	if _, exists := r.stopSentTimes[instanceID]; !exists {
+		r.stopSentTimes[instanceID] = 0 // 标记需要停止
+	}
+}
+
+// reapExited 检测并清理意外退出的应用
+// 这是故障检测的核心：检查所有应该运行的实例是否真的在运行
+func (r *Reconciler) reapExited(assignments []Assignment) {
+	// 检查所有期望运行但实际未运行的实例
+	for _, a := range assignments {
+		if a.Desired != "Running" {
+			continue // 只检查期望运行的实例
 		}
 
-		// 检查进程状态（读取/proc/pid/stat）
-		pid := state.Cmd.Process.Pid
-		statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-		processAlive := false
-		if err == nil {
-			// stat格式: pid (comm) state ...
-			// 提取状态字段（第3个字段）
-			statStr := string(statData)
-			// 找到第二个')'后的第一个字符就是状态
-			if idx := strings.LastIndex(statStr, ")"); idx != -1 && idx+2 < len(statStr) {
-				state := statStr[idx+2]
-				// Z = 僵尸, 其他状态认为进程还活着
-				processAlive = (state != 'Z')
-			}
-		}
+		// 检查实例是否真的在运行
+		if !r.appManager.IsRunning(a.InstanceID) {
+			// 实例未运行，但期望运行
+			// 这可能是进程意外退出（被kill等）
+			// ProcessManager.IsRunning() 已经清理了内部状态，这里只需要上报
 
-		if !processAlive {
-			log.Printf("Detected instance %s process died (PID %d)", id, pid)
-			// 进程已退出，尝试Wait获取退出状态
-			var exitCode int
-			if state.Cmd.ProcessState != nil {
-				exitCode = state.Cmd.ProcessState.ExitCode()
-			} else {
-				// ProcessState为nil，手动Wait（非阻塞）
-				go state.Cmd.Wait() // 异步Wait，避免阻塞
-				time.Sleep(100 * time.Millisecond)
-				if state.Cmd.ProcessState != nil {
-					exitCode = state.Cmd.ProcessState.ExitCode()
-				} else {
+			// 检查是否是我们主动停止的
+			if _, wasStopping := r.stopSentTimes[a.InstanceID]; !wasStopping {
+				// 不是主动停止的，说明是意外退出
+				log.Printf("⚠️  Detected instance %s process died unexpectedly (was not stopping)", a.InstanceID)
+
+				// 获取退出状态（尝试）
+				status, err := r.appManager.GetStatus(a.InstanceID)
+				exitCode := 0
+				if err == nil && !status.Running {
+					// 可能是非零退出码，但GetStatus可能无法获取
+					// 默认认为是失败退出（因为不是正常停止）
 					exitCode = -1
 				}
-			}
 
-			if state.StopSentTime > 0 {
-				r.postStatus(id, "Stopped", 0, true)
-				log.Printf("Reaped instance %s (stopped), exit=%d", id, exitCode)
+				// 上报失败状态
+				phase := "Failed"
+				healthy := false
+				r.postStatus(a.InstanceID, phase, exitCode, healthy)
+				log.Printf("✅ Reported instance %s as Failed, will restart in next ensureRunning", a.InstanceID)
+
+				// 清理停止标记（如果有）
+				delete(r.stopSentTimes, a.InstanceID)
 			} else {
-				phase := "Exited"
-				healthy := exitCode == 0
-				if !healthy {
-					phase = "Failed"
-				}
-				r.postStatus(id, phase, exitCode, healthy)
-				log.Printf("Reaped instance %s (died), exit=%d, phase=%s", id, exitCode, phase)
+				log.Printf("Instance %s is stopping (was marked for stop), skip restart", a.InstanceID)
 			}
-			delete(r.instances, id)
 		}
 	}
 }
 
 // StopAll 停止所有实例
 func (r *Reconciler) StopAll() {
+	// 标记所有实例需要停止
+	// 由于我们不知道所有实例ID，这里通过清空keep map来触发停止
 	r.Sync([]Assignment{})
-	// 等待最多7秒
+
+	// 等待最多7秒，让所有应用停止
 	for i := 0; i < 70; i++ {
 		r.ensureStoppedExcept(make(map[string]bool))
-		r.reapExited()
-		if len(r.instances) == 0 {
+		time.Sleep(100 * time.Millisecond)
+		// 检查是否还有运行中的实例
+		// 由于无法直接获取所有实例，这里简化处理
+		if len(r.stopSentTimes) == 0 {
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
 }
 

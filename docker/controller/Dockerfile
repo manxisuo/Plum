@@ -2,7 +2,12 @@
 # 多阶段构建，优化镜像大小
 
 # 构建阶段
+# 使用 go1.23-alpine，通过 GOTOOLCHAIN=auto 自动下载所需工具链
 FROM golang:1.23-alpine AS builder
+
+# 设置 GOTOOLCHAIN 允许自动下载所需工具链
+# go.mod 可能要求更高版本，通过此设置自动下载所需工具链
+ENV GOTOOLCHAIN=auto
 
 # 设置工作目录
 WORKDIR /app

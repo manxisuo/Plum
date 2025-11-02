@@ -48,12 +48,19 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent-a
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket（用于管理应用容器）
       - plum-agent-a-data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       - AGENT_NODE_ID=nodeA
       - CONTROLLER_BASE=http://plum-controller:8080
       - AGENT_DATA_DIR=/app/data
+      - AGENT_RUN_MODE=docker  # 容器模式：应用以Docker容器方式运行
+      - PLUM_BASE_IMAGE=${PLUM_BASE_IMAGE:-ubuntu:22.04}  # 应用容器基础镜像（推荐ubuntu，兼容glibc应用）
+      - PLUM_CONTAINER_MEMORY=${PLUM_CONTAINER_MEMORY:-}  # 容器内存限制（可选）
+      - PLUM_CONTAINER_CPUS=${PLUM_CONTAINER_CPUS:-}  # 容器CPU限制（可选）
+      - PLUM_HOST_LIB_PATHS=${PLUM_HOST_LIB_PATHS:-}  # 宿主机库路径映射（可选，如/usr/lib,/usr/local/lib）
+      - PLUM_CONTAINER_ENV=${PLUM_CONTAINER_ENV:-}  # 容器自定义环境变量（可选）
     networks:
       - plum-network
     restart: unless-stopped
@@ -80,12 +87,19 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent-b
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket（用于管理应用容器）
       - plum-agent-b-data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       - AGENT_NODE_ID=nodeB
       - CONTROLLER_BASE=http://plum-controller:8080
       - AGENT_DATA_DIR=/app/data
+      - AGENT_RUN_MODE=docker  # 容器模式：应用以Docker容器方式运行
+      - PLUM_BASE_IMAGE=${PLUM_BASE_IMAGE:-ubuntu:22.04}  # 应用容器基础镜像（推荐ubuntu，兼容glibc应用）
+      - PLUM_CONTAINER_MEMORY=${PLUM_CONTAINER_MEMORY:-}  # 容器内存限制（可选）
+      - PLUM_CONTAINER_CPUS=${PLUM_CONTAINER_CPUS:-}  # 容器CPU限制（可选）
+      - PLUM_HOST_LIB_PATHS=${PLUM_HOST_LIB_PATHS:-}  # 宿主机库路径映射（可选，如/usr/lib,/usr/local/lib）
+      - PLUM_CONTAINER_ENV=${PLUM_CONTAINER_ENV:-}  # 容器自定义环境变量（可选）
     networks:
       - plum-network
     restart: unless-stopped
@@ -112,12 +126,19 @@ services:
       dockerfile: docker/agent/Dockerfile
     container_name: plum-agent-c
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket（用于管理应用容器）
       - plum-agent-c-data:/app/data
       - ./agent-go/.env:/app/.env:ro
     environment:
       - AGENT_NODE_ID=nodeC
       - CONTROLLER_BASE=http://plum-controller:8080
       - AGENT_DATA_DIR=/app/data
+      - AGENT_RUN_MODE=docker  # 容器模式：应用以Docker容器方式运行
+      - PLUM_BASE_IMAGE=${PLUM_BASE_IMAGE:-ubuntu:22.04}  # 应用容器基础镜像（推荐ubuntu，兼容glibc应用）
+      - PLUM_CONTAINER_MEMORY=${PLUM_CONTAINER_MEMORY:-}  # 容器内存限制（可选）
+      - PLUM_CONTAINER_CPUS=${PLUM_CONTAINER_CPUS:-}  # 容器CPU限制（可选）
+      - PLUM_HOST_LIB_PATHS=${PLUM_HOST_LIB_PATHS:-}  # 宿主机库路径映射（可选，如/usr/lib,/usr/local/lib）
+      - PLUM_CONTAINER_ENV=${PLUM_CONTAINER_ENV:-}  # 容器自定义环境变量（可选）
     networks:
       - plum-network
     restart: unless-stopped

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -114,6 +115,70 @@ func UnzipFile(zipPath, destDir string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// ensureExecutablePermissions 确保应用目录中的可执行文件有执行权限
+// 检查ELF文件（Linux可执行文件）和没有扩展名的文件
+func ensureExecutablePermissions(appDir string) error {
+	entries, err := os.ReadDir(appDir)
+	if err != nil {
+		return err
+	}
+	
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue // 跳过目录
+		}
+		
+		fileName := entry.Name()
+		filePath := filepath.Join(appDir, fileName)
+		
+		// 跳过已知的非可执行文件
+		if strings.HasSuffix(fileName, ".ini") ||
+			strings.HasSuffix(fileName, ".json") ||
+			strings.HasSuffix(fileName, ".txt") ||
+			strings.HasSuffix(fileName, ".log") ||
+			strings.HasSuffix(fileName, ".zip") ||
+			fileName == "start.sh" || // start.sh已经在上面处理了
+			fileName == "log" { // log可能是运行产生的日志文件
+			continue
+		}
+		
+		// 检查文件信息
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		
+		// 读取文件前几个字节检查是否是ELF文件
+		isELF := false
+		if f, err := os.Open(filePath); err == nil {
+			var header [4]byte
+			if n, _ := f.Read(header[:]); n >= 4 {
+				// ELF文件魔数: 0x7F 'E' 'L' 'F'
+				if header[0] == 0x7F && header[1] == 'E' && header[2] == 'L' && header[3] == 'F' {
+					isELF = true
+				}
+			}
+			f.Close()
+		}
+		
+		// 如果是ELF文件，或者文件名没有扩展名（很可能是可执行文件）
+		hasExt := strings.Contains(fileName, ".")
+		if isELF || !hasExt {
+			// 检查当前权限
+			mode := info.Mode()
+			if mode&0111 == 0 { // 没有执行权限
+				if err := os.Chmod(filePath, mode|0111); err != nil {
+					log.Printf("Warning: failed to chmod %s: %v", fileName, err)
+				} else {
+					log.Printf("Set executable permission for %s", fileName)
+				}
+			}
+		}
+	}
+	
 	return nil
 }
 

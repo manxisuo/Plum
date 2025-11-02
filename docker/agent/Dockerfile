@@ -2,7 +2,12 @@
 # 多阶段构建，优化镜像大小
 
 # 构建阶段
+# 使用 go1.23-alpine，通过 GOTOOLCHAIN=auto 自动下载 go1.24 工具链（go.mod 要求 go >= 1.24.0）
 FROM golang:1.23-alpine AS builder
+
+# 设置 GOTOOLCHAIN 允许自动下载所需工具链
+# go.mod 要求 go >= 1.24.0，但 Docker 镜像可能只有 1.23，通过此设置自动下载 1.24 工具链
+ENV GOTOOLCHAIN=auto
 
 # 设置工作目录
 WORKDIR /app
