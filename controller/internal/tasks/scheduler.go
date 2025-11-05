@@ -244,74 +244,14 @@ func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool 
 				return true
 			} else {
 				log.Printf("tasks: failed to push task %s to worker %s (channel full or worker disconnected)", t.TaskID, worker.WorkerID)
-				// 继续尝试回退方式
 			}
 		} else {
 			log.Printf("tasks: no stream worker found for task %s (name=%s, targetKind=%s, targetRef=%s)",
 				t.TaskID, t.Name, t.TargetKind, t.TargetRef)
-			// 继续尝试回退方式
 		}
 	}
 
-	// 回退到旧版：通过 GRPCAddress 连接（兼容性）
-	var candidates []*store.EmbeddedWorker
-	for i := range embeddedWorkers {
-		w := &embeddedWorkers[i]
-		for _, name := range w.Tasks {
-			if name == t.Name {
-				candidates = append(candidates, w)
-				break
-			}
-		}
-	}
-
-	if len(candidates) == 0 {
-		return false
-	}
-
-	var candidate *store.EmbeddedWorker
-	if t.TargetKind == "node" && t.TargetRef != "" {
-		for _, w := range candidates {
-			if w.NodeID == t.TargetRef {
-				candidate = w
-				break
-			}
-		}
-	} else if t.TargetKind == "app" && t.TargetRef != "" {
-		for _, w := range candidates {
-			if w.AppName == t.TargetRef {
-				candidate = w
-				break
-			}
-		}
-	} else {
-		candidate = candidates[0]
-	}
-
-	if candidate == nil || candidate.GRPCAddress == "" {
-		return false
-	}
-
-	client, err := grpc.NewTaskClient(candidate.GRPCAddress)
-	if err != nil {
-		log.Printf("Failed to create gRPC client for worker %s: %v", candidate.WorkerID, err)
-		return false
-	}
-	defer client.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(embeddedTimeoutMs())*time.Millisecond)
-	defer cancel()
-
-	log.Printf("tasks: dispatch %s to legacy gRPC worker %s address=%s", t.Name, candidate.WorkerID, candidate.GRPCAddress)
-	result, err := client.ExecuteTask(ctx, t.TaskID, t.Name, t.PayloadJSON)
-	if err != nil {
-		log.Printf("tasks: gRPC call error: %v", err)
-		_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", err.Error(), time.Now().Unix(), t.Attempt)
-		return true
-	}
-
-	_ = store.Current.UpdateTaskFinished(t.TaskID, "Succeeded", result, "", time.Now().Unix(), t.Attempt)
-	return true
+	return false
 }
 
 func runEmbeddedHTTP(t store.Task, workers []store.Worker) bool {

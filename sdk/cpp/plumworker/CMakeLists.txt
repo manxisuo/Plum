@@ -7,7 +7,6 @@ pkg_check_modules(PROTOBUF REQUIRED protobuf)
 
 add_library(plumworker STATIC
   src/plum_worker.cpp
-  src/grpc_worker.cpp
 )
 target_include_directories(plumworker PUBLIC include)
 target_include_directories(plumworker PUBLIC ../grpc/proto)

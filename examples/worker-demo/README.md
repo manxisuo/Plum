@@ -88,9 +88,9 @@ curl -X POST http://localhost:8080/v1/apps/upload \
 ```bash
 # 点击"启动"按钮
 # Worker会自动：
-# 1. 启动gRPC服务（18090端口）
+# 1. 连接到Controller的gRPC服务（客户端模式）
 # 2. 注册到Controller
-# 3. 开始接受任务
+# 3. 开始接收任务（通过流式推送）
 ```
 
 ### 4. 验证Worker已注册
@@ -146,17 +146,16 @@ curl http://localhost:8080/v1/embedded-workers
 | PLUM_APP_VERSION | 1.0.0 | Agent注入 |
 | WORKER_ID | worker-demo-{instanceId} | Worker唯一ID |
 | WORKER_NODE_ID | nodeA | 所在节点 |
-| CONTROLLER_BASE | http://127.0.0.1:8080 | Controller地址 |
-| GRPC_ADDRESS | 0.0.0.0:18090 | gRPC监听地址 |
+| CONTROLLER_GRPC_ADDR | 127.0.0.1:9090 | Controller gRPC地址（Worker作为客户端连接） |
 
 ## 📝 文件说明
 
 ```
 worker-demo/
-├── main.cpp              # Worker实现（gRPC服务）
+├── main.cpp              # Worker实现（gRPC客户端，流式连接）
 ├── CMakeLists.txt        # 构建配置（链接proto库）
 ├── start.sh              # 启动脚本
-├── meta.ini              # 元数据（name、version、service）
+├── meta.ini              # 元数据（name、version）
 ├── build.sh              # 构建打包脚本
 └── README.md             # 本文档
 ```
@@ -207,7 +206,6 @@ cd examples/worker-demo
 
 1. **环境变量**：
    - `CONTROLLER_GRPC_ADDR`：Controller 的 gRPC 地址（默认：`127.0.0.1:9090`）
-   - `CONTROLLER_BASE`：Controller 的 HTTP 地址（用于旧版兼容，默认：`http://127.0.0.1:8080`）
 2. **proto依赖**：必须先`make proto`生成proto代码
 3. **gRPC依赖**：需要安装libgrpc++-dev
 4. **网络访问**：Worker 需要能访问 Controller 的 gRPC 端口（默认 9090）

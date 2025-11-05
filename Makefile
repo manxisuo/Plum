@@ -153,14 +153,6 @@ sdk_cpp_radar_sensor-run:
     #RESOURCE_ID=radar-001  ./sdk/cpp/build/examples/radar_sensor/radar_sensor
 	./sdk/cpp/build/examples/radar_sensor/radar_sensor
 
-# SDK C++ grpc_echo_worker
-sdk_cpp_grpc_echo_worker:
-	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
-	cmake --build sdk/cpp/build --target grpc_echo_worker -j
-
-sdk_cpp_grpc_echo_worker-run:
-	PLUM_INSTANCE_ID=grpc-instance-001 PLUM_APP_NAME=grpc-echo-app PLUM_APP_VERSION=v2.0.0 WORKER_ID=grpc-echo-1 WORKER_NODE_ID=nodeA GRPC_ADDRESS=0.0.0.0:18082 ./sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker
-
 # ============ Plum Client 库 ============
 plumclient:
 	@echo "Building Plum Client library..."
@@ -244,8 +236,6 @@ help:
 	@echo "    make sdk_cpp_echo_worker-run - 运行echo_worker示例"
 	@echo "    make sdk_cpp_radar_sensor    - 构建radar_sensor示例"
 	@echo "    make sdk_cpp_radar_sensor-run- 运行radar_sensor示例"
-	@echo "    make sdk_cpp_grpc_echo_worker- 构建grpc_echo_worker示例"
-	@echo "    make sdk_cpp_grpc_echo_worker-run - 运行grpc_echo_worker示例"
 	@echo ""
 	@echo "  📦 示例应用:"
 	@echo "    make examples_worker_demo    - 构建worker-demo"

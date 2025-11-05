@@ -152,7 +152,6 @@ int main() {
     std::string appVersion = getEnvOr("PLUM_APP_VERSION", "1.0.0");
     std::string workerId = getEnvOr("WORKER_ID", "worker-demo-1");
     std::string nodeId = getEnvOr("WORKER_NODE_ID", "nodeA");
-    std::string controllerBase = getEnvOr("CONTROLLER_BASE", "http://127.0.0.1:8080");
     std::string controllerGrpcAddr = getEnvOr("CONTROLLER_GRPC_ADDR", "127.0.0.1:9090");
 
     std::cout << "========================================" << std::endl;
@@ -164,7 +163,6 @@ int main() {
     std::cout << "App Name:          " << appName << std::endl;
     std::cout << "App Version:       " << appVersion << std::endl;
     std::cout << "Controller gRPC:   " << controllerGrpcAddr << std::endl;
-    std::cout << "Controller HTTP:   " << controllerBase << std::endl;
     std::cout << "========================================" << std::endl;
 
     std::vector<std::string> supportedTasks = {"demo.echo", "demo.delay"};

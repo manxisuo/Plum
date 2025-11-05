@@ -7,7 +7,6 @@ echo "Starting Plum Worker Demo..."
 # 设置环境变量（如果Agent未注入）
 export WORKER_ID="${WORKER_ID:-worker-demo-${PLUM_INSTANCE_ID}}"
 export WORKER_NODE_ID="${WORKER_NODE_ID:-nodeA}"
-export CONTROLLER_BASE="${CONTROLLER_BASE:-http://127.0.0.1:8080}"
 export CONTROLLER_GRPC_ADDR="${CONTROLLER_GRPC_ADDR:-127.0.0.1:9090}"
 
 echo "Environment:"

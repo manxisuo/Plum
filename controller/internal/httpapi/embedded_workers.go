@@ -36,10 +36,11 @@ func handleRegisterEmbeddedWorker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.WorkerID == "" || req.NodeID == "" || req.GRPCAddress == "" {
-		http.Error(w, "missing required fields", http.StatusBadRequest)
+	if req.WorkerID == "" || req.NodeID == "" {
+		http.Error(w, "missing required fields (workerId, nodeId)", http.StatusBadRequest)
 		return
 	}
+	// GRPCAddress 已废弃（流式模式下不需要），保留字段以兼容旧版 API
 
 	worker := store.EmbeddedWorker{
 		WorkerID:    req.WorkerID,
