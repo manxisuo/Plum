@@ -5,11 +5,8 @@
 ### 🔨 构建命令
 
 ```bash
-# 构建Go Agent（推荐）
+# 构建Go Agent
 make agent
-
-# 构建C++ Agent（旧版备份）
-make agent-cpp
 
 # 清理所有Agent编译产物
 make agent-clean
@@ -45,13 +42,6 @@ tail -f logs/agent-nodeC.log
 pkill -f plum-agent
 ```
 
-#### C++ Agent（旧版）
-```bash
-# 运行C++ Agent
-make agent-cpp-run      # nodeA
-make agent-cpp-runA     # nodeA
-make agent-cpp-runB     # nodeB
-```
 
 ### ℹ️ 帮助命令
 ```bash
@@ -94,14 +84,6 @@ pkill -f plum-agent
 make agent-clean && make agent && make agent-run
 ```
 
-### 场景4：对比测试Go vs C++
-```bash
-# 终端1：Go Agent
-make agent && make agent-runA
-
-# 终端2：C++ Agent
-make agent-cpp && make agent-cpp-runB
-```
 
 ## 🔧 环境变量自定义
 

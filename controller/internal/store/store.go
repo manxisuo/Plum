@@ -329,7 +329,17 @@ type Store interface {
 	ReplaceEndpointsForInstance(nodeID string, instanceID string, eps []Endpoint) error
 	UpdateEndpointHealthForInstance(instanceID string, eps []Endpoint) error
 	DeleteEndpointsForInstance(instanceID string) error
+	// 替换指定服务的端点（删除该实例下指定服务的所有端点，然后插入新端点）
+	ReplaceEndpointsForInstanceAndService(nodeID string, instanceID string, serviceName string, eps []Endpoint) error
+	// 添加单个端点（如果已存在则更新，不删除其他端点）
+	AddEndpoint(ep Endpoint) error
+	// 删除单个端点（通过主键）
+	DeleteEndpoint(serviceName string, instanceID string, ip string, port int, protocol string) error
+	// 更新单个端点信息
+	UpdateEndpoint(serviceName string, instanceID string, oldIP string, oldPort int, oldProtocol string, ep Endpoint) error
 	ListEndpointsByService(serviceName string, version string, protocol string) ([]Endpoint, error)
+	// 列出服务的所有端点（包括不健康的，用于管理界面）
+	ListAllEndpointsByService(serviceName string) ([]Endpoint, error)
 	ListServices() ([]string, error)
 
 	// Tasks (Phase A minimal)

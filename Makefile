@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: controller controller-run agent agent-cpp agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build proto proto-clean
+.PHONY: controller controller-run agent agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build proto proto-clean
 .PHONY: sdk_cpp sdk_cpp_mirror sdk_cpp_echo_worker sdk_cpp_echo_worker-run
 .PHONY: plumclient service_client_example service_client_example-run
 .PHONY: help stop-agent
@@ -17,16 +17,10 @@ agent:
 	@cd agent-go && go build -o plum-agent
 	@echo "✅ Go Agent built: agent-go/plum-agent"
 
-agent-cpp:
-	@echo "Building C++ Agent..."
-	@cmake -S agent -B agent/build -DCMAKE_BUILD_TYPE=Release
-	@cmake --build agent/build --config Release -j
-	@echo "✅ C++ Agent built: agent/build/plum_agent"
-
 agent-clean:
 	@echo "Cleaning agent build artifacts..."
 	@rm -f agent-go/plum-agent
-	@rm -rf agent/build
+	@rm -f agent-go/agent
 	@echo "✅ Agent artifacts cleaned"
 
 # ============ Agent 运行 ============
@@ -39,15 +33,6 @@ agent-run%:
 	@num=$(patsubst agent-run%,%,$@); \
 	echo "Starting Go Agent (node$$num)..."; \
 	AGENT_NODE_ID=node$$num ./agent-go/plum-agent
-
-agent-cpp-run:
-	@echo "Starting C++ Agent (nodeA)..."
-	@AGENT_NODE_ID=nodeA ./agent/build/plum_agent
-
-agent-cpp-run%:
-	@num=$(patsubst agent-cpp-run%,%,$@); \
-	echo "Starting C++ Agent (node$$num)..."; \
-	AGENT_NODE_ID=node$$num ./agent/build/plum_agent
 
 # 运行多个Agent节点（后台）
 agent-run-multi:
@@ -66,8 +51,7 @@ agent-help:
 	@echo "Plum Agent Commands:"
 	@echo ""
 	@echo "  构建："
-	@echo "    make agent              - 构建Go Agent（推荐）"
-	@echo "    make agent-cpp          - 构建C++ Agent（备份）"
+	@echo "    make agent              - 构建Go Agent"
 	@echo "    make agent-clean        - 清理编译产物"
 	@echo ""
 	@echo "  运行："
@@ -76,10 +60,6 @@ agent-help:
 	@echo "    make agent-runB         - 运行Go Agent (nodeB)"
 	@echo "    make agent-runC         - 运行Go Agent (nodeC)"
 	@echo "    make agent-run-multi    - 后台运行3个Go Agent (A/B/C)"
-	@echo ""
-	@echo "  C++ Agent（旧版）："
-	@echo "    make agent-cpp-run      - 运行C++ Agent (nodeA)"
-	@echo "    make agent-cpp-runA     - 运行C++ Agent (nodeA)"
 	@echo ""
 	@echo "  环境变量："
 	@echo "    AGENT_NODE_ID           - 节点ID（默认：nodeA）"

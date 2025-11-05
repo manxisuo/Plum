@@ -578,6 +578,34 @@ func (s *sqliteStore) ReplaceEndpointsForInstance(nodeID string, instanceID stri
 	return tx.Commit()
 }
 
+// ReplaceEndpointsForInstanceAndService 替换指定服务的端点（只删除该实例下指定服务的端点，保留其他服务的端点）
+func (s *sqliteStore) ReplaceEndpointsForInstanceAndService(nodeID string, instanceID string, serviceName string, eps []store.Endpoint) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	// 只删除该实例下指定服务的端点
+	_, err = tx.Exec(`DELETE FROM endpoints WHERE instance_id=? AND service_name=?`, instanceID, serviceName)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	// 插入该服务的新端点
+	for _, e := range eps {
+		if e.ServiceName != serviceName {
+			continue // 跳过不属于该服务的端点（理论上不应该发生）
+		}
+		labelsJSON, _ := json.Marshal(e.Labels)
+		if _, err := tx.Exec(`INSERT INTO endpoints(service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+			e.ServiceName, instanceID, nodeID, e.IP, e.Port, e.Protocol, e.Version, string(labelsJSON), boolToInt(e.Healthy), e.LastSeen,
+		); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *sqliteStore) UpdateEndpointHealthForInstance(instanceID string, eps []store.Endpoint) error {
 	ts := time.Now().Unix()
 	for _, e := range eps {
@@ -596,6 +624,56 @@ func (s *sqliteStore) DeleteEndpointsForInstance(instanceID string) error {
 	return err
 }
 
+// AddEndpoint 添加单个端点（如果已存在则更新，不删除其他端点）
+func (s *sqliteStore) AddEndpoint(ep store.Endpoint) error {
+	labelsJSON, _ := json.Marshal(ep.Labels)
+	ts := time.Now().Unix()
+	// 使用 INSERT OR REPLACE（基于主键）
+	// 主键是 (service_name, instance_id, ip, port, protocol)
+	_, err := s.db.Exec(`INSERT OR REPLACE INTO endpoints(service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+		ep.ServiceName, ep.InstanceID, ep.NodeID, ep.IP, ep.Port, ep.Protocol, ep.Version, string(labelsJSON), boolToInt(ep.Healthy), ts)
+	return err
+}
+
+// DeleteEndpoint 删除单个端点
+func (s *sqliteStore) DeleteEndpoint(serviceName string, instanceID string, ip string, port int, protocol string) error {
+	_, err := s.db.Exec(`DELETE FROM endpoints WHERE service_name=? AND instance_id=? AND ip=? AND port=? AND protocol=?`,
+		serviceName, instanceID, ip, port, protocol)
+	return err
+}
+
+// UpdateEndpoint 更新单个端点信息
+func (s *sqliteStore) UpdateEndpoint(serviceName string, instanceID string, oldIP string, oldPort int, oldProtocol string, ep store.Endpoint) error {
+	labelsJSON, _ := json.Marshal(ep.Labels)
+	ts := time.Now().Unix()
+	// 如果主键字段发生变化，需要先删除旧记录，再插入新记录
+	if ep.ServiceName != serviceName || ep.InstanceID != instanceID || ep.IP != oldIP || ep.Port != oldPort || ep.Protocol != oldProtocol {
+		tx, err := s.db.Begin()
+		if err != nil {
+			return err
+		}
+		// 删除旧记录
+		_, err = tx.Exec(`DELETE FROM endpoints WHERE service_name=? AND instance_id=? AND ip=? AND port=? AND protocol=?`,
+			serviceName, instanceID, oldIP, oldPort, oldProtocol)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		// 插入新记录
+		_, err = tx.Exec(`INSERT INTO endpoints(service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+			ep.ServiceName, ep.InstanceID, ep.NodeID, ep.IP, ep.Port, ep.Protocol, ep.Version, string(labelsJSON), boolToInt(ep.Healthy), ts)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		return tx.Commit()
+	}
+	// 只更新非主键字段
+	_, err := s.db.Exec(`UPDATE endpoints SET node_id=?, version=?, labels=?, healthy=?, last_seen=? WHERE service_name=? AND instance_id=? AND ip=? AND port=? AND protocol=?`,
+		ep.NodeID, ep.Version, string(labelsJSON), boolToInt(ep.Healthy), ts, serviceName, instanceID, oldIP, oldPort, oldProtocol)
+	return err
+}
+
 func (s *sqliteStore) ListEndpointsByService(serviceName string, version string, protocol string) ([]store.Endpoint, error) {
 	// Add health check based on last_seen timestamp (15 seconds TTL)
 	sqlStr := `SELECT service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen FROM endpoints WHERE service_name=? AND healthy=1 AND last_seen > ?`
@@ -609,6 +687,28 @@ func (s *sqliteStore) ListEndpointsByService(serviceName string, version string,
 		args = append(args, protocol)
 	}
 	rows, err := s.db.Query(sqlStr, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.Endpoint
+	for rows.Next() {
+		var e store.Endpoint
+		var labelsStr string
+		var healthy int
+		if err := rows.Scan(&e.ServiceName, &e.InstanceID, &e.NodeID, &e.IP, &e.Port, &e.Protocol, &e.Version, &labelsStr, &healthy, &e.LastSeen); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(labelsStr), &e.Labels)
+		e.Healthy = healthy != 0
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// ListAllEndpointsByService 列出服务的所有端点（包括不健康的，用于管理界面）
+func (s *sqliteStore) ListAllEndpointsByService(serviceName string) ([]store.Endpoint, error) {
+	rows, err := s.db.Query(`SELECT service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen FROM endpoints WHERE service_name=?`, serviceName)
 	if err != nil {
 		return nil, err
 	}

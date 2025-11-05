@@ -626,7 +626,7 @@ make controller
 
 ### 2. 启动Agent
 ```bash
-CONTROLLER_BASE=http://127.0.0.1:8080 NODE_ID=nodeA ./agent/build/plum_agent
+AGENT_NODE_ID=nodeA ./agent-go/plum-agent
 ```
 
 ### 3. 启动UI

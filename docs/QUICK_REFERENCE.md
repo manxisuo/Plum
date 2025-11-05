@@ -10,7 +10,7 @@ cd /home/stone/code/Plum && ./controller/bin/controller
 cd /home/stone/code/Plum/ui && npm run dev
 
 # Terminal 3: Agent (可选)
-CONTROLLER_BASE=http://127.0.0.1:8080 NODE_ID=nodeA ./agent/build/plum_agent
+AGENT_NODE_ID=nodeA ./agent-go/plum-agent
 
 # Terminal 4: gRPC Worker示例
 cd /home/stone/code/Plum
@@ -72,7 +72,6 @@ GRPC_ADDRESS=0.0.0.0:18082 \
 # 构建
 make controller              # 构建Controller
 make agent                   # 构建Go Agent
-make agent-cpp               # 构建C++ Agent
 make agent-clean             # 清理Agent编译产物
 make proto                   # 编译proto文件（Go+C++）
 make sdk_cpp                 # 构建C++ SDK

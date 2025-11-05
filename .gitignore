@@ -21,9 +21,11 @@ ui/.eslintcache
 controller/bin/
 controller/dist/
 bin/
+controller/server
 
 # Agent build outputs
 agent-go/plum-agent
+agent-go/agent
 
 # C++ build (CMake)
 agent/build/
@@ -37,6 +39,8 @@ examples/*/*.zip
 examples/demo-app/demo-app
 examples/worker-demo/worker-demo
 examples/kv-demo/kv-demo
+
+examples-local
 
 # gRPC generated files (keep proto files, ignore generated code)
 *.pb.cc

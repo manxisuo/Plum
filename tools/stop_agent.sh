@@ -4,8 +4,8 @@
 
 echo "正在停止agent..."
 
-# 查找agent进程
-AGENT_PID=$(ps aux | grep -v grep | grep "./agent/build/plum_agent" | awk '{print $2}')
+# 查找agent进程（Go Agent）
+AGENT_PID=$(ps aux | grep -v grep | grep "plum-agent" | awk '{print $2}')
 
 if [ -z "$AGENT_PID" ]; then
     echo "没有找到运行中的agent进程"

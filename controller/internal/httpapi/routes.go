@@ -22,7 +22,8 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// services (register/discovery)
 	mux.HandleFunc("/v1/services/register", withCORS(handleRegisterEndpoints))
 	mux.HandleFunc("/v1/services/heartbeat", withCORS(handleHeartbeatEndpoints))
-	mux.HandleFunc("/v1/services", withCORS(handleDeleteEndpoints)) // DELETE ?instanceId=
+	mux.HandleFunc("/v1/services", withCORS(handleDeleteEndpoints))       // DELETE ?instanceId=
+	mux.HandleFunc("/v1/services/endpoint", withCORS(handleEndpointCRUD)) // DELETE/PATCH单个端点
 	mux.HandleFunc("/v1/services/list", withCORS(handleListServices))
 	mux.HandleFunc("/v1/discovery", withCORS(handleDiscover))
 	mux.HandleFunc("/v1/discovery/random", withCORS(handleDiscoverRandom))

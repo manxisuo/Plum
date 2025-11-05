@@ -73,18 +73,15 @@ go build -o plum-agent
 ### 4. 更新构建系统 ✅
 ```makefile
 agent:          # 构建Go Agent（默认）
-agent-cpp:      # 构建C++ Agent（备份）
 agent-run:      # 运行Go Agent
-agent-cpp-run:  # 运行C++ Agent
+agent-run-multi:# 后台运行多个Go Agent
+agent-clean:    # 清理编译产物
 ```
 
 ## 📦 目录结构
 
 ```
 Plum/
-├── agent/          # C++ Agent（已废弃，保留作参考）
-│   ├── src/
-│   └── CMakeLists.txt
 ├── agent-go/       # Go Agent（推荐使用）★
 │   ├── main.go
 │   ├── reconciler.go
@@ -115,14 +112,7 @@ CONTROLLER_BASE=http://127.0.0.1:8080 \
 ./plum-agent
 ```
 
-#### C++ Agent（仅作备份）
-```bash
-# 构建
-make agent-cpp
-
-# 运行
-make agent-cpp-run
-```
+> **注意**：C++ Agent 已删除，仅保留 Go Agent 实现。
 
 ## ✅ 功能验证
 
@@ -208,16 +198,16 @@ std::condition_variable cv;
 - [ ] 收集性能数据
 
 ### 长期（可选）
-- [ ] 删除C++ Agent代码
+- [x] 删除C++ Agent代码 ✅ **已完成**
 - [ ] 添加Go Agent单元测试
 - [ ] 优化日志和监控
 
 ## 📝 经验总结
 
 ### 成功因素
-1. **C++ Agent代码质量高**：逻辑清晰，易于理解
+1. **C++ Agent代码质量高**：逻辑清晰，易于理解（已删除）
 2. **Go标准库强大**：JSON、HTTP、exec开箱即用
-3. **渐进式迁移**：保留C++ Agent作为备份
+3. **渐进式迁移**：已完成从C++到Go的迁移，C++ Agent代码已删除
 4. **充分测试**：验证所有功能正常
 
 ### 经验教训

@@ -323,6 +323,8 @@ func (r *Reconciler) postStatus(instanceID, phase string, exitCode int, healthy 
 }
 
 // RegisterServices 注册服务
+// 采用增量注册模式：只注册meta.ini中定义的服务端点，不影响手动注册的其他服务
+// 这样可以在真实应用实例上手动注册额外服务，而不会被Agent覆盖
 func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string) {
 	metaPath := filepath.Join(r.baseDir, instanceID, "app", "meta.ini")
 	if !FileExists(metaPath) {
@@ -340,6 +342,8 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string) {
 		IP:         ip,
 		Endpoints:  endpoints,
 	}
+	// 使用增量注册模式（不传replace=true），只添加/更新meta.ini中的服务端点
+	// 不会删除手动注册的其他服务端点
 	url := r.controller + "/v1/services/register"
 	if err := r.http.PostJSON(url, reg); err != nil {
 		log.Printf("Failed to register services: %v", err)
