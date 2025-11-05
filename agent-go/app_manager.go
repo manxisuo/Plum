@@ -28,6 +28,10 @@ type AppManager interface {
 	// instanceID: 实例ID
 	// 返回：应用状态信息
 	GetStatus(instanceID string) (AppStatus, error)
+
+	// ListRunning 列出所有运行中的实例ID
+	// 返回：运行中的实例ID列表
+	ListRunning() []string
 }
 
 // AppStatus 应用状态

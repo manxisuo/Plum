@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/manxisuo/plum/controller/internal/notify"
 	"github.com/manxisuo/plum/controller/internal/store"
 )
 
@@ -114,11 +115,18 @@ func handleDeploymentByID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		// 级联删除：先删 assignments 与相关 statuses，再删 deployment
 		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
+		// 收集所有涉及的节点ID，用于通知Agent
+		nodeIDs := make(map[string]bool)
 		for _, a := range assigns {
+			nodeIDs[a.NodeID] = true
 			_ = store.Current.DeleteStatusesForInstance(a.InstanceID)
 		}
 		_ = store.Current.DeleteAssignmentsForDeployment(id)
 		_ = store.Current.DeleteDeployment(id)
+		// 通知所有涉及的节点，让Agent立即停止进程
+		for nodeID := range nodeIDs {
+			notify.Publish(nodeID)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -148,14 +156,28 @@ func handleDeploymentAction(w http.ResponseWriter, r *http.Request, id string, a
 	// 如果是停止操作，将所有实例的Desired状态设为Stopped
 	if action == "stop" {
 		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
+		// 收集所有涉及的节点ID，用于通知Agent
+		nodeIDs := make(map[string]bool)
 		for _, a := range assigns {
+			nodeIDs[a.NodeID] = true
 			_ = store.Current.UpdateAssignmentDesired(a.InstanceID, store.DesiredStopped)
+		}
+		// 通知所有涉及的节点
+		for nodeID := range nodeIDs {
+			notify.Publish(nodeID)
 		}
 	} else {
 		// 如果是启动操作，将所有实例的Desired状态设为Running
 		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
+		// 收集所有涉及的节点ID，用于通知Agent
+		nodeIDs := make(map[string]bool)
 		for _, a := range assigns {
+			nodeIDs[a.NodeID] = true
 			_ = store.Current.UpdateAssignmentDesired(a.InstanceID, store.DesiredRunning)
+		}
+		// 通知所有涉及的节点
+		for nodeID := range nodeIDs {
+			notify.Publish(nodeID)
 		}
 	}
 

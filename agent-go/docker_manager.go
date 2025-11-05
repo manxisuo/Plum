@@ -362,6 +362,49 @@ func (m *DockerManager) GetStatus(instanceID string) (AppStatus, error) {
 	}, nil
 }
 
+// ListRunning 列出所有运行中的实例ID
+func (m *DockerManager) ListRunning() []string {
+	var running []string
+	// 检查所有已知的容器
+	for instanceID := range m.containers {
+		if m.IsRunning(instanceID) {
+			running = append(running, instanceID)
+		}
+	}
+	// 也检查可能通过容器名启动但不在记录中的容器
+	// 通过列出所有 plum-app-* 容器来发现
+	containerList, err := m.client.ContainerList(m.ctx, types.ContainerListOptions{
+		All: true, // 包括已停止的容器
+	})
+	if err != nil {
+		log.Printf("Failed to list containers: %v", err)
+		return running
+	}
+	prefix := "plum-app-"
+	for _, container := range containerList {
+		for _, name := range container.Names {
+			// 容器名格式：/plum-app-{instanceID}
+			if strings.HasPrefix(name, "/"+prefix) {
+				instanceID := strings.TrimPrefix(name, "/"+prefix)
+				// 检查是否已经在 running 列表中
+				found := false
+				for _, r := range running {
+					if r == instanceID {
+						found = true
+						break
+					}
+				}
+				if !found && container.State == "running" {
+					running = append(running, instanceID)
+					// 更新容器记录
+					m.containers[instanceID] = container.ID
+				}
+			}
+		}
+	}
+	return running
+}
+
 // getMemoryLimit 从环境变量获取内存限制（字节）
 func getMemoryLimit() int64 {
 	memoryStr := os.Getenv("PLUM_CONTAINER_MEMORY")

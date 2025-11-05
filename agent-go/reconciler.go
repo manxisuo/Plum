@@ -175,12 +175,11 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 	now := time.Now().Unix()
 
-	// 获取所有运行中的实例（通过AppManager）
-	// 由于接口限制，我们需要通过状态检查来确定哪些实例在运行
-	// 这里简化处理：通过检查已知的实例ID
-	// 更好的方式是AppManager提供ListRunning()方法，但为了最小改动，先这样实现
+	// 获取所有运行中的实例（通过AppManager.ListRunning）
+	// 这样可以发现所有运行中的实例，包括那些不在 assignments 中的（已删除的实例）
+	allRunning := r.appManager.ListRunning()
 
-	// 检查需要停止的实例
+	// 检查需要停止的实例（已在 stopSentTimes 中的）
 	for instanceID := range r.stopSentTimes {
 		if keep[instanceID] {
 			// 仍在keep列表中，清除停止标记
@@ -217,22 +216,24 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 		}
 	}
 
-	// 对于不在stopSentTimes中但需要停止的实例，也需要处理
-	// 检查所有运行中的实例，如果不在keep列表中，也需要停止
-	// 这主要是为了处理容器模式，因为容器的生命周期由Docker管理
-	// 我们需要主动检查并清理不需要的容器
-	for instanceID := range r.knownInstances {
+	// 检查所有运行中的实例，如果不在keep列表中，需要停止
+	// 这包括：1) Desired=Stopped 的实例，2) assignment 被删除的实例
+	for _, instanceID := range allRunning {
 		if keep[instanceID] {
 			continue // 应该在运行，跳过
 		}
 
-		// 这个实例不应该运行，检查是否真的在运行
-		if r.appManager.IsRunning(instanceID) {
-			// 实例在运行，但不在keep列表中，需要停止
-			if _, exists := r.stopSentTimes[instanceID]; !exists {
-				// 还没有标记停止，现在标记
-				r.markForStop(instanceID)
-				log.Printf("Found running instance %s that should be stopped, marking for stop", instanceID)
+		// 这个实例不应该运行，但正在运行，需要停止
+		if _, exists := r.stopSentTimes[instanceID]; !exists {
+			// 还没有标记停止，现在标记并立即尝试停止
+			r.markForStop(instanceID)
+			log.Printf("Found running instance %s that should be stopped (not in keep list), marking for stop", instanceID)
+			// 立即尝试停止（不等待下一次循环）
+			if err := r.appManager.StopApp(instanceID); err != nil {
+				log.Printf("Failed to stop app %s: %v", instanceID, err)
+			} else {
+				r.stopSentTimes[instanceID] = now
+				log.Printf("Sent stop signal to instance %s", instanceID)
 			}
 		}
 	}

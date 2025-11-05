@@ -17,5 +17,5 @@ echo "  WORKER_ID: $WORKER_ID"
 echo "  CONTROLLER_GRPC_ADDR: $CONTROLLER_GRPC_ADDR"
 
 # 启动Worker
-./worker-demo
+exec ./worker-demo
 
