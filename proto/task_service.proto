@@ -5,8 +5,38 @@ package plum.task;
 option go_package = "github.com/manxisuo/plum/controller/proto;proto";
 
 service TaskService {
+    // 旧版接口（保留兼容性）
     rpc ExecuteTask(TaskRequest) returns (TaskResponse);
     rpc HealthCheck(HealthRequest) returns (HealthResponse);
+    
+    // 新版双向流接口（推荐使用）
+    // Worker 连接到 Controller，Controller 通过流推送任务
+    rpc TaskStream(stream TaskAck) returns (stream TaskRequest);
+}
+
+// Worker 注册信息
+message WorkerRegister {
+    string worker_id = 1;
+    string node_id = 2;
+    string instance_id = 3;
+    string app_name = 4;
+    string app_version = 5;
+    repeated string tasks = 6;  // 支持的任务列表
+    map<string, string> labels = 7;  // 标签
+}
+
+// 任务确认（Worker 发送给 Controller）
+message TaskAck {
+    oneof message {
+        WorkerRegister register = 1;  // 首次连接时发送注册信息
+        TaskResponse result = 2;       // 任务执行结果
+        Heartbeat heartbeat = 3;       // 心跳
+    }
+}
+
+// 心跳消息
+message Heartbeat {
+    string worker_id = 1;
 }
 
 message TaskRequest {
@@ -16,8 +46,9 @@ message TaskRequest {
 }
 
 message TaskResponse {
-    string result = 1;
-    string error = 2;
+    string task_id = 1;  // 任务ID（用于结果回传）
+    string result = 2;
+    string error = 3;
 }
 
 message HealthRequest {

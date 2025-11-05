@@ -36,9 +36,6 @@ sdk/cpp/cmake-build-*/
 examples/*/build/
 examples/*/package/
 examples/*/*.zip
-examples/demo-app/demo-app
-examples/worker-demo/worker-demo
-examples/kv-demo/kv-demo
 
 examples-local
 

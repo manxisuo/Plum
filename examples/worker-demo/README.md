@@ -4,21 +4,33 @@
 
 ## 📋 功能
 
-- ✅ 启动gRPC服务器监听任务请求
-- ✅ 自动注册到Controller
+- ✅ **Worker 作为客户端连接到 Controller**（无需监听端口）
+- ✅ 使用 gRPC 双向流接收任务
+- ✅ 自动注册到 Controller
 - ✅ 支持任务执行（demo.echo、demo.delay）
+- ✅ 通过流返回任务结果
 - ✅ 定期发送心跳
-- ✅ 优雅处理SIGTERM信号
+- ✅ 优雅处理 SIGTERM 信号
 - ✅ 完整的构建和打包流程
 
-## 🎯 与普通应用的区别
+## 🎯 架构优势
 
-| 特性 | 普通应用 | Worker应用 |
-|------|---------|-----------|
-| 功能 | 独立运行 | 接受任务调度 |
-| gRPC | 不需要 | 必须启动gRPC服务 |
-| 注册 | 不需要 | 向Controller注册能力 |
-| 任务 | 无 | 执行embedded任务 |
+### 新架构（流式推送）
+
+| 特性 | 旧架构 | 新架构 |
+|------|--------|--------|
+| Worker 角色 | gRPC 服务端 | gRPC 客户端 |
+| 端口管理 | 每个 Worker 需要端口 | **无需端口** |
+| 网络环境 | 需要 Controller 能访问 Worker | **适合 NAT/防火墙** |
+| 连接方式 | Controller → Worker | **Worker → Controller** |
+| 任务推送 | Controller 主动连接 | **Controller 通过流推送** |
+
+### 优势
+
+1. **无需端口管理**：Worker 不需要监听端口，避免端口冲突
+2. **适合复杂网络**：Worker 在 NAT 后也能正常工作
+3. **更符合拉取模式**：Worker 主动连接并保持长连接
+4. **架构更简洁**：不需要在注册时传递 `GRPC_ADDRESS`
 
 ## 🔨 构建
 
@@ -30,12 +42,28 @@ make proto
 ```
 
 ### 构建Worker Demo
+
+**方式1：直接构建（开发测试）**
 ```bash
 cd examples/worker-demo
+mkdir -p build
+cd build
+cmake ..
+make
+# 生成: build/worker-demo
+```
 
-# 使用构建脚本
+**方式2：使用构建脚本（打包部署）**
+```bash
+cd examples/worker-demo
 ./build.sh
-# 生成: worker-demo.zip
+# 生成: worker-demo.zip（包含可执行文件、启动脚本、配置文件）
+```
+
+### 运行构建后的 Worker
+```bash
+cd examples/worker-demo
+CONTROLLER_GRPC_ADDR=127.0.0.1:9090 ./build/worker-demo
 ```
 
 ## 📦 部署到Plum
@@ -177,10 +205,13 @@ cd examples/worker-demo
 
 ## ⚠️ 注意事项
 
-1. **端口冲突**：默认18090端口，如果多实例需要不同端口
+1. **环境变量**：
+   - `CONTROLLER_GRPC_ADDR`：Controller 的 gRPC 地址（默认：`127.0.0.1:9090`）
+   - `CONTROLLER_BASE`：Controller 的 HTTP 地址（用于旧版兼容，默认：`http://127.0.0.1:8080`）
 2. **proto依赖**：必须先`make proto`生成proto代码
 3. **gRPC依赖**：需要安装libgrpc++-dev
-4. **网络访问**：Worker需要能访问Controller
+4. **网络访问**：Worker 需要能访问 Controller 的 gRPC 端口（默认 9090）
+5. **无需端口配置**：Worker 不再需要 `GRPC_ADDRESS` 环境变量
 
 ---
 

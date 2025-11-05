@@ -3,6 +3,7 @@ SHELL := /bin/bash
 .PHONY: controller controller-run agent agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build proto proto-clean
 .PHONY: sdk_cpp sdk_cpp_mirror sdk_cpp_echo_worker sdk_cpp_echo_worker-run
 .PHONY: plumclient service_client_example service_client_example-run
+.PHONY: examples_worker_demo examples_worker_demo-pkg
 .PHONY: help stop-agent
 
 controller:
@@ -187,6 +188,40 @@ stop-agent:
 	@chmod +x tools/stop_agent.sh
 	@tools/stop_agent.sh
 
+# ============ Examples ============
+# Worker Demo 构建
+examples_worker_demo:
+	@echo "Building Worker Demo..."
+	@if [ ! -f "sdk/cpp/grpc/proto/task_service.pb.cc" ]; then \
+		echo "❌ Proto文件不存在，请先运行: make proto"; \
+		exit 1; \
+	fi
+	@cd examples/worker-demo && \
+		mkdir -p build && \
+		cd build && \
+		cmake .. && \
+		make
+	@echo "✅ Worker Demo built: examples/worker-demo/build/worker-demo"
+
+# Worker Demo 打包
+examples_worker_demo-pkg: examples_worker_demo
+	@echo "Packaging Worker Demo..."
+	@cd examples/worker-demo && \
+		VERSION=$$(grep "^version=" meta.ini | cut -d'=' -f2 | tr -d ' ' || echo "unknown"); \
+		echo "Version: $$VERSION"; \
+		mkdir -p package && \
+		cp build/worker-demo package/ && \
+		cp start.sh package/ && \
+		cp meta.ini package/ && \
+		chmod +x package/start.sh && \
+		chmod +x package/worker-demo && \
+		cd package && \
+		zip -q -r ../worker-demo-$$VERSION.zip . && \
+		cd .. && \
+		rm -rf package
+	@echo "✅ Package created: examples/worker-demo/worker-demo-$$(grep '^version=' examples/worker-demo/meta.ini | cut -d'=' -f2 | tr -d ' ').zip"
+	@ls -lh examples/worker-demo/worker-demo-*.zip | tail -1
+
 # ============ 帮助信息 ============
 help:
 	@echo "Plum 项目构建和运行命令:"
@@ -211,6 +246,10 @@ help:
 	@echo "    make sdk_cpp_radar_sensor-run- 运行radar_sensor示例"
 	@echo "    make sdk_cpp_grpc_echo_worker- 构建grpc_echo_worker示例"
 	@echo "    make sdk_cpp_grpc_echo_worker-run - 运行grpc_echo_worker示例"
+	@echo ""
+	@echo "  📦 示例应用:"
+	@echo "    make examples_worker_demo    - 构建worker-demo"
+	@echo "    make examples_worker_demo-pkg - 打包worker-demo（包含meta.ini和start.sh）"
 	@echo ""
 	@echo "  🌐 Plum Client 库:"
 	@echo "    make plumclient              - 构建Plum Client库"

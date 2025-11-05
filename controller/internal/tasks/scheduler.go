@@ -17,6 +17,7 @@ import (
 	"github.com/manxisuo/plum/controller/internal/grpc"
 	"github.com/manxisuo/plum/controller/internal/notify"
 	"github.com/manxisuo/plum/controller/internal/store"
+	"github.com/manxisuo/plum/controller/proto"
 )
 
 func intervalSeconds() int {
@@ -227,8 +228,33 @@ func runEmbedded(t store.Task) {
 }
 
 func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool {
+	// 优先使用新的流式推送方式
+	grpcServer := grpc.GetServer()
+	if grpcServer != nil {
+		worker := grpcServer.FindWorker(t.Name, t.TargetKind, t.TargetRef)
+		if worker != nil {
+			taskReq := &proto.TaskRequest{
+				TaskId:  t.TaskID,
+				Name:    t.Name,
+				Payload: t.PayloadJSON,
+			}
+			if grpcServer.PushTask(worker.WorkerID, taskReq) {
+				log.Printf("tasks: dispatched %s to stream worker %s (node=%s, app=%s)",
+					t.TaskID, worker.WorkerID, worker.NodeID, worker.AppName)
+				return true
+			} else {
+				log.Printf("tasks: failed to push task %s to worker %s (channel full or worker disconnected)", t.TaskID, worker.WorkerID)
+				// 继续尝试回退方式
+			}
+		} else {
+			log.Printf("tasks: no stream worker found for task %s (name=%s, targetKind=%s, targetRef=%s)",
+				t.TaskID, t.Name, t.TargetKind, t.TargetRef)
+			// 继续尝试回退方式
+		}
+	}
+
+	// 回退到旧版：通过 GRPCAddress 连接（兼容性）
 	var candidates []*store.EmbeddedWorker
-	// First, find all workers that support this task name
 	for i := range embeddedWorkers {
 		w := &embeddedWorkers[i]
 		for _, name := range w.Tasks {
@@ -243,10 +269,8 @@ func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool 
 		return false
 	}
 
-	// Filter by target type if specified
 	var candidate *store.EmbeddedWorker
 	if t.TargetKind == "node" && t.TargetRef != "" {
-		// Find worker on specific node
 		for _, w := range candidates {
 			if w.NodeID == t.TargetRef {
 				candidate = w
@@ -254,7 +278,6 @@ func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool 
 			}
 		}
 	} else if t.TargetKind == "app" && t.TargetRef != "" {
-		// For app, find workers that match the app name
 		for _, w := range candidates {
 			if w.AppName == t.TargetRef {
 				candidate = w
@@ -262,15 +285,13 @@ func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool 
 			}
 		}
 	} else {
-		// No specific target, pick first available
 		candidate = candidates[0]
 	}
 
-	if candidate == nil {
+	if candidate == nil || candidate.GRPCAddress == "" {
 		return false
 	}
 
-	// Create gRPC client and execute task
 	client, err := grpc.NewTaskClient(candidate.GRPCAddress)
 	if err != nil {
 		log.Printf("Failed to create gRPC client for worker %s: %v", candidate.WorkerID, err)
@@ -281,7 +302,7 @@ func runEmbeddedGRPC(t store.Task, embeddedWorkers []store.EmbeddedWorker) bool 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(embeddedTimeoutMs())*time.Millisecond)
 	defer cancel()
 
-	log.Printf("tasks: dispatch %s to gRPC worker %s address=%s", t.Name, candidate.WorkerID, candidate.GRPCAddress)
+	log.Printf("tasks: dispatch %s to legacy gRPC worker %s address=%s", t.Name, candidate.WorkerID, candidate.GRPCAddress)
 	result, err := client.ExecuteTask(ctx, t.TaskID, t.Name, t.PayloadJSON)
 	if err != nil {
 		log.Printf("tasks: gRPC call error: %v", err)

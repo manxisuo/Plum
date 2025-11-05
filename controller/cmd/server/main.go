@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/manxisuo/plum/controller/internal/failover"
+	grpcserver "github.com/manxisuo/plum/controller/internal/grpc"
 	"github.com/manxisuo/plum/controller/internal/httpapi"
 	"github.com/manxisuo/plum/controller/internal/store"
 	sqlitestore "github.com/manxisuo/plum/controller/internal/store/sqlite"
@@ -104,6 +105,17 @@ func main() {
 	tasks.Start()
 	// start DAG orchestrator
 	httpapi.InitDAGOrchestrator(store.Current)
+
+	// start gRPC server for worker connections
+	grpcAddr := os.Getenv("CONTROLLER_GRPC_ADDR")
+	if grpcAddr == "" {
+		grpcAddr = ":9090"
+	}
+	grpcServer, err := grpcserver.StartServer(grpcAddr, store.Current)
+	if err != nil {
+		log.Fatalf("Failed to start gRPC server: %v", err)
+	}
+	defer grpcServer.GracefulStop()
 
 	// static file server for artifacts
 	dataDir := os.Getenv("CONTROLLER_DATA_DIR")
