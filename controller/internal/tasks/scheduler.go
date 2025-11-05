@@ -152,10 +152,17 @@ func tick() {
 		}
 	}
 	// watchdog: mark long-running running tasks as Failed
+	// 使用任务的 TimeoutSec，如果没有设置则使用默认值
+	defaultTimeoutSec := embeddedTimeoutMs()/1000 + 5 // 默认超时时间（秒）
 	for _, t := range tasks {
 		if t.State == "Running" && t.StartedAt > 0 {
-			if now-t.StartedAt >= int64(embeddedTimeoutMs()/1000+5) {
-				_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", "controller watchdog timeout", now, t.Attempt)
+			timeoutSec := t.TimeoutSec
+			if timeoutSec <= 0 {
+				timeoutSec = defaultTimeoutSec
+			}
+			// 添加 5 秒缓冲，避免任务刚好在超时边界时被标记为失败
+			if now-t.StartedAt >= int64(timeoutSec+5) {
+				_ = store.Current.UpdateTaskFinished(t.TaskID, "Failed", "{}", fmt.Sprintf("controller watchdog timeout (running for %d seconds, timeout=%d)", now-t.StartedAt, timeoutSec), now, t.Attempt)
 			}
 		}
 	}

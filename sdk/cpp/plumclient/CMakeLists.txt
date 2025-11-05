@@ -64,39 +64,77 @@ if(USE_OFFLINE_DEPS)
     endif()
 else()
     # 在线模式：使用FetchContent下载依赖
-    # 查找nlohmann/json
-    find_path(NLOHMANN_JSON_INCLUDE_DIR
-        NAMES nlohmann/json.hpp
-        PATHS 
-            /usr/include 
-            /usr/local/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/json-src/include
-        PATH_SUFFIXES nlohmann
-    )
+    include(FetchContent)
+    set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
-    if(NOT NLOHMANN_JSON_INCLUDE_DIR)
-        message(WARNING "nlohmann/json not found, trying to use from build directory")
-        set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/json-src/include")
+    # 支持使用GitHub镜像（中国网络环境）
+    option(USE_GITHUB_MIRROR "Use GitHub mirror for China network" OFF)
+    if(USE_GITHUB_MIRROR)
+        set(GITHUB_MIRROR "https://ghproxy.link/")
+    else()
+        set(GITHUB_MIRROR "")
     endif()
 
-    # 查找httplib
-    find_path(HTTPLIB_INCLUDE_DIR
-        NAMES httplib.h
-        PATHS 
-            /usr/include 
-            /usr/local/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src
-            ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/cpp-httplib
-    )
+    # 下载 nlohmann/json（如果还没有下载）
+    if(NOT TARGET nlohmann_json::nlohmann_json)
+        FetchContent_Declare(
+            json
+            GIT_REPOSITORY ${GITHUB_MIRROR}https://github.com/nlohmann/json.git
+            GIT_TAG v3.11.3
+        )
+        FetchContent_MakeAvailable(json)
+    endif()
+
+    # 下载 httplib（如果还没有下载）
+    if(NOT TARGET httplib::httplib)
+        FetchContent_Declare(
+            httplib
+            GIT_REPOSITORY ${GITHUB_MIRROR}https://github.com/yhirose/cpp-httplib.git
+            GIT_TAG v0.15.3
+        )
+        FetchContent_MakeAvailable(httplib)
+    endif()
+
+    # 设置包含目录
+    if(TARGET nlohmann_json::nlohmann_json)
+        get_target_property(NLOHMANN_JSON_INCLUDE_DIR nlohmann_json::nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
+        if(NLOHMANN_JSON_INCLUDE_DIR)
+            list(GET NLOHMANN_JSON_INCLUDE_DIR 0 NLOHMANN_JSON_INCLUDE_DIR)
+        endif()
+    endif()
+
+    if(TARGET httplib::httplib)
+        get_target_property(HTTPLIB_INCLUDE_DIR httplib::httplib INTERFACE_INCLUDE_DIRECTORIES)
+        if(HTTPLIB_INCLUDE_DIR)
+            list(GET HTTPLIB_INCLUDE_DIR 0 HTTPLIB_INCLUDE_DIR)
+        endif()
+    endif()
+
+    # 如果仍然找不到，尝试从 build 目录查找
+    if(NOT NLOHMANN_JSON_INCLUDE_DIR)
+        find_path(NLOHMANN_JSON_INCLUDE_DIR
+            NAMES nlohmann/json.hpp
+            PATHS 
+                ${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/json-src/include
+            PATH_SUFFIXES nlohmann
+        )
+    endif()
 
     if(NOT HTTPLIB_INCLUDE_DIR)
-        message(WARNING "httplib not found, trying to use from build directory")
-        set(HTTPLIB_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src")
+        find_path(HTTPLIB_INCLUDE_DIR
+            NAMES httplib.h
+            PATHS 
+                ${CMAKE_CURRENT_SOURCE_DIR}/../../build/_deps/httplib-src
+        )
     endif()
 
-    # 确保路径正确
-    if(NOT EXISTS "${HTTPLIB_INCLUDE_DIR}/httplib.h")
-        message(FATAL_ERROR "httplib.h not found at ${HTTPLIB_INCLUDE_DIR}")
+    # 如果还是找不到，使用链接目标（让 CMake 自动处理）
+    if(NOT NLOHMANN_JSON_INCLUDE_DIR)
+        message(WARNING "nlohmann/json include dir not found, will use target")
+    endif()
+
+    if(NOT HTTPLIB_INCLUDE_DIR)
+        message(WARNING "httplib include dir not found, will use target")
     endif()
 endif()
 
@@ -113,8 +151,6 @@ add_library(plumclient SHARED
 target_include_directories(plumclient
     PUBLIC
         include
-        ${NLOHMANN_JSON_INCLUDE_DIR}
-        ${HTTPLIB_INCLUDE_DIR}
 )
 
 # 在离线模式下设置额外的包含目录
@@ -125,6 +161,14 @@ if(USE_OFFLINE_DEPS)
     if(PLUMCLIENT_HTTPLIB_INCLUDE_DIR)
         target_include_directories(plumclient PUBLIC ${PLUMCLIENT_HTTPLIB_INCLUDE_DIR})
     endif()
+else()
+    # 在线模式：使用 CMake 目标（自动处理包含目录）
+    if(NLOHMANN_JSON_INCLUDE_DIR)
+        target_include_directories(plumclient PUBLIC ${NLOHMANN_JSON_INCLUDE_DIR})
+    endif()
+    if(HTTPLIB_INCLUDE_DIR)
+        target_include_directories(plumclient PUBLIC ${HTTPLIB_INCLUDE_DIR})
+    endif()
 endif()
 
 # 链接库
@@ -132,6 +176,16 @@ target_link_libraries(plumclient
     PUBLIC
         Threads::Threads
 )
+
+# 在线模式下链接依赖目标（如果存在）
+if(NOT USE_OFFLINE_DEPS)
+    if(TARGET nlohmann_json::nlohmann_json)
+        target_link_libraries(plumclient PUBLIC nlohmann_json::nlohmann_json)
+    endif()
+    if(TARGET httplib::httplib)
+        target_link_libraries(plumclient PUBLIC httplib::httplib)
+    endif()
+endif()
 
 # 安装规则
 install(TARGETS plumclient

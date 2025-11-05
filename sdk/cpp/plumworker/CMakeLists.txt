@@ -7,9 +7,12 @@ pkg_check_modules(PROTOBUF REQUIRED protobuf)
 
 add_library(plumworker STATIC
   src/plum_worker.cpp
+  src/stream_worker.cpp
 )
-target_include_directories(plumworker PUBLIC include)
-target_include_directories(plumworker PUBLIC ../grpc/proto)
+target_include_directories(plumworker PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ../grpc/proto
+)
 
 # Add gRPC generated files
 add_library(grpc_proto STATIC
