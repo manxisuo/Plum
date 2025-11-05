@@ -227,13 +227,11 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 		if _, exists := r.stopSentTimes[instanceID]; !exists {
 			// 还没有标记停止，现在标记并立即尝试停止
 			r.markForStop(instanceID)
-			log.Printf("Found running instance %s that should be stopped (not in keep list), marking for stop", instanceID)
 			// 立即尝试停止（不等待下一次循环）
 			if err := r.appManager.StopApp(instanceID); err != nil {
 				log.Printf("Failed to stop app %s: %v", instanceID, err)
 			} else {
 				r.stopSentTimes[instanceID] = now
-				log.Printf("Sent stop signal to instance %s", instanceID)
 			}
 		}
 	}

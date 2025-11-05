@@ -795,3 +795,41 @@ func handleListWorkers(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, list)
 }
+
+func handleWorkerByID(w http.ResponseWriter, r *http.Request) {
+	workerID := r.URL.Path[len("/v1/workers/"):]
+	if workerID == "" {
+		http.Error(w, "missing workerId", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		worker, exists, err := store.Current.GetWorker(workerID)
+		if err != nil {
+			log.Printf("Failed to get worker %s: %v", workerID, err)
+			http.Error(w, "get failed", http.StatusInternalServerError)
+			return
+		}
+
+		if !exists {
+			http.Error(w, "worker not found", http.StatusNotFound)
+			return
+		}
+
+		writeJSON(w, worker)
+
+	case http.MethodDelete:
+		if err := store.Current.DeleteWorker(workerID); err != nil {
+			log.Printf("Failed to delete worker %s: %v", workerID, err)
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Deleted worker %s", workerID)
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}

@@ -110,53 +110,42 @@ func handleListEmbeddedWorkers(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetEmbeddedWorker(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	workerID := r.URL.Path[len("/v1/embedded-workers/"):]
 	if workerID == "" {
 		http.Error(w, "missing workerId", http.StatusBadRequest)
 		return
 	}
 
-	worker, exists, err := store.Current.GetEmbeddedWorker(workerID)
-	if err != nil {
-		fmt.Printf("Failed to get embedded worker %s: %v\n", workerID, err)
-		http.Error(w, "get failed", http.StatusInternalServerError)
-		return
-	}
+	switch r.Method {
+	case http.MethodGet:
+		worker, exists, err := store.Current.GetEmbeddedWorker(workerID)
+		if err != nil {
+			fmt.Printf("Failed to get embedded worker %s: %v\n", workerID, err)
+			http.Error(w, "get failed", http.StatusInternalServerError)
+			return
+		}
 
-	if !exists {
-		http.Error(w, "worker not found", http.StatusNotFound)
-		return
-	}
+		if !exists {
+			http.Error(w, "worker not found", http.StatusNotFound)
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(worker); err != nil {
-		fmt.Printf("Failed to encode embedded worker: %v\n", err)
-	}
-}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(worker); err != nil {
+			fmt.Printf("Failed to encode embedded worker: %v\n", err)
+		}
 
-func handleDeleteEmbeddedWorker(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
+	case http.MethodDelete:
+		if err := store.Current.DeleteEmbeddedWorker(workerID); err != nil {
+			fmt.Printf("Failed to delete embedded worker %s: %v\n", workerID, err)
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Printf("Deleted embedded worker %s\n", workerID)
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
 	}
-
-	workerID := r.URL.Path[len("/v1/embedded-workers/"):]
-	if workerID == "" {
-		http.Error(w, "missing workerId", http.StatusBadRequest)
-		return
-	}
-
-	if err := store.Current.DeleteEmbeddedWorker(workerID); err != nil {
-		fmt.Printf("Failed to delete embedded worker %s: %v\n", workerID, err)
-		http.Error(w, "delete failed", http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Printf("Deleted embedded worker %s\n", workerID)
-	w.WriteHeader(http.StatusNoContent)
 }

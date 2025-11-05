@@ -163,7 +163,25 @@ func (s *TaskStreamServer) TaskStream(stream proto.TaskService_TaskStreamServer)
 func (s *TaskStreamServer) handleTaskPush(worker *WorkerConnection) {
 	for {
 		select {
-		case task := <-worker.TaskChan:
+		case task, ok := <-worker.TaskChan:
+			// channel 被关闭或收到 nil 任务
+			if !ok || task == nil {
+				log.Printf("[gRPC] Task channel closed for worker %s, exiting handleTaskPush", worker.WorkerID)
+				return
+			}
+			// 检查 worker 是否还存在（防止并发删除）
+			s.workersMu.RLock()
+			_, exists := s.workers[worker.WorkerID]
+			s.workersMu.RUnlock()
+			if !exists {
+				log.Printf("[gRPC] Worker %s no longer exists, exiting handleTaskPush", worker.WorkerID)
+				return
+			}
+			// 检查 Stream 是否有效
+			if worker.Stream == nil {
+				log.Printf("[gRPC] Worker %s stream is nil, exiting handleTaskPush", worker.WorkerID)
+				return
+			}
 			if err := worker.Stream.Send(task); err != nil {
 				log.Printf("[gRPC] Failed to send task to worker %s: %v", worker.WorkerID, err)
 				s.removeWorker(worker.WorkerID)
@@ -171,11 +189,15 @@ func (s *TaskStreamServer) handleTaskPush(worker *WorkerConnection) {
 			}
 			// 保存任务映射
 			worker.mu.Lock()
+			if worker.taskMap == nil {
+				worker.taskMap = make(map[string]*proto.TaskRequest)
+			}
 			worker.taskMap[task.TaskId] = task
 			worker.mu.Unlock()
 			log.Printf("[gRPC] Task dispatched to worker %s: task_id=%s, name=%s",
 				worker.WorkerID, task.TaskId, task.Name)
 		case <-worker.Stream.Context().Done():
+			log.Printf("[gRPC] Worker %s stream context done, exiting handleTaskPush", worker.WorkerID)
 			return
 		}
 	}
@@ -183,11 +205,21 @@ func (s *TaskStreamServer) handleTaskPush(worker *WorkerConnection) {
 
 // PushTask 推送任务到 worker
 func (s *TaskStreamServer) PushTask(workerID string, task *proto.TaskRequest) bool {
+	if task == nil {
+		log.Printf("[gRPC] Cannot push nil task to worker %s", workerID)
+		return false
+	}
 	s.workersMu.RLock()
 	worker, exists := s.workers[workerID]
 	s.workersMu.RUnlock()
 
-	if !exists {
+	if !exists || worker == nil {
+		return false
+	}
+
+	// 检查 TaskChan 是否已关闭
+	if worker.TaskChan == nil {
+		log.Printf("[gRPC] Worker %s task channel is nil", workerID)
 		return false
 	}
 
@@ -256,7 +288,19 @@ func (s *TaskStreamServer) removeWorker(workerID string) {
 	s.workersMu.Lock()
 	defer s.workersMu.Unlock()
 	if worker, exists := s.workers[workerID]; exists {
-		close(worker.TaskChan)
+		// 关闭 TaskChan（如果还没关闭）
+		// 使用 recover 捕获关闭已关闭 channel 的 panic
+		if worker.TaskChan != nil {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// channel 已经关闭，忽略 panic
+						log.Printf("[gRPC] TaskChan for worker %s already closed", workerID)
+					}
+				}()
+				close(worker.TaskChan)
+			}()
+		}
 		delete(s.workers, workerID)
 		log.Printf("[gRPC] Worker removed: %s", workerID)
 	}

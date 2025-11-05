@@ -37,6 +37,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/workers/register", withCORS(handleRegisterWorker))
 	mux.HandleFunc("/v1/workers/heartbeat", withCORS(handleHeartbeatWorker))
 	mux.HandleFunc("/v1/workers", withCORS(handleListWorkers))
+	mux.HandleFunc("/v1/workers/", withCORS(handleWorkerByID))
 	// resources
 	mux.HandleFunc("/v1/resources/register", withCORS(handleRegisterResource))
 	mux.HandleFunc("/v1/resources/heartbeat", withCORS(handleHeartbeatResource))
@@ -51,7 +52,6 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/embedded-workers/heartbeat", withCORS(handleHeartbeatEmbeddedWorker))
 	mux.HandleFunc("/v1/embedded-workers", withCORS(handleListEmbeddedWorkers))
 	mux.HandleFunc("/v1/embedded-workers/", withCORS(handleGetEmbeddedWorker))
-	mux.HandleFunc("/v1/embedded-workers/delete/", withCORS(handleDeleteEmbeddedWorker))
 
 	// deployments
 	mux.HandleFunc("/v1/deployments", withCORS(handleDeployments))

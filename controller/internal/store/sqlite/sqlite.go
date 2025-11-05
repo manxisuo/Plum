@@ -827,6 +827,26 @@ func (s *sqliteStore) ListWorkers() ([]store.Worker, error) {
 	return out, rows.Err()
 }
 
+func (s *sqliteStore) GetWorker(workerID string) (store.Worker, bool, error) {
+	row := s.db.QueryRow(`SELECT worker_id, node_id, url, tasks, labels, capacity, last_seen FROM workers WHERE worker_id=?`, workerID)
+	var w store.Worker
+	var tasksStr, labelsStr string
+	if err := row.Scan(&w.WorkerID, &w.NodeID, &w.URL, &tasksStr, &labelsStr, &w.Capacity, &w.LastSeen); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return store.Worker{}, false, nil
+		}
+		return store.Worker{}, false, err
+	}
+	_ = json.Unmarshal([]byte(tasksStr), &w.Tasks)
+	_ = json.Unmarshal([]byte(labelsStr), &w.Labels)
+	return w, true, nil
+}
+
+func (s *sqliteStore) DeleteWorker(workerID string) error {
+	_, err := s.db.Exec(`DELETE FROM workers WHERE worker_id=?`, workerID)
+	return err
+}
+
 // Tasks (Phase A minimal)
 func (s *sqliteStore) CreateTask(t store.Task) (string, error) {
 	if t.TaskID == "" {

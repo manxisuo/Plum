@@ -355,6 +355,8 @@ type Store interface {
 	RegisterWorker(w Worker) error
 	HeartbeatWorker(workerID string, capacity int, lastSeen int64) error
 	ListWorkers() ([]Worker, error)
+	GetWorker(workerID string) (Worker, bool, error)
+	DeleteWorker(workerID string) error
 
 	// Embedded Workers (new gRPC-based)
 	RegisterEmbeddedWorker(w EmbeddedWorker) error

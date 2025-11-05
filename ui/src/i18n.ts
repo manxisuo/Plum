@@ -20,6 +20,9 @@ const messages = {
       no: 'No',
       selectNode: 'Select node',
       confirmDelete: 'Confirm delete?',
+      confirm: 'Confirm',
+      ok: 'OK',
+      close: 'Close',
     },
     nav: {
       home: 'Home',
@@ -454,6 +457,9 @@ const messages = {
       no: '否',
       selectNode: '选择节点',
       confirmDelete: '确认删除？',
+      confirm: '确认',
+      ok: '确定',
+      close: '关闭',
     },
     nav: {
       home: '首页',
