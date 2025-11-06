@@ -32,6 +32,9 @@ agent/build/
 sdk/cpp/build/
 sdk/cpp/cmake-build-*/
 
+# app zip package
+apps
+
 # Examples build outputs
 examples/*/build/
 examples/*/package/
