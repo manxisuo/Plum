@@ -54,7 +54,8 @@ go build -o plum-agent
 
 # 自定义配置
 AGENT_NODE_ID=nodeA \
-CONTROLLER_BASE=http://127.0.0.1:8080 \
+CONTROLLER_BASE=http://plum-controller:8080 \
+AGENT_IP=192.168.1.10 \
 AGENT_DATA_DIR=/tmp/plum-agent \
 ./agent-go/plum-agent
 ```
@@ -64,7 +65,8 @@ AGENT_DATA_DIR=/tmp/plum-agent \
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | AGENT_NODE_ID | nodeA | 节点ID |
-| CONTROLLER_BASE | http://127.0.0.1:8080 | Controller地址 |
+| CONTROLLER_BASE | http://plum-controller:8080 | Controller地址（建议在各节点的 /etc/hosts 中配置 plum-controller 指向 Controller IP） |
+| AGENT_IP | 127.0.0.1 | Agent对外通告的IP，用于心跳和服务注册 |
 | AGENT_DATA_DIR | /tmp/plum-agent | 数据目录 |
 
 ## 项目结构

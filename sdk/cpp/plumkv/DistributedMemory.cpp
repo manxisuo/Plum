@@ -151,7 +151,7 @@ std::shared_ptr<DistributedMemory> DistributedMemory::create(
     
     std::string url = controllerURL;
     if (url.empty()) {
-        url = getEnvOr("CONTROLLER_BASE", "http://127.0.0.1:8080");
+        url = getEnvOr("CONTROLLER_BASE", "http://plum-controller:8080");
     }
     
     auto dm = std::shared_ptr<DistributedMemory>(new DistributedMemory(ns, url));

@@ -37,7 +37,7 @@ int main() {
 
     std::string appName = getEnvOr("PLUM_APP_NAME", "kv-demo");
     std::string instanceId = getEnvOr("PLUM_INSTANCE_ID", "kv-demo-001");
-    std::string controllerBase = getEnvOr("CONTROLLER_BASE", "http://127.0.0.1:8080");
+    std::string controllerBase = getEnvOr("CONTROLLER_BASE", "http://plum-controller:8080");
 
     std::cout << "========================================" << std::endl;
     std::cout << "  Plum KV Demo - 崩溃恢复演示" << std::endl;

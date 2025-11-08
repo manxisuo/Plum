@@ -117,9 +117,15 @@ FAILOVER_ENABLED=true
 EOF
 
 # Agent环境配置
+DEFAULT_AGENT_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$DEFAULT_AGENT_IP" ]; then
+    DEFAULT_AGENT_IP="127.0.0.1"
+fi
+
 sudo tee $DEPLOY_ROOT/.env.agent > /dev/null << EOF
 AGENT_NODE_ID=nodeA
-CONTROLLER_BASE=http://127.0.0.1:8080
+CONTROLLER_BASE=http://plum-controller:8080
+AGENT_IP=$DEFAULT_AGENT_IP
 AGENT_DATA_DIR=$DEPLOY_ROOT/data/agent
 EOF
 
@@ -187,7 +193,7 @@ server {
     }
     
     location /v1/ {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://plum-controller:8080;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

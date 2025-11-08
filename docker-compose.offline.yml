@@ -39,6 +39,7 @@ services:
     environment:
       - AGENT_NODE_ID=nodeA
       - CONTROLLER_BASE=http://plum-controller:8080
+      - AGENT_IP=plum-agent-a
       - AGENT_DATA_DIR=/app/data
       # 容器模式配置（可选，如需使用容器模式部署应用）
       # - AGENT_RUN_MODE=docker  # 应用容器模式：process（默认）或 docker
@@ -69,6 +70,7 @@ services:
     environment:
       - AGENT_NODE_ID=nodeB
       - CONTROLLER_BASE=http://plum-controller:8080
+      - AGENT_IP=plum-agent-b
       - AGENT_DATA_DIR=/app/data
       # 容器模式配置（可选，如需使用容器模式部署应用）
       # - AGENT_RUN_MODE=docker  # 应用容器模式：process（默认）或 docker
@@ -99,6 +101,7 @@ services:
     environment:
       - AGENT_NODE_ID=nodeC
       - CONTROLLER_BASE=http://plum-controller:8080
+      - AGENT_IP=plum-agent-c
       - AGENT_DATA_DIR=/app/data
       # 容器模式配置（可选，如需使用容器模式部署应用）
       # - AGENT_RUN_MODE=docker  # 应用容器模式：process（默认）或 docker

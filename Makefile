@@ -64,7 +64,8 @@ agent-help:
 	@echo ""
 	@echo "  环境变量："
 	@echo "    AGENT_NODE_ID           - 节点ID（默认：nodeA）"
-	@echo "    CONTROLLER_BASE         - Controller地址（默认：http://127.0.0.1:8080）"
+	@echo "    CONTROLLER_BASE         - Controller地址（默认：http://plum-controller:8080）"
+	@echo "    AGENT_IP                - Agent对外通告的IP（默认：127.0.0.1）"
 	@echo "    AGENT_DATA_DIR          - 数据目录（默认：/tmp/plum-agent）"
 	@echo ""
 

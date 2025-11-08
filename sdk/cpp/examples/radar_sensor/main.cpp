@@ -97,7 +97,7 @@ public:
 int main() {
     // 配置选项
     ResourceOptions opt;
-    opt.controllerBase = getenv_or("CONTROLLER_BASE", "http://127.0.0.1:8080");
+    opt.controllerBase = getenv_or("CONTROLLER_BASE", "http://plum-controller:8080");
     opt.resourceId = getenv_or("RESOURCE_ID", "");  // 空值时自动生成唯一ID
     opt.nodeId = getenv_or("RESOURCE_NODE_ID", "");  // 空值时自动使用主机名
     opt.heartbeatSec = 10;

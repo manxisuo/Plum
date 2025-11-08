@@ -15,7 +15,8 @@ ExecStart=/home/manxisuo/Plum/agent-go/plum-agent
 
 # 环境变量
 Environment="AGENT_NODE_ID=%i"
-Environment="CONTROLLER_BASE=http://127.0.0.1:8080"
+Environment="CONTROLLER_BASE=http://plum-controller:8080"
+Environment="AGENT_IP=127.0.0.1"
 Environment="AGENT_DATA_DIR=/home/manxisuo/Plum/data/agents/%i"
 
 # 重启策略

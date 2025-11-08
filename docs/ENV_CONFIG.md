@@ -111,7 +111,8 @@ vim .env  # 修改配置
 | 变量名 | 说明 | 默认值 | 示例 |
 |--------|------|--------|------|
 | `AGENT_NODE_ID` | 节点ID（唯一标识） | `nodeA` | `nodeA`, `nodeB`, `worker-01` |
-| `CONTROLLER_BASE` | Controller地址 | `http://127.0.0.1:8080` | `http://localhost:8080`, `http://plum-controller:8080` |
+| `CONTROLLER_BASE` | Controller地址（建议在 `/etc/hosts` 中将 `plum-controller` 指向 Controller IP） | `http://plum-controller:8080` | `http://plum-controller:8080`, `http://controller.internal:8080` |
+| `AGENT_IP` | Agent对外通告的IP（心跳与服务注册使用） | `127.0.0.1` | `192.168.1.101`, `10.0.0.5` |
 | `AGENT_DATA_DIR` | Agent数据目录 | `/tmp/plum-agent` | `/var/lib/plum-agent`, `/app/data` |
 
 ### 应用运行模式配置
@@ -152,7 +153,7 @@ vim .env  # 修改配置
 
 | 变量名 | 说明 | 默认值 | 示例 |
 |--------|------|--------|------|
-| `CONTROLLER_BASE` | Controller地址 | `http://127.0.0.1:8080` | `http://localhost:8080` |
+| `CONTROLLER_BASE` | Controller地址 | `http://plum-controller:8080` | `http://plum-controller:8080`, `http://controller.internal:8080` |
 | `PLUM_KV_SYNC_MODE` | KV同步模式 | `polling` | `polling`, `sse`, `disabled` |
 
 **同步模式说明**：
@@ -164,7 +165,7 @@ vim .env  # 修改配置
 
 | 变量名 | 说明 | 默认值 | 示例 |
 |--------|------|--------|------|
-| `CONTROLLER_BASE` | Controller地址 | `http://127.0.0.1:8080` | `http://localhost:8080` |
+| `CONTROLLER_BASE` | Controller地址 | `http://plum-controller:8080` | `http://plum-controller:8080`, `http://controller.internal:8080` |
 | `RESOURCE_ID` | 资源ID | 自动生成 | `sensor-001` |
 | `RESOURCE_NODE_ID` | 节点ID | 主机名 | `nodeA` |
 
@@ -211,7 +212,8 @@ TASK_EMBEDDED_TIMEOUT_MS=30000
 # agent-go/.env
 # ========== 节点配置 ==========
 AGENT_NODE_ID=nodeA
-CONTROLLER_BASE=http://127.0.0.1:8080
+CONTROLLER_BASE=http://plum-controller:8080
+AGENT_IP=192.168.1.10
 AGENT_DATA_DIR=/tmp/plum-agent
 
 # ========== 应用运行模式 ==========
@@ -224,7 +226,8 @@ AGENT_RUN_MODE=process  # 进程模式（默认）
 # agent-go/.env
 # ========== 节点配置 ==========
 AGENT_NODE_ID=nodeA
-CONTROLLER_BASE=http://127.0.0.1:8080
+CONTROLLER_BASE=http://plum-controller:8080
+AGENT_IP=192.168.1.10
 AGENT_DATA_DIR=/tmp/plum-agent
 
 # ========== 应用运行模式 ==========
@@ -250,7 +253,7 @@ PLUM_CONTAINER_ENV=DISPLAY=:99,QT_QPA_PLATFORM=xcb
 
 ```bash
 # examples/kv-demo/.env
-CONTROLLER_BASE=http://127.0.0.1:8080
+CONTROLLER_BASE=http://plum-controller:8080
 PLUM_KV_SYNC_MODE=polling  # 或 sse（实时推送）
 ```
 
@@ -299,7 +302,7 @@ auto kv = DistributedMemory::create("namespace");
 ```bash
 # ========== 节点配置 ==========
 AGENT_NODE_ID=nodeA
-CONTROLLER_BASE=http://127.0.0.1:8080
+CONTROLLER_BASE=http://plum-controller:8080
 
 # ========== 容器模式配置 ==========
 AGENT_RUN_MODE=docker
@@ -387,7 +390,7 @@ ENV_FILE=.env.prod ./agent-go/plum-agent  # 需要代码支持
 # 应该看到：
 # Starting Plum Agent
 #   NodeID: nodeA
-#   Controller: http://127.0.0.1:8080
+#   Controller: http://plum-controller:8080
 #   DataDir: /tmp/plum-agent
 # Using app run mode: docker  # 如果是容器模式
 ```

@@ -19,7 +19,7 @@ PLUM_APP_NAME=grpc-echo-app \
 PLUM_APP_VERSION=v2.0.0 \
 WORKER_ID=grpc-echo-1 \
 WORKER_NODE_ID=nodeA \
-CONTROLLER_BASE=http://127.0.0.1:8080 \
+CONTROLLER_BASE=http://plum-controller:8080 \
 GRPC_ADDRESS=0.0.0.0:18082 \
 ./sdk/cpp/build/examples/grpc_echo_worker/grpc_echo_worker
 ```
@@ -27,9 +27,9 @@ GRPC_ADDRESS=0.0.0.0:18082 \
 ## 🌐 重要URL
 
 - **UI**: http://localhost:5173 或 5174
-- **API**: http://127.0.0.1:8080
-- **Swagger**: http://127.0.0.1:8080/swagger
-- **健康检查**: http://127.0.0.1:8080/healthz
+- **API**: http://plum-controller:8080 （确保各节点能解析 `plum-controller`）
+- **Swagger**: http://plum-controller:8080/swagger
+- **健康检查**: http://plum-controller:8080/healthz
 
 ## 🔑 核心概念速查
 
@@ -85,9 +85,9 @@ make agent-run-multi         # 后台运行3个Go Agent
 make agent-help              # 显示Agent命令帮助
 
 # 测试API
-curl -s http://127.0.0.1:8080/v1/nodes | jq .
-curl -s http://127.0.0.1:8080/v1/embedded-workers | jq .
-curl -s http://127.0.0.1:8080/v1/tasks | jq .
+curl -s http://plum-controller:8080/v1/nodes | jq .
+curl -s http://plum-controller:8080/v1/embedded-workers | jq .
+curl -s http://plum-controller:8080/v1/tasks | jq .
 
 # 清理进程
 pkill -f controller

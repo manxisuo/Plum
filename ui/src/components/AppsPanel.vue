@@ -147,7 +147,7 @@ const { t } = useI18n()
 function artifactHref(row: Artifact): string {
   const u = row.url || ''
   if (u.startsWith('http://') || u.startsWith('https://')) return u
-  const base = API_BASE || 'http://127.0.0.1:8080'
+  const base = API_BASE || 'http://plum-controller:8080'
   return u.startsWith('/') ? `${base}${u}` : `${base}/${u}`
 }
 

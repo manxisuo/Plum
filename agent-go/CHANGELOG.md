@@ -105,7 +105,8 @@ go build -o plum-agent
 
 # 3. 启动新Agent
 AGENT_NODE_ID=nodeA \
-CONTROLLER_BASE=http://127.0.0.1:8080 \
+CONTROLLER_BASE=http://plum-controller:8080 \
+AGENT_IP=192.168.1.10 \
 ./plum-agent
 ```
 

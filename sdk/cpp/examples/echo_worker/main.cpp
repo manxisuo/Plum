@@ -12,7 +12,7 @@ static std::string getenv_or(const char* k, const char* d) {
 
 int main() {
   WorkerOptions opt;
-  opt.controllerBase = getenv_or("CONTROLLER_BASE", "http://127.0.0.1:8080");
+  opt.controllerBase = getenv_or("CONTROLLER_BASE", "http://plum-controller:8080");
   opt.workerId = getenv_or("WORKER_ID", "cpp-echo-1");
   opt.nodeId = getenv_or("WORKER_NODE_ID", "nodeA");
   opt.capacity = 4;

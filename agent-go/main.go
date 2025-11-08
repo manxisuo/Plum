@@ -54,13 +54,15 @@ func main() {
 	}
 
 	nodeID := getEnv("AGENT_NODE_ID", "nodeA")
-	controller := getEnv("CONTROLLER_BASE", "http://127.0.0.1:8080")
+	controller := getEnv("CONTROLLER_BASE", "http://plum-controller:8080")
 	dataDir := getEnv("AGENT_DATA_DIR", "/tmp/plum-agent")
+	agentIP := getEnv("AGENT_IP", "127.0.0.1")
 
 	log.Printf("Starting Plum Agent")
 	log.Printf("  NodeID: %s", nodeID)
 	log.Printf("  Controller: %s", controller)
 	log.Printf("  DataDir: %s", dataDir)
+	log.Printf("  AdvertiseIP: %s", agentIP)
 
 	httpClient := NewHTTPClient()
 	reconciler := NewReconciler(fmt.Sprintf("%s/%s", dataDir, nodeID), httpClient, controller)
@@ -120,7 +122,7 @@ func main() {
 		// 发送心跳
 		heartbeat := map[string]string{
 			"nodeId": nodeID,
-			"ip":     "127.0.0.1",
+			"ip":     agentIP,
 		}
 		url := controller + "/v1/nodes/heartbeat"
 		if err := httpClient.PostJSON(url, heartbeat); err != nil {
@@ -147,7 +149,7 @@ func main() {
 				// 注册服务
 				for _, a := range assignments {
 					if a.Desired == "Running" {
-						reconciler.RegisterServices(a.InstanceID, nodeID, "127.0.0.1")
+						reconciler.RegisterServices(a.InstanceID, nodeID, agentIP)
 						reconciler.HeartbeatServices(a.InstanceID)
 					}
 				}
