@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,11 +42,19 @@ func intervalSeconds() int {
 }
 
 func enabled() bool {
-	v := os.Getenv("FAILOVER_ENABLED")
-	if v == "" {
-		return true
+	if v := os.Getenv("AUTO_MIGRATION_ENABLED"); v != "" {
+		return parseBool(v)
 	}
-	return v == "1" || v == "true" || v == "yes"
+	return false
+}
+
+func parseBool(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 // Start launches a background loop that performs failover for assignments on Unhealthy nodes.

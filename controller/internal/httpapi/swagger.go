@@ -175,6 +175,22 @@ func generateOpenAPIDoc() map[string]any {
 					},
 				},
 			},
+			"/v1/discovery/one": OA{
+				"get": OA{
+					"summary": "获取单个服务端点（支持策略 random/lazy）",
+					"parameters": []OA{
+						{"name": "service", "in": "query", "required": true, "schema": OA{"type": "string"}, "description": "服务名"},
+						{"name": "version", "in": "query", "required": false, "schema": OA{"type": "string"}, "description": "版本"},
+						{"name": "protocol", "in": "query", "required": false, "schema": OA{"type": "string"}, "description": "协议"},
+						{"name": "strategy", "in": "query", "required": false, "schema": OA{"type": "string", "enum": []string{"random", "lazy"}}, "description": "返回策略，默认 random"},
+					},
+					"responses": OA{
+						"200": OA{"description": "匹配的服务端点"},
+						"400": OA{"description": "参数错误"},
+						"404": OA{"description": "未找到端点"},
+					},
+				},
+			},
 			"/v1/workers/register": OA{
 				"post": OA{
 					"summary":   "注册嵌入式工作器",

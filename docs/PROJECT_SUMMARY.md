@@ -320,6 +320,7 @@ type ResourceOpDesc struct {
 - `POST /v1/services/heartbeat` - 服务心跳
 - `GET /v1/services/list` - 获取服务列表
 - `GET /v1/discovery?service={name}` - 服务发现
+- `GET /v1/discovery/one?service={name}&strategy=lazy` - 获取单个服务端点（支持 random/lazy 策略）
 - `DELETE /v1/services?instanceId={id}` - 删除服务
 
 ### 部署管理

@@ -500,7 +500,7 @@ CONTROLLER_BASE=http://127.0.0.1:9090 make agent-run
 - `CONTROLLER_DB` - 数据库路径
 - `CONTROLLER_DATA_DIR` - 数据目录
 - `HEARTBEAT_TTL_SEC` - 心跳超时（默认30秒）
-- `FAILOVER_ENABLED` - 故障转移开关（默认true）
+- `AUTO_MIGRATION_ENABLED` - 是否启用自动迁移（默认false，可在节点故障时自动迁移应用）
 
 **Agent:**
 - `AGENT_NODE_ID` - 节点ID（默认`nodeA`）

@@ -75,7 +75,7 @@ vim .env  # 修改配置
 |--------|------|--------|------|
 | `HEARTBEAT_TTL_SEC` | 节点心跳超时时间（秒） | `3` | `3`, `30` |
 | `FAILOVER_INTERVAL_SEC` | 故障转移检查间隔（秒） | `1` | `1`, `10` |
-| `FAILOVER_ENABLED` | 是否启用故障转移 | `true` | `true`, `false` |
+| `AUTO_MIGRATION_ENABLED` | 是否启用自动迁移（节点故障时迁移应用） | `false` | `true`, `false` |
 
 ### 性能监控配置
 
@@ -199,7 +199,7 @@ CONTROLLER_DATA_DIR=.
 # ========== 故障转移配置 ==========
 HEARTBEAT_TTL_SEC=3
 FAILOVER_INTERVAL_SEC=1
-FAILOVER_ENABLED=true
+AUTO_MIGRATION_ENABLED=false
 
 # ========== 调度配置 ==========
 TASK_SCHED_INTERVAL_SEC=1

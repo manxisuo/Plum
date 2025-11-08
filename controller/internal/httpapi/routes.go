@@ -27,6 +27,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/services/list", withCORS(handleListServices))
 	mux.HandleFunc("/v1/discovery", withCORS(handleDiscover))
 	mux.HandleFunc("/v1/discovery/random", withCORS(handleDiscoverRandom))
+	mux.HandleFunc("/v1/discovery/one", withCORS(handleDiscoverOne))
 	mux.HandleFunc("/v1/apps", withCORS(handleListApps))
 	mux.HandleFunc("/v1/apps/upload", withCORS(handleAppUpload))
 	mux.HandleFunc("/v1/apps/", withCORS(handleDeleteApp))

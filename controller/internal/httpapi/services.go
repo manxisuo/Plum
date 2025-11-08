@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/manxisuo/plum/controller/internal/store"
@@ -38,6 +40,45 @@ type HeartbeatRequest struct {
 	Health     []EndpointDTO `json:"health"` // allow health override per endpoint
 }
 
+var discoveryCache = struct {
+	sync.RWMutex
+	entries map[string]store.Endpoint
+}{
+	entries: make(map[string]store.Endpoint),
+}
+
+func endpointToDTO(e store.Endpoint) EndpointDTO {
+	return EndpointDTO{
+		ServiceName: e.ServiceName,
+		InstanceID:  e.InstanceID,
+		NodeID:      e.NodeID,
+		IP:          e.IP,
+		Port:        e.Port,
+		Protocol:    e.Protocol,
+		Version:     e.Version,
+		Labels:      e.Labels,
+		Healthy:     e.Healthy,
+		LastSeen:    e.LastSeen,
+	}
+}
+
+func endpointsEqual(a, b store.Endpoint) bool {
+	return a.ServiceName == b.ServiceName &&
+		a.InstanceID == b.InstanceID &&
+		a.IP == b.IP &&
+		a.Port == b.Port &&
+		a.Protocol == b.Protocol
+}
+
+func discoveryCacheKey(service, version, protocol string) string {
+	return service + "|" + version + "|" + protocol
+}
+
+func selectRandomEndpoint(eps []store.Endpoint) store.Endpoint {
+	rand.Seed(time.Now().UnixNano())
+	return eps[rand.Intn(len(eps))]
+}
+
 func handleRegisterEndpoints(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -53,17 +94,6 @@ func handleRegisterEndpoints(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 判断是否是Agent注册（通过replace参数）
-	// Agent注册会带replace=true参数，手动注册不带
-	isAgentRegistration := r.URL.Query().Get("replace") == "true"
-	requestURL := r.URL.String()
-
-	log.Printf("===== Registration Request =====")
-	log.Printf("URL: %s", requestURL)
-	log.Printf("Replace parameter: %v", isAgentRegistration)
-	log.Printf("InstanceID: %s", req.InstanceID)
-	log.Printf("NodeID (before): %s", req.NodeID)
-
 	// nodeID可以为空（手动注册可以使用默认值）
 	if req.NodeID == "" {
 		req.NodeID = "manual"
@@ -77,15 +107,8 @@ func handleRegisterEndpoints(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().Unix()
 
 	// 判断是否是手动注册：
-	// 手动注册的特点：没有replace=true参数（从UI手动注册）
-	// Agent注册的特点：有replace=true参数（从Agent自动注册）
-	// 对于手动注册，需要立即进行健康检查
-	isManualRegistration := !isAgentRegistration
-
-	log.Printf("NodeID (after): %s", req.NodeID)
-	log.Printf("Is Agent Registration: %v", isAgentRegistration)
-	log.Printf("Is Manual Registration: %v", isManualRegistration)
-	log.Printf("================================")
+	// 手动注册时（没有 replace=true 参数）需要立即进行健康检查
+	isManualRegistration := r.URL.Query().Get("replace") != "true"
 
 	for _, e := range req.Endpoints {
 		ep := store.Endpoint{
@@ -103,42 +126,20 @@ func handleRegisterEndpoints(w http.ResponseWriter, r *http.Request) {
 
 		// 对于手动注册的端点，立即进行健康检查
 		if isManualRegistration {
-			log.Printf("🔍 [HEALTH CHECK] Starting check for: service=%s, ip=%s, port=%d, protocol=%s",
-				ep.ServiceName, ep.IP, ep.Port, ep.Protocol)
-
-			// 执行健康检查前，明确记录初始状态
-			initialHealthy := ep.Healthy
-			log.Printf("   Initial healthy status: %v", initialHealthy)
-
 			isHealthy := checkEndpointHealth(ep.IP, ep.Port, ep.Protocol)
 			ep.Healthy = isHealthy
 
-			log.Printf("   Health check result: %v", isHealthy)
-			log.Printf("   Final healthy status: %v", ep.Healthy)
-
 			if !isHealthy {
-				log.Printf("❌ [HEALTH CHECK FAILED] service=%s, ip=%s, port=%d",
-					ep.ServiceName, ep.IP, ep.Port)
-			} else {
-				log.Printf("✅ [HEALTH CHECK PASSED] service=%s, ip=%s, port=%d",
+				log.Printf("service register health check failed: service=%s, ip=%s, port=%d",
 					ep.ServiceName, ep.IP, ep.Port)
 			}
-		} else {
-			log.Printf("⏭️  [SKIP HEALTH CHECK] Agent-registered endpoint: service=%s, instance=%s",
-				ep.ServiceName, ep.InstanceID)
 		}
 
-		log.Printf("💾 [SAVING] About to save endpoint: service=%s, instance=%s, ip=%s, port=%d, healthy=%v",
-			ep.ServiceName, ep.InstanceID, ep.IP, ep.Port, ep.Healthy)
-
 		if err := store.Current.AddEndpoint(ep); err != nil {
-			log.Printf("❌ [SAVE FAILED] Failed to add endpoint: %v", err)
+			log.Printf("service register failed to add endpoint: %v", err)
 			http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
-		log.Printf("✅ [SAVED] Endpoint saved successfully: service=%s, instance=%s, node=%s, ip=%s, port=%d, protocol=%s, healthy=%v",
-			ep.ServiceName, ep.InstanceID, ep.NodeID, ep.IP, ep.Port, ep.Protocol, ep.Healthy)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -253,22 +254,73 @@ func handleDiscoverRandom(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no endpoints found", http.StatusNotFound)
 		return
 	}
-	// 随机选择一个端点
-	rand.Seed(time.Now().UnixNano())
-	selected := eps[rand.Intn(len(eps))]
-	out := EndpointDTO{
-		ServiceName: selected.ServiceName,
-		InstanceID:  selected.InstanceID,
-		NodeID:      selected.NodeID,
-		IP:          selected.IP,
-		Port:        selected.Port,
-		Protocol:    selected.Protocol,
-		Version:     selected.Version,
-		Labels:      selected.Labels,
-		Healthy:     selected.Healthy,
-		LastSeen:    selected.LastSeen,
+	selected := selectRandomEndpoint(eps)
+	writeJSON(w, endpointToDTO(selected))
+}
+
+func handleDiscoverOne(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
-	writeJSON(w, out)
+	service := r.URL.Query().Get("service")
+	if service == "" {
+		http.Error(w, "service required", http.StatusBadRequest)
+		return
+	}
+	version := r.URL.Query().Get("version")
+	protocol := r.URL.Query().Get("protocol")
+	strategy := strings.ToLower(r.URL.Query().Get("strategy"))
+	if strategy == "" {
+		strategy = "random"
+	}
+
+	eps, err := store.Current.ListEndpointsByService(service, version, protocol)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if len(eps) == 0 {
+		http.Error(w, "no endpoints found", http.StatusNotFound)
+		return
+	}
+
+	var selected store.Endpoint
+
+	switch strategy {
+	case "random":
+		selected = selectRandomEndpoint(eps)
+	case "lazy":
+		key := discoveryCacheKey(service, version, protocol)
+
+		var cached store.Endpoint
+		var ok bool
+		discoveryCache.RLock()
+		cached, ok = discoveryCache.entries[key]
+		discoveryCache.RUnlock()
+
+		found := false
+		if ok {
+			for _, e := range eps {
+				if endpointsEqual(e, cached) {
+					selected = e
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			selected = selectRandomEndpoint(eps)
+		}
+		discoveryCache.Lock()
+		discoveryCache.entries[key] = selected
+		discoveryCache.Unlock()
+	default:
+		http.Error(w, "invalid strategy", http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, endpointToDTO(selected))
 }
 
 func handleListServices(w http.ResponseWriter, r *http.Request) {
