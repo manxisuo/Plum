@@ -23,7 +23,7 @@
 | `agent-go/vendor/` | Go模块包 | Go模块包 | 🟢 复用 | 预下载的Go依赖源码 |
 | `ui/node_modules/` | NPM包 | NPM包 | 🟢 复用 | 预下载的Node.js依赖包 |
 | **构建工具** | | | | |
-| Go工具链 | `go1.23.0.linux-amd64` | `go1.23.0.linux-arm64` | 🔴 不同 | 需要ARM64版本 |
+| Go工具链 | `go1.24.3.linux-amd64` | `go1.24.3.linux-arm64` | 🔴 不同 | 需要ARM64版本 |
 | Node.js工具 | `node-v18.20.4-linux-x64` | `node-v18.20.4-linux-arm64` | 🔴 不同 | 需要ARM64版本 |
 | **构建产物** | | | | |
 | `controller/bin/controller` | ELF 64-bit x86-64 | ELF 64-bit aarch64 | 🔴 不同 | 需要在目标环境重新构建 |
@@ -89,7 +89,7 @@ rm -rf .git/                          # Git历史（可选，~20MB）
 
 ### 💡 最佳实践
 1. **预下载依赖**：使用`go mod vendor`和`npm install`预下载所有依赖
-2. **工具版本匹配**：确保Go 1.23.0和Node.js 18.x版本一致
+2. **工具版本匹配**：确保Go 1.24.3和Node.js 18.x版本一致
 3. **目标环境构建**：所有可执行文件在ARM64环境重新构建
 4. **验证完整性**：使用`go mod verify`和`npm ls`验证依赖
 

@@ -1,7 +1,7 @@
 # Go相关工具完整需求清单
 
 ## 📋 你已经准备的文件
-✅ `go1.23.12.linux-arm64.tar.gz` - Go ARM64版本
+✅ `go1.24.3.linux-arm64.tar.gz` - Go ARM64版本
 
 ## 🔴 还需要准备的Go工具
 
@@ -27,8 +27,8 @@ $GOPATH/bin/protoc-gen-go-grpc # ELF 64-bit x86-64
 
 ```bash
 # 1. 安装Go ARM64版本（临时）
-wget https://go.dev/dl/go1.23.12.linux-arm64.tar.gz
-sudo tar -C /tmp -xzf go1.23.12.linux-arm64.tar.gz
+wget https://go.dev/dl/go1.24.3.linux-arm64.tar.gz
+sudo tar -C /tmp -xzf go1.24.3.linux-arm64.tar.gz
 export PATH="/tmp/go/bin:$PATH"
 
 # 2. 设置Go环境
@@ -69,7 +69,7 @@ mkdir -p plum-offline-deploy/tools/go-arm64-tools/bin
 
 # 使用你已有的ARM64 Go编译工具
 cd /tmp
-tar -xzf go1.23.12.linux-arm64.tar.gz
+tar -xzf go1.24.3.linux-arm64.tar.gz
 export PATH="/tmp/go/bin:$PATH"
 
 # 交叉编译ARM64版本
@@ -85,7 +85,7 @@ cp /tmp/go-arm64-tools/bin/* plum-offline-deploy/tools/go-arm64-tools/bin/
 你需要准备的Go相关文件：
 ```
 tools/
-├── go1.23.12.linux-arm64.tar.gz     # ✅ 你已有
+├── go1.24.3.linux-arm64.tar.gz     # ✅ 你已有
 ├── go-arm64-tools/                  # 新增
 │   └── bin/
 │       ├── protoc-gen-go            # ARM64版本
@@ -97,7 +97,7 @@ tools/
 
 在目标环境验证：
 ```bash
-go version                           # go1.23.12 linux/arm64
+go version                           # go1.24.3 linux/arm64
 protoc-gen-go --version             # protoc-gen-go v1.x.x
 protoc-gen-go-grpc --version        # protoc-gen-go-grpc v1.x.x
 ```

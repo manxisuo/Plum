@@ -80,8 +80,8 @@ scripts/
 ### 1. 构建工具和执行文件
 ```
 构建工具（必须区分架构）：
-├── tools/go1.23.0.linux-arm64.tar.gz      # Go工具链 ARM64版本
-│   └── (当前环境：go1.23.0.linux-amd64.tar.gz x86版本)
+├── tools/go1.24.3.linux-arm64.tar.gz      # Go工具链 ARM64版本
+│   └── (当前环境：go1.24.3.linux-amd64.tar.gz x86版本)
 └── tools/node-v18.20.4-linux-arm64.tar.xz # Node.js ARM64版本
     └── (当前环境：node-v18.20.4-linux-x64.tar.xz x86版本)
 ```

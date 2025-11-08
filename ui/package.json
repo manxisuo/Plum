@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview --port 5173"
   },
@@ -27,6 +27,6 @@
     "vite": "5.4.8"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-arm64-gnu": "^4.52.5"
+    "@rollup/rollup-linux-arm64-gnu": "^4.53.1"
   }
 }

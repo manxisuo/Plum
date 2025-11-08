@@ -37,7 +37,7 @@ plum-offline-deploy/
 ### 1.2 ARM64构建工具
 ```
 tools/
-├── go1.23.0.linux-arm64.tar.gz    # Go 1.23.0 ARM64版本
+├── go1.24.3.linux-arm64.tar.gz    # Go 1.24.3 ARM64版本
 ├── node-v18.20.4-linux-arm64.tar.xz # Node.js 18.x ARM64版本
 └── download-tools.sh              # 工具下载脚本
 ```
@@ -70,7 +70,7 @@ cd ui && npm install && cd ..
 ### 步骤2：下载ARM64工具
 ```bash
 # 下载Go ARM64版本
-wget https://golang.google.cn/dl/go1.23.0.linux-arm64.tar.gz -O plum-offline-deploy/tools/
+wget https://golang.google.cn/dl/go1.24.3.linux-arm64.tar.gz -O plum-offline-deploy/tools/
 
 # 下载Node.js ARM64版本
 wget https://nodejs.org/dist/v18.20.4/node-v18.20.4-linux-arm64.tar.xz -O plum-offline-deploy/tools/
@@ -108,7 +108,7 @@ cd plum-offline-deploy/scripts
 ### 4.1 Go离线构建
 - 使用`go mod vendor`下载所有依赖到vendor目录
 - 构建时使用`-mod=vendor`参数避免网络请求
-- 确保Go版本为1.23.0，支持ARM64架构
+- 确保Go版本为1.24.3，支持ARM64架构
 
 ### 4.2 Node.js离线构建
 - 使用`npm install`下载所有依赖到node_modules目录

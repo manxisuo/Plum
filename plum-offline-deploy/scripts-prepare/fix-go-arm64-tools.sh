@@ -19,8 +19,8 @@ echo "📁 工具目录: $TOOLS_DIR"
 mkdir -p "$TOOLS_DIR/go-arm64-tools/bin"
 
 # 检查Go文件是否存在
-if [ ! -f "$TOOLS_DIR/go1.23.12.linux-arm64.tar.gz" ]; then
-    echo "❌ 未找到Go ARM64文件: $TOOLS_DIR/go1.23.12.linux-arm64.tar.gz"
+if [ ! -f "$TOOLS_DIR/go1.24.3.linux-arm64.tar.gz" ]; then
+    echo "❌ 未找到Go ARM64文件: $TOOLS_DIR/go1.24.3.linux-arm64.tar.gz"
     exit 1
 fi
 
@@ -34,7 +34,7 @@ mkdir -p $TEMP_DIR
 echo "📦 解压Go并重新编译工具..."
 
 cd $TEMP_DIR
-tar -xzf "$PROJECT_ROOT/$TOOLS_DIR/go1.23.12.linux-arm64.tar.gz"
+tar -xzf "$PROJECT_ROOT/$TOOLS_DIR/go1.24.3.linux-arm64.tar.gz"
 
 # 设置交叉编译环境
 export PATH="$TEMP_DIR/go/bin:$PATH"

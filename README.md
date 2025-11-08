@@ -231,7 +231,7 @@ Plum 旨在解决分布式环境下的任务编排、调度和执行问题，支
 ### 环境要求
 
 **核心组件**：
-- Go 1.23+ （Controller和Agent，实际需要Go 1.24+工具链）
+- Go 1.24+ （Controller和Agent要求 Toolchain 1.24+）
 - Node.js 16+ （Web UI）
 - Git
 - Docker（容器模式可选，用于容器化部署）
@@ -250,9 +250,9 @@ Plum 旨在解决分布式环境下的任务编排、调度和执行问题，支
 sudo apt update
 sudo apt install -y git curl
 
-# Go 1.23+（如果未安装，推荐使用最新版本）
-wget https://golang.google.cn/dl/go1.23.12.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.23.12.linux-amd64.tar.gz
+# Go 1.24+（如果未安装，推荐使用最新版本）
+wget https://golang.google.cn/dl/go1.24.3.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.24.3.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bashrc
 source ~/.bashrc
 
@@ -292,7 +292,7 @@ sudo apt install -y libgrpc++-dev libprotobuf-dev
 #### 验证安装
 
 ```bash
-go version                # go version go1.23.12 linux/amd64 (或更高版本)
+go version                # go version go1.24.3 linux/amd64 (或更高版本)
 node --version            # v18.x.x
 npm --version             # 9.x.x
 git --version             # git version 2.x.x
@@ -391,6 +391,24 @@ make ui-dev
 # - Go代码修改后需重新构建：make controller 或 make agent
 # - 然后重启对应进程
 ```
+
+##### WSL2 环境下通过宿主机 IP 访问 (192.168.x.x)
+
+- `make ui-dev` 现在默认让 Vite 监听 `0.0.0.0`，Windows 本机可直接访问 `http://localhost:5173`。
+- 如果希望通过宿主机的以太网地址（例如 `http://192.168.1.101:5173`、`http://192.168.1.101:8080`）在局域网中访问，需要在 **Windows** 上建立端口转发。
+- 仓库提供了 `tools/wsl-portproxy.ps1` 脚本（需管理员 PowerShell）：
+
+```powershell
+cd C:\path\to\Plum
+.\tools\wsl-portproxy.ps1 -ListenAddress 192.168.1.101 -Ports 5173,8080
+```
+
+- WSL 重启或 IP 变化时需重新执行脚本；若要清理端口转发：
+
+```powershell
+.\tools\wsl-portproxy.ps1 -ListenAddress 192.168.1.101 -Ports 5173,8080 -Remove
+```
+
 
 #### 方式3：容器模式部署（应用容器化）
 

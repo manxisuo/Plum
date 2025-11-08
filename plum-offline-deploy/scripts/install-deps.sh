@@ -12,11 +12,11 @@ if [ "$(uname -m)" != "aarch64" ]; then
 fi
 
 # 1. 安装Go
-echo "📦 安装Go 1.23.12..."
+echo "📦 安装Go 1.24.3..."
 if ! command -v go &> /dev/null; then
     cd ../tools
-    if [ -f "go1.23.12.linux-arm64.tar.gz" ]; then
-        sudo tar -C /usr/local -xzf go1.23.12.linux-arm64.tar.gz
+    if [ -f "go1.24.3.linux-arm64.tar.gz" ]; then
+        sudo tar -C /usr/local -xzf go1.24.3.linux-arm64.tar.gz
         echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
         export PATH=$PATH:/usr/local/go/bin
         echo "✅ Go安装完成"

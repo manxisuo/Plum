@@ -52,8 +52,8 @@ if [[ "$BUILD_SYSTEM" == "x86" ]]; then
 else
     # ARM64系统：使用ARM64版本的Go
     ARM64_GO_FILE=""
-    if [ -f "$TOOLS_DIR/go1.23.12.linux-arm64.tar.gz" ]; then
-        ARM64_GO_FILE="$TOOLS_DIR/go1.23.12.linux-arm64.tar.gz"
+    if [ -f "$TOOLS_DIR/go1.24.3.linux-arm64.tar.gz" ]; then
+        ARM64_GO_FILE="$TOOLS_DIR/go1.24.3.linux-arm64.tar.gz"
         # 转换为绝对路径
         if command -v realpath &> /dev/null; then
             ARM64_GO_FILE="$(realpath "$ARM64_GO_FILE")"
@@ -62,7 +62,7 @@ else
         fi
         echo "✅ 找到ARM64 Go: $ARM64_GO_FILE"
     else
-        echo "❌ 未找到go1.23.12.linux-arm64.tar.gz文件"
+        echo "❌ 未找到go1.24.3.linux-arm64.tar.gz文件"
         echo "请将文件放到: $TOOLS_DIR/"
         exit 1
     fi
@@ -117,7 +117,7 @@ cd $TEMP_WORK_DIR
 cat > go.mod << 'EOF'
 module temp-build
 
-go 1.23.0
+go 1.24.0
 EOF
 
 # 设置临时GOPATH和GOCACHE（但不设置GOBIN）
@@ -438,9 +438,9 @@ echo ""
 echo "文件结构:"
 echo "$TOOLS_DIR/"
 if [[ "$BUILD_SYSTEM" != "arm64" ]]; then
-    echo "├── go1.23.12.linux-arm64.tar.gz     # Go ARM64版本（目标环境用）"
+    echo "├── go1.24.3.linux-arm64.tar.gz     # Go ARM64版本（目标环境用）"
 else
-    echo "├── go1.23.12.linux-arm64.tar.gz     # Go ARM64版本"
+    echo "├── go1.24.3.linux-arm64.tar.gz     # Go ARM64版本"
 fi
 echo "└── go-arm64-tools/"
 echo "    ├── bin/"

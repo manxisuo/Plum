@@ -291,19 +291,19 @@ echo "📦 下载ARM64构建工具..."
 #!/bin/bash
 echo "下载ARM64版本的构建工具..."
 
-# Go 1.23.12 ARM64版本（与prepare-arm64-go-tools.sh保持一致）
-if [ ! -f "go1.23.12.linux-arm64.tar.gz" ]; then
-    echo "下载Go 1.23.12 ARM64版本..."
-    wget https://golang.google.cn/dl/go1.23.12.linux-arm64.tar.gz || {
+# Go 1.24.3 ARM64版本（与prepare-arm64-go-tools.sh保持一致）
+if [ ! -f "go1.24.3.linux-arm64.tar.gz" ]; then
+    echo "下载Go 1.24.3 ARM64版本..."
+    wget https://golang.google.cn/dl/go1.24.3.linux-arm64.tar.gz || {
         echo "❌ 下载Go失败，尝试备用地址..."
-        wget https://go.dev/dl/go1.23.12.linux-arm64.tar.gz || {
+        wget https://go.dev/dl/go1.24.3.linux-arm64.tar.gz || {
             echo "❌ 备用地址也失败，请检查网络连接或手动下载"
             exit 1
         }
     }
     echo "✅ Go下载完成"
 else
-    echo "✅ Go文件已存在: go1.23.12.linux-arm64.tar.gz"
+    echo "✅ Go文件已存在: go1.24.3.linux-arm64.tar.gz"
 fi
 
 # Node.js 18.x ARM64版本  
@@ -340,9 +340,9 @@ else
 fi
 
 # 检查Go文件是否下载成功
-if [ ! -f "go1.23.12.linux-arm64.tar.gz" ]; then
+if [ ! -f "go1.24.3.linux-arm64.tar.gz" ]; then
     echo "❌ Go文件下载失败，请检查网络连接"
-    echo "可以手动下载: wget https://golang.google.cn/dl/go1.23.12.linux-arm64.tar.gz"
+    echo "可以手动下载: wget https://golang.google.cn/dl/go1.24.3.linux-arm64.tar.gz"
     exit 1
 fi
 

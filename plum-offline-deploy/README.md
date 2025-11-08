@@ -26,7 +26,7 @@ plum-offline-deploy/
 │   ├── install-cpp-sdk.sh            # C++ SDK安装脚本
 │   └── deploy.sh                     # 部署脚本
 ├── tools/                            # 构建工具（ARM64版本）
-│   ├── go1.23.12.linux-arm64.tar.gz # Go ARM64版本
+│   ├── go1.24.3.linux-arm64.tar.gz # Go ARM64版本
 │   ├── node-v18.20.4-linux-arm64.tar.xz # Node.js ARM64版本
 │   └── go-arm64-tools/               # Go protobuf工具（ARM64）
 ├── source/                           # 项目源码（包含依赖）
@@ -122,7 +122,7 @@ cd plum-offline-deploy/scripts
 - **deploy.sh**: 部署为systemd服务并配置nginx
 
 ### 工具文件（tools/）
-- **go1.23.12.linux-arm64.tar.gz**: Go 1.23.12 ARM64版本
+- **go1.24.3.linux-arm64.tar.gz**: Go 1.24.3 ARM64版本
 - **node-v18.20.4-linux-arm64.tar.xz**: Node.js 18.x ARM64版本
 - **go-arm64-tools/**: 预编译的protobuf工具（ARM64）
 
