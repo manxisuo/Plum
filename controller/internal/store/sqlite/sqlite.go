@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
+	"strconv"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -14,7 +16,8 @@ import (
 )
 
 type sqliteStore struct {
-	db *sql.DB
+	db        *sql.DB
+	healthTTL int64
 }
 
 func New(dbPath string) (store.Store, error) {
@@ -31,7 +34,13 @@ func New(dbPath string) (store.Store, error) {
 	}
 	// 在线迁移：为已存在的deployments表添加status列（忽略错误，如果列已存在）
 	db.Exec(`ALTER TABLE deployments ADD COLUMN status TEXT DEFAULT 'Stopped'`)
-	return &sqliteStore{db: db}, nil
+	ttl := int64(15)
+	if v := os.Getenv("SERVICE_HEALTH_TTL_SEC"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			ttl = int64(n)
+		}
+	}
+	return &sqliteStore{db: db, healthTTL: ttl}, nil
 }
 
 func migrate(db *sql.DB) error {
@@ -619,6 +628,11 @@ func (s *sqliteStore) UpdateEndpointHealthForInstance(instanceID string, eps []s
 	return nil
 }
 
+func (s *sqliteStore) TouchEndpointsForInstance(instanceID string, ts int64) error {
+	_, err := s.db.Exec(`UPDATE endpoints SET last_seen=? WHERE instance_id=?`, ts, instanceID)
+	return err
+}
+
 func (s *sqliteStore) DeleteEndpointsForInstance(instanceID string) error {
 	_, err := s.db.Exec(`DELETE FROM endpoints WHERE instance_id=?`, instanceID)
 	return err
@@ -675,9 +689,12 @@ func (s *sqliteStore) UpdateEndpoint(serviceName string, instanceID string, oldI
 }
 
 func (s *sqliteStore) ListEndpointsByService(serviceName string, version string, protocol string) ([]store.Endpoint, error) {
-	// Add health check based on last_seen timestamp (15 seconds TTL)
+	ttlThreshold := time.Now().Unix() - s.healthTTL
+	if ttlThreshold < 0 {
+		ttlThreshold = 0
+	}
 	sqlStr := `SELECT service_name, instance_id, node_id, ip, port, protocol, version, labels, healthy, last_seen FROM endpoints WHERE service_name=? AND healthy=1 AND last_seen > ?`
-	args := []any{serviceName, time.Now().Unix() - 15}
+	args := []any{serviceName, ttlThreshold}
 	if version != "" {
 		sqlStr += ` AND version=?`
 		args = append(args, version)

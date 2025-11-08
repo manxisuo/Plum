@@ -168,6 +168,11 @@ func handleHeartbeatEndpoints(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "db error", http.StatusInternalServerError)
 			return
 		}
+	} else {
+		if err := store.Current.TouchEndpointsForInstance(req.InstanceID, time.Now().Unix()); err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -442,7 +447,6 @@ func handleUpdateEndpoint(w http.ResponseWriter, r *http.Request) {
 // 对于HTTP/HTTPS协议，发送HEAD请求验证；对于其他协议，进行TCP连接检查
 func checkEndpointHealth(ip string, port int, protocol string) bool {
 	address := net.JoinHostPort(ip, strconv.Itoa(port))
-	log.Printf("Checking endpoint health: %s (protocol: %s)", address, protocol)
 
 	// 对于HTTP协议，发送HEAD请求进行更严格的检查
 	if protocol == "http" || protocol == "https" {
@@ -471,13 +475,12 @@ func checkHTTPHealth(ip string, port int, protocol string) bool {
 
 	// 如果HEAD失败（比如返回405 Method Not Allowed），尝试GET请求
 	// 这样可以兼容只接受POST的服务（它们通常会拒绝HEAD/GET，但至少证明HTTP服务存在）
-	if healthy, statusCode := tryHTTPRequest(client, "GET", url, address); healthy {
-		log.Printf("Health check passed for %s via GET: HTTP %d (HEAD was rejected)", address, statusCode)
+	if healthy, _ := tryHTTPRequest(client, "GET", url, address); healthy {
 		return true
 	}
 
 	// 两个请求都失败，认为服务不存在或不可用
-	log.Printf("Health check failed for %s: both HEAD and GET requests failed", address)
+	log.Printf("service health check failed for %s: both HEAD and GET requests rejected", address)
 	return false
 }
 
@@ -485,7 +488,7 @@ func checkHTTPHealth(ip string, port int, protocol string) bool {
 func tryHTTPRequest(client *http.Client, method, url, address string) (bool, int) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		log.Printf("  Failed to create %s request for %s: %v", method, address, err)
+		log.Printf("service health check: failed to create %s request for %s: %v", method, address, err)
 		return false, 0
 	}
 
@@ -496,7 +499,7 @@ func tryHTTPRequest(client *http.Client, method, url, address string) (bool, int
 	resp, err := client.Do(req)
 	if err != nil {
 		// 连接超时、拒绝连接等错误
-		log.Printf("  %s request to %s failed: %v", method, address, err)
+		log.Printf("service health check: %s request to %s failed: %v", method, address, err)
 		return false, 0
 	}
 	defer resp.Body.Close()
@@ -512,7 +515,6 @@ func tryHTTPRequest(client *http.Client, method, url, address string) (bool, int
 	// 特殊情况：某些服务可能返回非HTTP响应，这种情况resp.StatusCode可能是0
 	// 但如果有响应，至少说明TCP连接成功且可能有某种服务
 
-	log.Printf("  %s request to %s: HTTP %d", method, address, resp.StatusCode)
 	return true, resp.StatusCode
 }
 
@@ -521,12 +523,11 @@ func checkTCPHealth(address string) bool {
 	// 设置超时（3秒）
 	conn, err := net.DialTimeout("tcp", address, 3*time.Second)
 	if err != nil {
-		log.Printf("Health check failed for %s: %v", address, err)
+		log.Printf("service health check failed for %s: %v", address, err)
 		return false
 	}
 	defer conn.Close()
 
 	// TCP连接成功，认为基本健康
-	log.Printf("Health check passed for %s: TCP connection successful", address)
 	return true
 }

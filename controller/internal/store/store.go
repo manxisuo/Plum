@@ -328,6 +328,7 @@ type Store interface {
 	// Services / discovery
 	ReplaceEndpointsForInstance(nodeID string, instanceID string, eps []Endpoint) error
 	UpdateEndpointHealthForInstance(instanceID string, eps []Endpoint) error
+	TouchEndpointsForInstance(instanceID string, ts int64) error
 	DeleteEndpointsForInstance(instanceID string) error
 	// 替换指定服务的端点（删除该实例下指定服务的所有端点，然后插入新端点）
 	ReplaceEndpointsForInstanceAndService(nodeID string, instanceID string, serviceName string, eps []Endpoint) error

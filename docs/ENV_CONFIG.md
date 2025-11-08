@@ -77,6 +77,12 @@ vim .env  # 修改配置
 | `FAILOVER_INTERVAL_SEC` | 故障转移检查间隔（秒） | `1` | `1`, `10` |
 | `AUTO_MIGRATION_ENABLED` | 是否启用自动迁移（节点故障时迁移应用） | `false` | `true`, `false` |
 
+### 服务发现配置
+
+| 变量名 | 说明 | 默认值 | 示例 |
+|--------|------|--------|------|
+| `SERVICE_HEALTH_TTL_SEC` | 服务健康TTL，超过该秒数未收到心跳的端点被视为不健康 | `15` | `5`, `10` |
+
 ### 性能监控配置
 
 | 变量名 | 说明 | 默认值 | 示例 |
@@ -200,6 +206,9 @@ CONTROLLER_DATA_DIR=.
 HEARTBEAT_TTL_SEC=3
 FAILOVER_INTERVAL_SEC=1
 AUTO_MIGRATION_ENABLED=false
+
+# ========== 服务发现配置 ==========
+SERVICE_HEALTH_TTL_SEC=15
 
 # ========== 调度配置 ==========
 TASK_SCHED_INTERVAL_SEC=1
