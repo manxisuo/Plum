@@ -513,6 +513,7 @@ CONTROLLER_BASE=http://127.0.0.1:9090 make agent-run
 - `PLUM_CONTAINER_CPUS` - 容器CPU限制（可选，如`1.0`）
 - `PLUM_HOST_LIB_PATHS` - 宿主机库路径映射（可选，如`/usr/lib,/usr/local/lib`）
 - `PLUM_CONTAINER_ENV` - 容器环境变量（可选，如`DISPLAY=:99`）
+  - 若 Agent 本身以容器运行，必须在 `docker-compose.yml` 中将宿主机目录先挂载到 Agent 容器（例如 `/usr/lib64:/host-libs/usr/lib64:ro`），然后在此变量里填写容器内的路径（`/host-libs/usr/lib64`）；Agent 裸机运行时则直接填写宿主机真实路径即可。
 
 **SDK/应用:**
 - `PLUM_INSTANCE_ID` - 实例ID（Agent注入）

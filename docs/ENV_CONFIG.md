@@ -150,6 +150,8 @@ vim .env  # 修改配置
   - 适用于多个应用共享相同的系统库（如Qt库）
   - 避免每个应用都自包含库，减少重复存储
   - 注意：需要确保宿主机和容器架构兼容（都是x86_64或都是ARM64）
+  - **Agent 以容器方式运行时**：必须先在 Agent 容器启动参数中通过 `volumes` 挂载宿主机目录，例如 `- /usr/lib64:/host-libs/usr/lib64:ro`，然后在 `.env` 中写 `PLUM_HOST_LIB_PATHS=/host-libs/usr/lib64`。否则 Agent 在容器内无法看到宿主机路径。
+  - **Agent 直接运行在宿主机时**：`PLUM_HOST_LIB_PATHS` 可以直接填写宿主机实际路径，无需额外挂载。
 
 ---
 
