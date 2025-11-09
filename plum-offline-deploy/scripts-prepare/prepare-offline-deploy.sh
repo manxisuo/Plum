@@ -121,7 +121,7 @@ echo "复制源代码（排除构建文件）..."
 if command -v rsync &> /dev/null; then
     echo "使用rsync复制..."
     # 复制目录
-    for dir in controller agent-go ui proto sdk examples examples-local docs tools; do
+    for dir in controller agent-go ui proto sdk examples docs tools; do
         if [ -e "$dir" ]; then
             echo "复制: $dir"
             rsync -av --exclude='build/' \
@@ -152,7 +152,7 @@ if command -v rsync &> /dev/null; then
     fi
     
     # 复制Docker Compose文件
-    for file in docker-compose*.yml; do
+    for file in docker-compose*.yml docker-compose.agent.yml docker-compose.main.yml; do
         if [ -e "$file" ]; then
             echo "复制: $file"
             cp "$file" "$DEPLOY_DIR/source/Plum/"
@@ -182,7 +182,7 @@ else
     fi
     
     # 复制Docker Compose文件
-    for file in docker-compose*.yml; do
+    for file in docker-compose*.yml docker-compose.agent.yml docker-compose.main.yml; do
         if [ -e "$file" ]; then
             echo "复制: $file"
             cp "$file" $DEPLOY_DIR/source/Plum/
@@ -358,6 +358,16 @@ echo "   - protobuf-compiler_*_arm64.deb"
 # 回到根目录并准备ARM64 protobuf工具
 cd ../..
 
+# 下载 get-pip.py 供离线安装 pip
+if [ -f "plum-offline-deploy/scripts-prepare/download-pip.sh" ]; then
+    echo "⬇️  下载 get-pip.py（离线安装 pip）..."
+    bash ./plum-offline-deploy/scripts-prepare/download-pip.sh || {
+        echo "⚠️  get-pip.py 下载失败，请在联网环境手动获取 https://bootstrap.pypa.io/get-pip.py"
+    }
+else
+    echo "⚠️  未找到 download-pip.sh，跳过 get-pip.py 下载"
+fi
+
 # 准备C++ SDK离线依赖
 echo "📦 准备C++ SDK离线依赖..."
 
@@ -432,6 +442,9 @@ echo "✓ Node.js依赖 (node_modules/)"
 echo "✓ ARM64构建工具 (tools/)"
 if [ -d "$DEPLOY_DIR/source/Plum/offline-images" ]; then
     echo "✓ Docker镜像 (offline-images/)"
+fi
+if [ -f "$DEPLOY_DIR/tools/get-pip.py" ]; then
+    echo "✓ get-pip.py（离线安装 pip）"
 fi
 echo ""
 echo "下一步：将整个 $DEPLOY_DIR 目录传输到目标ARM64环境"
