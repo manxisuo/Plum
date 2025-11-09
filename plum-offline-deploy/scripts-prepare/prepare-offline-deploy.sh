@@ -362,7 +362,7 @@ cd ../..
 if [ -f "plum-offline-deploy/scripts-prepare/download-pip.sh" ]; then
     echo "⬇️  下载 get-pip.py（离线安装 pip）..."
     bash ./plum-offline-deploy/scripts-prepare/download-pip.sh || {
-        echo "⚠️  get-pip.py 下载失败，请在联网环境手动获取 https://bootstrap.pypa.io/get-pip.py"
+        echo "⚠️  get-pip.py 下载失败，请在联网环境手动获取 https://bootstrap.pypa.io/pip/3.8/get-pip.py"
     }
 else
     echo "⚠️  未找到 download-pip.sh，跳过 get-pip.py 下载"
