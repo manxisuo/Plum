@@ -1,0 +1,43 @@
+# Plum 离线部署配置 - Docker Compose 1.25.0 兼容版本
+# 适用于银河麒麟V10 ARM64环境
+
+version: '3.3'
+
+services:
+  # Plum Controller 服务
+  plum-controller:
+    image: plum-controller:offline
+    container_name: plum-controller
+    network_mode: host
+    volumes:
+      - plum-controller-data:/app/data
+      - ./controller/.env:/app/.env:ro
+    environment:
+      - CONTROLLER_ADDR=:8080
+      - CONTROLLER_DB=file:/app/data/controller.db?_pragma=busy_timeout(5000)
+      - CONTROLLER_DATA_DIR=/app/data
+      - HEARTBEAT_TTL_SEC=3
+      - AUTO_MIGRATION_ENABLED=false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/nodes"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx 反向代理
+  plum-nginx:
+    image: nginx:alpine
+    container_name: plum-nginx
+    network_mode: host
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ui/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - plum-controller
+    restart: unless-stopped
+
+# 数据卷配置
+volumes:
+  plum-controller-data:
+    driver: local

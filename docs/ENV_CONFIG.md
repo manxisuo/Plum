@@ -152,6 +152,12 @@ vim .env  # 修改配置
   - 注意：需要确保宿主机和容器架构兼容（都是x86_64或都是ARM64）
   - **Agent 以容器方式运行时**：必须先在 Agent 容器启动参数中通过 `volumes` 挂载宿主机目录，例如 `- /usr/lib64:/host-libs/usr/lib64:ro`，然后在 `.env` 中写 `PLUM_HOST_LIB_PATHS=/host-libs/usr/lib64`。否则 Agent 在容器内无法看到宿主机路径。
   - **Agent 直接运行在宿主机时**：`PLUM_HOST_LIB_PATHS` 可以直接填写宿主机实际路径，无需额外挂载。
+- **使用本地目录作为数据卷时**：若 `.env` 中 `AGENT_DATA_DIR=/tmp/plum-agent`（或其它宿主路径），请在宿主机提前创建并授予容器用户写权限，例如：
+  ```bash
+  sudo mkdir -p /tmp/plum-agent
+  sudo chown 1001:1001 /tmp/plum-agent
+  ```
+  或者改用 Docker Named Volume（`plum-agent-data:/app/data`），由 Docker 管理持久化目录。
 
 ---
 
