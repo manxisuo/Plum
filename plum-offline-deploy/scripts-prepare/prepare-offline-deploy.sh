@@ -121,7 +121,7 @@ echo "复制源代码（排除构建文件）..."
 if command -v rsync &> /dev/null; then
     echo "使用rsync复制..."
     # 复制目录
-    for dir in controller agent-go ui proto sdk examples docs tools; do
+    for dir in controller agent-go ui proto sdk examples examples-local docs tools; do
         if [ -e "$dir" ]; then
             echo "复制: $dir"
             rsync -av --exclude='build/' \
@@ -160,7 +160,7 @@ if command -v rsync &> /dev/null; then
     done
 else
     echo "rsync不可用，使用cp并手动清理..."
-    for dir in controller agent-go ui proto sdk examples docs tools; do
+    for dir in controller agent-go ui proto sdk examples examples-local docs tools; do
         if [ -e "$dir" ]; then
             echo "复制: $dir"
             cp -r "$dir" $DEPLOY_DIR/source/Plum/
