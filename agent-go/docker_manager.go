@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 )
 
 // DockerManager 容器模式管理器
@@ -135,12 +137,46 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		log.Printf("Added LD_LIBRARY_PATH=/app/lib for instance %s", instanceID)
 	}
 
+	// 根据 meta.ini 暴露端口
+	exposedPorts := nat.PortSet{}
+	portBindings := nat.PortMap{}
+	metaPath := filepath.Join(appDir, "meta.ini")
+	if endpoints, err := ParseMetaINI(metaPath); err == nil && len(endpoints) > 0 {
+		for _, ep := range endpoints {
+			if ep.Port <= 0 {
+				continue
+			}
+			proto := strings.ToLower(ep.Protocol)
+			switch proto {
+			case "", "http", "https", "grpc":
+				proto = "tcp"
+			case "tcp", "udp":
+				// keep
+			default:
+				proto = "tcp"
+			}
+			port, err := nat.NewPort(proto, strconv.Itoa(ep.Port))
+			if err != nil {
+				log.Printf("Failed to parse service port %d/%s for instance %s: %v", ep.Port, proto, instanceID, err)
+				continue
+			}
+			if _, exists := exposedPorts[port]; exists {
+				continue
+			}
+			exposedPorts[port] = struct{}{}
+			portBindings[port] = []nat.PortBinding{
+				{HostIP: "0.0.0.0", HostPort: strconv.Itoa(ep.Port)},
+			}
+		}
+	}
+
 	// 创建容器配置
 	containerConfig := &container.Config{
-		Image:      baseImage,
-		Cmd:        cmdParts,
-		WorkingDir: "/app",
-		Env:        envVars,
+		Image:        baseImage,
+		Cmd:          cmdParts,
+		WorkingDir:   "/app",
+		Env:          envVars,
+		ExposedPorts: exposedPorts,
 		// 设置容器自动删除（停止后）
 		// 但我们需要手动管理，所以不设置AutoRemove
 	}
@@ -181,10 +217,19 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 			Memory:   getMemoryLimit(), // 从环境变量或默认值
 			NanoCPUs: getCPULimit(),    // CPU限制
 		},
+		PortBindings: portBindings,
 		// 网络模式：使用bridge网络（默认）
 		NetworkMode: container.NetworkMode("bridge"),
 		// 自动重启策略：不自动重启（由Agent管理）
 		RestartPolicy: container.RestartPolicy{Name: "no"},
+	}
+
+	if len(portBindings) > 0 {
+		var ports []string
+		for port := range portBindings {
+			ports = append(ports, port.Port()+"/"+port.Proto())
+		}
+		log.Printf("Exposing ports for instance %s: %s", instanceID, strings.Join(ports, ", "))
 	}
 
 	// 创建容器
