@@ -51,6 +51,8 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/bin/controller ./bin/controller
+# 复制Swagger静态资源
+COPY --from=builder /app/static ./controller/static
 
 # 复制配置文件
 COPY controller/env.example ./.env
