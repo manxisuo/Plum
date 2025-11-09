@@ -5,6 +5,9 @@ set -e
 
 echo "🚀 开始安装依赖到银河麒麟V10 ARM64环境..."
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # 检测系统
 if [ "$(uname -m)" != "aarch64" ]; then
     echo "❌ 当前系统不是ARM64架构，请确认运行环境"
@@ -282,13 +285,10 @@ fi
 
 # 6. 安装esbuild ARM64依赖
 echo "🔧 安装esbuild ARM64依赖..."
-if [ -f "../tools/esbuild-linux-arm64-0.21.5.tgz" ]; then
+if [ -f "$ROOT_DIR/tools/esbuild-linux-arm64-0.21.5.tgz" ]; then
     echo "📦 发现esbuild ARM64包，开始安装..."
-    cd ../source/Plum
-    
-    # 运行esbuild安装脚本
-    if [ -f "scripts/install-esbuild-arm64-0.21.5.sh" ]; then
-        bash scripts/install-esbuild-arm64-0.21.5.sh || {
+    if [ -f "$ROOT_DIR/scripts/install-esbuild-arm64-0.21.5.sh" ]; then
+        ( cd "$ROOT_DIR/source/Plum" && bash "$ROOT_DIR/scripts/install-esbuild-arm64-0.21.5.sh" ) || {
             echo "⚠️  esbuild ARM64安装失败"
             echo "💡 请检查esbuild包是否完整"
         }
@@ -296,8 +296,6 @@ if [ -f "../tools/esbuild-linux-arm64-0.21.5.tgz" ]; then
         echo "⚠️  未找到install-esbuild-arm64-0.21.5.sh脚本"
         echo "💡 请确保脚本已正确复制到部署包中"
     fi
-    
-    cd ../../scripts
 else
     echo "📋 未找到esbuild ARM64包，跳过安装"
     echo "💡 如需安装，请将esbuild-linux-arm64-0.21.5.tgz放到tools目录"
@@ -305,13 +303,10 @@ fi
 
 # 7. 安装rollup ARM64依赖
 echo "🔧 安装rollup ARM64依赖..."
-if [ -f "../tools/rollup-linux-arm64-gnu-4.52.5.tgz" ]; then
+if [ -f "$ROOT_DIR/tools/rollup-linux-arm64-gnu-4.52.5.tgz" ]; then
     echo "📦 发现rollup ARM64包，开始安装..."
-    cd ../source/Plum
-    
-    # 运行rollup修复脚本
-    if [ -f "scripts/fix-rollup-arm64.sh" ]; then
-        bash scripts/fix-rollup-arm64.sh || {
+    if [ -f "$ROOT_DIR/scripts/fix-rollup-arm64.sh" ]; then
+        ( cd "$ROOT_DIR/source/Plum" && bash "$ROOT_DIR/scripts/fix-rollup-arm64.sh" ) || {
             echo "⚠️  rollup ARM64安装失败"
             echo "💡 请检查rollup包是否完整"
         }
@@ -319,8 +314,6 @@ if [ -f "../tools/rollup-linux-arm64-gnu-4.52.5.tgz" ]; then
         echo "⚠️  未找到fix-rollup-arm64.sh脚本"
         echo "💡 请确保脚本已正确复制到部署包中"
     fi
-    
-    cd ../../scripts
 else
     echo "📋 未找到rollup ARM64包，跳过安装"
     echo "💡 如需安装，请将rollup-linux-arm64-gnu-4.52.5.tgz放到tools目录"

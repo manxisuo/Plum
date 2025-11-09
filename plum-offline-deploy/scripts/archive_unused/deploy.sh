@@ -31,6 +31,16 @@ else
     exit 1
 fi
 
+# 部署Controller静态资源（Swagger UI）
+if [ -d "controller/static" ]; then
+    sudo mkdir -p $DEPLOY_ROOT/controller
+    sudo cp -r controller/static $DEPLOY_ROOT/controller/
+    sudo chown -R $SERVICE_USER:$SERVICE_GROUP $DEPLOY_ROOT/controller
+    echo "✅ Controller静态资源已部署"
+else
+    echo "⚠️ controller/static 未找到，Swagger UI 可能无法访问"
+fi
+
 # 部署Agent
 if [ -f "agent-go/plum-agent" ]; then
     sudo cp agent-go/plum-agent $DEPLOY_ROOT/bin/

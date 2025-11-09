@@ -45,10 +45,12 @@ tools/
 ### 1.3 部署脚本
 ```
 scripts/
-├── install-deps.sh                # 依赖安装脚本
-├── build-all.sh                   # 构建脚本  
-├── deploy.sh                      # 部署脚本
-└── OFFLINE_DEPLOYMENT_GUIDE.md   # 详细部署指南
+├── install-deps.sh                # 离线依赖安装入口
+├── install-esbuild-arm64-0.21.5.sh# UI esbuild ARM64补丁
+├── fix-rollup-arm64.sh            # UI rollup ARM64补丁
+└── archive_unused/                # 旧版脚本归档
+    ├── build-all.sh               # （已废弃）
+    └── deploy.sh                  # （已废弃）
 ```
 
 ## 2. 准备步骤（在WSL2中执行）
@@ -95,13 +97,24 @@ cd plum-offline-deploy/scripts
 
 ### 步骤2：构建项目
 ```bash
-./build-all.sh
+export GOTOOLCHAIN=local CGO_ENABLED=0
+
+make controller
+make agent
+make ui-build
 ```
 
 ### 步骤3：部署服务
 ```bash
-./deploy.sh
+# 复制可执行文件与静态资源到目标路径（示例）
+sudo mkdir -p /opt/plum/{bin,ui,data,logs}
+sudo cp controller/bin/controller /opt/plum/bin/
+sudo cp agent-go/plum-agent /opt/plum/bin/
+sudo cp -r ui/dist/* /opt/plum/ui/
+# 根据环境编写 /opt/plum/.env.controller 与 .env.agent
 ```
+
+> 如需使用 systemd 管理服务，可参考下文 **“4.3 系统服务配置”**。
 
 ## 4. 关键配置说明
 

@@ -40,6 +40,7 @@ POSSIBLE_FILES=(
     "rollup-linux-arm64-gnu-4.52.5.tgz"
     "ui/rollup-linux-arm64-gnu-4.52.5.tgz"
     "../tools/rollup-linux-arm64-gnu-4.52.5.tgz"
+    "../../tools/rollup-linux-arm64-gnu-4.52.5.tgz"
     "../../rollup-linux-arm64-gnu-4.52.5.tgz"
     "/tmp/rollup-linux-arm64-gnu-4.52.5.tgz"
 )
