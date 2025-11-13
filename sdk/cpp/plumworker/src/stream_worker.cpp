@@ -197,6 +197,7 @@ bool StreamWorker::runTaskStream() {
 
     // 心跳线程
     std::thread heartbeatThread([this, &receiveThreadRunning]() {
+        std::cout << "[StreamWorker] Heartbeat thread started, interval=" << options_.heartbeatIntervalSec << "s" << std::endl;
         while (!stop_.load() && receiveThreadRunning.load()) {
             std::this_thread::sleep_for(
                 std::chrono::seconds(options_.heartbeatIntervalSec));
@@ -205,8 +206,7 @@ bool StreamWorker::runTaskStream() {
                 break;
             }
 
-            std::lock_guard<std::mutex> lock(streamMutex_);
-            if (!streamPtr_ || !sendHeartbeat(streamPtr_)) {
+            if (!sendHeartbeat(streamPtr_)) {
                 std::cerr << "[StreamWorker] Failed to send heartbeat" << std::endl;
                 receiveThreadRunning.store(false);
                 break;
@@ -235,7 +235,7 @@ bool StreamWorker::runTaskStream() {
                   << status.error_message() << std::endl;
     }
 
-    return true;
+    return stop_.load();
 }
 
 bool StreamWorker::sendRegistration(std::shared_ptr<grpc::ClientReaderWriterInterface<TaskAck, TaskRequest>> stream) {
@@ -260,12 +260,19 @@ bool StreamWorker::sendRegistration(std::shared_ptr<grpc::ClientReaderWriterInte
 }
 
 bool StreamWorker::sendHeartbeat(std::shared_ptr<grpc::ClientReaderWriterInterface<TaskAck, TaskRequest>> stream) {
+    if (!stream) {
+        return false;
+    }
     TaskAck ack;
     auto* hb = ack.mutable_heartbeat();
     hb->set_worker_id(options_.workerId);
 
     std::lock_guard<std::mutex> lock(streamMutex_);
-    return stream->Write(ack);
+    bool ok = stream->Write(ack);
+    if (ok) {
+        std::cout << "[StreamWorker] Heartbeat sent" << std::endl;
+    }
+    return ok;
 }
 
 bool StreamWorker::sendTaskResult(std::shared_ptr<grpc::ClientReaderWriterInterface<TaskAck, TaskRequest>> stream,
@@ -290,8 +297,21 @@ bool StreamWorker::sendTaskResult(std::shared_ptr<grpc::ClientReaderWriterInterf
 
 void StreamWorker::handleTask(const std::string& taskId, const std::string& taskName,
                               const std::string& payload) {
+    auto summarize = [](const std::string& text) -> std::string {
+        static constexpr std::size_t kMaxLen = 2048;
+        if (text.size() <= kMaxLen) {
+            return text;
+        }
+        return text.substr(0, kMaxLen) + "...(truncated)";
+    };
+
     std::cout << "[StreamWorker] Executing task: " << taskName 
               << " (taskId: " << taskId << ")" << std::endl;
+    if (!payload.empty()) {
+        std::cout << "[StreamWorker] Task payload: " << summarize(payload) << std::endl;
+    } else {
+        std::cout << "[StreamWorker] Task payload: <empty>" << std::endl;
+    }
 
     // 查找任务处理函数
     auto it = handlers_.find(taskName);
@@ -314,6 +334,14 @@ void StreamWorker::handleTask(const std::string& taskId, const std::string& task
 
     // 发送结果（需要加锁保护 stream）
     if (streamPtr_) {
+        if (!result.empty()) {
+            std::cout << "[StreamWorker] Task result for " << taskId << ": "
+                      << summarize(result) << std::endl;
+        }
+        if (!error.empty()) {
+            std::cerr << "[StreamWorker] Task error for " << taskId << ": "
+                      << summarize(error) << std::endl;
+        }
         sendTaskResult(streamPtr_, taskId, result, error);
     }
 }
