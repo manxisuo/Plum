@@ -85,19 +85,42 @@ func NewDAGExecutor(runID string, dag store.WorkflowDAG, payload map[string]any)
 	if payload != nil {
 		if v, ok := payload["stageControlBase"].(string); ok && strings.TrimSpace(v) != "" {
 			base = v
+			log.Printf("[DAGExecutor] Found stageControlBase in payload: %s", base)
 		}
 		// 兼容旧的 payload 字段名
 		if base == "" {
 			if v, ok := payload["mainControlBase"].(string); ok && strings.TrimSpace(v) != "" {
 				base = v
+				log.Printf("[DAGExecutor] Found mainControlBase in payload: %s", base)
 			}
 		}
-		if v, ok := payload["taskId"].(string); ok {
+		// 支持多种字段名：taskId, task_id, taskID
+		if v, ok := payload["taskId"].(string); ok && strings.TrimSpace(v) != "" {
 			exec.taskID = v
+			log.Printf("[DAGExecutor] Found taskId in payload: %s", exec.taskID)
+		} else if v, ok := payload["task_id"].(string); ok && strings.TrimSpace(v) != "" {
+			exec.taskID = v
+			log.Printf("[DAGExecutor] Found task_id in payload: %s", exec.taskID)
+		} else if v, ok := payload["taskID"].(string); ok && strings.TrimSpace(v) != "" {
+			exec.taskID = v
+			log.Printf("[DAGExecutor] Found taskID in payload: %s", exec.taskID)
 		}
+		// 调试：打印 payload 的所有键
+		log.Printf("[DAGExecutor] Payload keys: %v", func() []string {
+			keys := make([]string, 0, len(payload))
+			for k := range payload {
+				keys = append(keys, k)
+			}
+			return keys
+		}())
 	}
 
 	exec.stageControlBase = strings.TrimRight(base, "/")
+	if exec.stageControlBase != "" {
+		log.Printf("[DAGExecutor] Stage control base configured: %s, taskID: %s", exec.stageControlBase, exec.taskID)
+	} else {
+		log.Printf("[DAGExecutor] Stage control base not configured, external stage control disabled")
+	}
 	exec.httpClient = &http.Client{Timeout: 5 * time.Second}
 
 	return exec
@@ -150,15 +173,28 @@ func (e *DAGExecutor) syncNodeStates(storeInst store.Store) {
 							if stdoutStr, ok := stdoutVal.(string); ok && stdoutStr != "" {
 								var stdoutJSON map[string]any
 								if err := json.Unmarshal([]byte(stdoutStr), &stdoutJSON); err == nil {
+									// 成功解析 stdout JSON，合并到 result
 									for k, v := range stdoutJSON {
 										result[k] = v
 									}
+								} else {
+									// stdout 不是有效的 JSON，记录警告但继续使用原始 result
+									log.Printf("[DAGExecutor] Failed to parse stdout JSON for task %s: %v", taskID, err)
+									log.Printf("[DAGExecutor] stdout content (first 200 chars): %s",
+										func() string {
+											if len(stdoutStr) > 200 {
+												return stdoutStr[:200] + "..."
+											}
+											return stdoutStr
+										}())
 								}
 							}
 						}
 					}
 					e.results[taskID] = result
 					e.nodeOutputs[nodeID] = result
+				} else {
+					log.Printf("[DAGExecutor] Failed to parse ResultJSON for task %s: %v", taskID, err)
 				}
 			}
 		case "Failed", "Timeout":
@@ -333,6 +369,7 @@ func (e *DAGExecutor) scheduleTaskNode(nodeID string, node store.WorkflowNode, s
 	}
 
 	stageKey := e.getStageKey(node, taskDef)
+	log.Printf("[DAGExecutor] Node %s stageKey: %s, stageControlBase: %s, taskID: %s", nodeID, stageKey, e.stageControlBase, e.taskID)
 	if stageKey != "" {
 		e.nodeStage[nodeID] = stageKey
 		// 只有在配置了外部控制系统时才尝试获取阶段 payload
@@ -723,16 +760,22 @@ func (e *DAGExecutor) GetNodeStates() map[string]string {
 }
 
 func (e *DAGExecutor) getStageKey(node store.WorkflowNode, def store.TaskDefinition) string {
-	// 只使用显式的 labels 来识别阶段，不进行业务相关的猜测
+	// 优先使用 Task Definition 名称（直接返回，不做任何业务相关的判断）
+	if def.Name != "" {
+		return strings.TrimSpace(def.Name)
+	}
+
+	// 如果名称为空，再尝试使用显式的 labels
 	if def.Labels != nil {
 		if stage := strings.TrimSpace(def.Labels["workflow.stage"]); stage != "" {
-			return strings.ToLower(stage)
+			return stage
 		}
 		if stage := strings.TrimSpace(def.Labels["stage"]); stage != "" {
-			return strings.ToLower(stage)
+			return stage
 		}
 	}
-	// 如果 labels 不存在，返回空字符串，不尝试从名称中猜测
+
+	// 如果都不存在，返回空字符串
 	return ""
 }
 
@@ -796,8 +839,10 @@ func (e *DAGExecutor) fetchStagePayload(stage string) (map[string]any, bool, err
 
 func (e *DAGExecutor) notifyStageBegin(nodeID, stage string) {
 	if e.taskID == "" || e.stageControlBase == "" {
+		log.Printf("[DAGExecutor] Skipping stage begin notification: taskID=%s, stageControlBase=%s", e.taskID, e.stageControlBase)
 		return
 	}
+	log.Printf("[DAGExecutor] Notifying stage begin: stage=%s, taskID=%s", stage, e.taskID)
 	url := fmt.Sprintf("%s/api/task/%s/stage/%s/begin", e.stageControlBase, e.taskID, stage)
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBufferString("{}"))
 	if err != nil {
@@ -822,8 +867,10 @@ func (e *DAGExecutor) notifyStageBegin(nodeID, stage string) {
 
 func (e *DAGExecutor) notifyStageResult(nodeID, stage string, result map[string]any, errMsg string) {
 	if e.taskID == "" || e.stageControlBase == "" {
+		log.Printf("[DAGExecutor] Skipping stage result notification: taskID=%s, stageControlBase=%s", e.taskID, e.stageControlBase)
 		return
 	}
+	log.Printf("[DAGExecutor] Notifying stage result: stage=%s, taskID=%s, hasError=%v", stage, e.taskID, errMsg != "")
 
 	payload := make(map[string]any, len(result)+1)
 	if errMsg != "" {
