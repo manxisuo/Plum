@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -115,7 +116,14 @@ func main() {
 	}()
 
 	// 主循环 - 优化：降低到1秒以提高故障检测速度
-	ticker := time.NewTicker(1 * time.Second)
+	syncInterval := 5 * time.Second
+	if v := os.Getenv("SYNC_INTERVAL_SEC"); v != "" {
+		if sec, err := strconv.Atoi(v); err == nil && sec > 0 {
+			syncInterval = time.Duration(sec) * time.Second
+		}
+	}
+	log.Printf("Agent sync interval: %v", syncInterval)
+	ticker := time.NewTicker(syncInterval)
 	defer ticker.Stop()
 
 	for {
