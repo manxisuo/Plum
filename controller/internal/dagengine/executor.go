@@ -1,10 +1,15 @@
 package dagengine
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,6 +33,18 @@ type DAGExecutor struct {
 	results    map[string]map[string]any // taskID -> result JSON
 	loopStates map[string]*LoopState     // nodeID -> loopState（Loop节点状态）
 	mu         sync.RWMutex              // 保护并发访问
+
+	// 外部控制系统集成（可选）
+	taskID            string
+	initialPayload    map[string]any
+	stageControlBase  string
+	httpClient        *http.Client
+	stagePayloadCache map[string]map[string]any
+	nodeOutputs       map[string]map[string]any
+	nodeErrors        map[string]string
+	nodeStage         map[string]string
+	stageBeginSent    map[string]bool
+	stageResultSent   map[string]bool
 }
 
 type NodeState string
@@ -41,20 +58,49 @@ const (
 	NodeSkipped   NodeState = "Skipped"
 )
 
-func NewDAGExecutor(runID string, dag store.WorkflowDAG) *DAGExecutor {
+func NewDAGExecutor(runID string, dag store.WorkflowDAG, payload map[string]any) *DAGExecutor {
 	states := make(map[string]NodeState)
 	for nodeID := range dag.Nodes {
 		states[nodeID] = NodePending
 	}
 
-	return &DAGExecutor{
-		runID:      runID,
-		dag:        dag,
-		nodeStates: states,
-		taskIDs:    make(map[string]string),
-		results:    make(map[string]map[string]any),
-		loopStates: make(map[string]*LoopState),
+	exec := &DAGExecutor{
+		runID:             runID,
+		dag:               dag,
+		nodeStates:        states,
+		taskIDs:           make(map[string]string),
+		results:           make(map[string]map[string]any),
+		loopStates:        make(map[string]*LoopState),
+		initialPayload:    payload,
+		stagePayloadCache: make(map[string]map[string]any),
+		nodeOutputs:       make(map[string]map[string]any),
+		nodeErrors:        make(map[string]string),
+		nodeStage:         make(map[string]string),
+		stageBeginSent:    make(map[string]bool),
+		stageResultSent:   make(map[string]bool),
 	}
+
+	// 从环境变量或 payload 中获取外部控制系统的基础 URL（可选）
+	base := os.Getenv("STAGE_CONTROL_BASE")
+	if payload != nil {
+		if v, ok := payload["stageControlBase"].(string); ok && strings.TrimSpace(v) != "" {
+			base = v
+		}
+		// 兼容旧的 payload 字段名
+		if base == "" {
+			if v, ok := payload["mainControlBase"].(string); ok && strings.TrimSpace(v) != "" {
+				base = v
+			}
+		}
+		if v, ok := payload["taskId"].(string); ok {
+			exec.taskID = v
+		}
+	}
+
+	exec.stageControlBase = strings.TrimRight(base, "/")
+	exec.httpClient = &http.Client{Timeout: 5 * time.Second}
+
+	return exec
 }
 
 // Tick - 调度一轮
@@ -95,17 +141,15 @@ func (e *DAGExecutor) syncNodeStates(storeInst store.Store) {
 			e.nodeStates[nodeID] = NodeRunning
 		case "Succeeded":
 			e.nodeStates[nodeID] = NodeSucceeded
-			// 缓存结果
+			e.nodeErrors[nodeID] = ""
 			if task.ResultJSON != "" {
 				var result map[string]any
 				if err := json.Unmarshal([]byte(task.ResultJSON), &result); err == nil {
-					// 如果结果包含stdout字段（os_process），尝试解析其中的JSON
 					if result != nil {
 						if stdoutVal, ok := result["stdout"]; ok {
 							if stdoutStr, ok := stdoutVal.(string); ok && stdoutStr != "" {
 								var stdoutJSON map[string]any
 								if err := json.Unmarshal([]byte(stdoutStr), &stdoutJSON); err == nil {
-									// 将stdout中的JSON字段合并到result根级别
 									for k, v := range stdoutJSON {
 										result[k] = v
 									}
@@ -114,10 +158,31 @@ func (e *DAGExecutor) syncNodeStates(storeInst store.Store) {
 						}
 					}
 					e.results[taskID] = result
+					e.nodeOutputs[nodeID] = result
 				}
 			}
 		case "Failed", "Timeout":
 			e.nodeStates[nodeID] = NodeFailed
+			e.nodeErrors[nodeID] = task.Error
+		}
+
+		state := e.nodeStates[nodeID]
+		if (state == NodeSucceeded || state == NodeFailed) && !e.stageResultSent[nodeID] {
+			stage := e.nodeStage[nodeID]
+			if stage != "" {
+				var result map[string]any
+				errMsg := ""
+				if state == NodeSucceeded {
+					result = e.nodeOutputs[nodeID]
+				} else {
+					errMsg = e.nodeErrors[nodeID]
+					if errMsg == "" {
+						errMsg = "stage execution failed"
+					}
+				}
+				e.notifyStageResult(nodeID, stage, result, errMsg)
+			}
+			e.stageResultSent[nodeID] = true
 		}
 	}
 }
@@ -262,27 +327,55 @@ func (e *DAGExecutor) scheduleTaskNode(nodeID string, node store.WorkflowNode, s
 		return fmt.Errorf("task definition not found: %s", node.TaskDefID)
 	}
 
-	// 创建Task
+	payloadJSON := node.PayloadJSON
+	if payloadJSON == "" {
+		payloadJSON = taskDef.DefaultPayloadJSON
+	}
+
+	stageKey := e.getStageKey(node, taskDef)
+	if stageKey != "" {
+		e.nodeStage[nodeID] = stageKey
+		// 只有在配置了外部控制系统时才尝试获取阶段 payload
+		if e.stageControlBase != "" {
+			prepared, skip, prepErr := e.prepareStagePayload(stageKey)
+			if prepErr != nil {
+				e.nodeErrors[nodeID] = prepErr.Error()
+				e.nodeStates[nodeID] = NodeFailed
+				log.Printf("[DAGExecutor] Failed to prepare payload for node %s (stage=%s): %v", nodeID, stageKey, prepErr)
+				if stageKey != "" && !e.stageResultSent[nodeID] {
+					e.notifyStageResult(nodeID, stageKey, nil, prepErr.Error())
+					e.stageResultSent[nodeID] = true
+				}
+				return prepErr
+			}
+			if skip {
+				e.nodeStates[nodeID] = NodeSkipped
+				e.stageResultSent[nodeID] = true
+				log.Printf("[DAGExecutor] Stage %s skipped for node %s", stageKey, nodeID)
+				return nil
+			}
+			if prepared != "" {
+				payloadJSON = prepared
+			}
+		}
+		// 如果没有配置外部控制系统，使用节点本身的 payload（node.PayloadJSON 或 taskDef.DefaultPayloadJSON）
+	}
+
 	task := store.Task{
-		Name:        taskDef.Name, // 使用TaskDef的名称以支持builtin.* 任务
+		Name:        taskDef.Name,
 		Executor:    taskDef.Executor,
 		TargetKind:  taskDef.TargetKind,
 		TargetRef:   taskDef.TargetRef,
 		State:       "Pending",
-		PayloadJSON: node.PayloadJSON,
+		PayloadJSON: payloadJSON,
 		TimeoutSec:  node.TimeoutSec,
 		MaxRetries:  node.MaxRetries,
 		CreatedAt:   time.Now().Unix(),
 		Labels: map[string]string{
 			"dagRunId":    e.runID,
 			"dagNodeId":   nodeID,
-			"dagNodeName": node.Name, // 保存节点名称到Label
+			"dagNodeName": node.Name,
 		},
-	}
-
-	// 优先使用node的payload，否则使用taskDef的默认payload
-	if task.PayloadJSON == "" {
-		task.PayloadJSON = taskDef.DefaultPayloadJSON
 	}
 
 	taskID, err := storeInst.CreateTask(task)
@@ -294,6 +387,12 @@ func (e *DAGExecutor) scheduleTaskNode(nodeID string, node store.WorkflowNode, s
 	e.taskIDs[nodeID] = taskID
 	e.nodeStates[nodeID] = NodeRunning
 	log.Printf("[DAGExecutor] Scheduled task node %s -> task %s", nodeID, taskID)
+
+	if stageKey != "" && !e.stageBeginSent[nodeID] {
+		e.notifyStageBegin(nodeID, stageKey)
+		e.stageBeginSent[nodeID] = true
+	}
+
 	return nil
 }
 
@@ -542,6 +641,27 @@ func toFloat(s string) (float64, bool) {
 	return f, err == nil
 }
 
+func toStringMap(value any) (map[string]any, bool) {
+	if value == nil {
+		return nil, false
+	}
+	if m, ok := value.(map[string]any); ok {
+		return m, true
+	}
+	return nil, false
+}
+
+func marshalJSON(data map[string]any) (string, error) {
+	if data == nil {
+		return "", nil
+	}
+	buf, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	return string(buf), nil
+}
+
 // 查找边
 func (e *DAGExecutor) findEdge(from, to string) *store.WorkflowEdge {
 	for i := range e.dag.Edges {
@@ -600,4 +720,150 @@ func (e *DAGExecutor) GetNodeStates() map[string]string {
 		result[nodeID] = string(state)
 	}
 	return result
+}
+
+func (e *DAGExecutor) getStageKey(node store.WorkflowNode, def store.TaskDefinition) string {
+	// 只使用显式的 labels 来识别阶段，不进行业务相关的猜测
+	if def.Labels != nil {
+		if stage := strings.TrimSpace(def.Labels["workflow.stage"]); stage != "" {
+			return strings.ToLower(stage)
+		}
+		if stage := strings.TrimSpace(def.Labels["stage"]); stage != "" {
+			return strings.ToLower(stage)
+		}
+	}
+	// 如果 labels 不存在，返回空字符串，不尝试从名称中猜测
+	return ""
+}
+
+func (e *DAGExecutor) prepareStagePayload(stage string) (string, bool, error) {
+	if stage == "" {
+		return "", false, nil
+	}
+
+	if cached, ok := e.stagePayloadCache[stage]; ok {
+		txt, err := marshalJSON(cached)
+		return txt, false, err
+	}
+
+	payload, skip, err := e.fetchStagePayload(stage)
+	if err != nil || skip {
+		return "", skip, err
+	}
+
+	e.stagePayloadCache[stage] = payload
+	txt, err := marshalJSON(payload)
+	return txt, false, err
+}
+
+func (e *DAGExecutor) fetchStagePayload(stage string) (map[string]any, bool, error) {
+	if e.taskID == "" {
+		return nil, false, fmt.Errorf("task payload missing taskId for stage %s", stage)
+	}
+	if e.stageControlBase == "" {
+		return nil, false, fmt.Errorf("stage control base URL not configured")
+	}
+
+	url := fmt.Sprintf("%s/api/task/%s/stage/%s/input", e.stageControlBase, e.taskID, stage)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, false, err
+	}
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusConflict {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[DAGExecutor] Stage %s not applicable: %s", stage, strings.TrimSpace(string(body)))
+		return nil, true, nil
+	}
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, false, fmt.Errorf("stage input request failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var data map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, false, err
+	}
+	return data, false, nil
+}
+
+func (e *DAGExecutor) notifyStageBegin(nodeID, stage string) {
+	if e.taskID == "" || e.stageControlBase == "" {
+		return
+	}
+	url := fmt.Sprintf("%s/api/task/%s/stage/%s/begin", e.stageControlBase, e.taskID, stage)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBufferString("{}"))
+	if err != nil {
+		log.Printf("[DAGExecutor] Failed to build stage begin request (stage=%s): %v", stage, err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[DAGExecutor] Stage begin request failed (stage=%s): %v", stage, err)
+		return
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		log.Printf("[DAGExecutor] Stage begin request failed (stage=%s) status=%d", stage, resp.StatusCode)
+	} else {
+		log.Printf("[DAGExecutor] Stage begin recorded (stage=%s)", stage)
+	}
+}
+
+func (e *DAGExecutor) notifyStageResult(nodeID, stage string, result map[string]any, errMsg string) {
+	if e.taskID == "" || e.stageControlBase == "" {
+		return
+	}
+
+	payload := make(map[string]any, len(result)+1)
+	if errMsg != "" {
+		payload["status"] = "error"
+		payload["message"] = errMsg
+	} else if result != nil {
+		for k, v := range result {
+			payload[k] = v
+		}
+		if _, ok := payload["status"]; !ok {
+			payload["status"] = "success"
+		}
+	} else {
+		payload["status"] = "success"
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("[DAGExecutor] Failed to marshal stage result payload (stage=%s): %v", stage, err)
+		return
+	}
+
+	url := fmt.Sprintf("%s/api/task/%s/stage/%s/result", e.stageControlBase, e.taskID, stage)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		log.Printf("[DAGExecutor] Failed to build stage result request (stage=%s): %v", stage, err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[DAGExecutor] Stage result request failed (stage=%s): %v", stage, err)
+		return
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		log.Printf("[DAGExecutor] Stage result request failed (stage=%s) status=%d", stage, resp.StatusCode)
+	} else {
+		log.Printf("[DAGExecutor] Stage result recorded (stage=%s)", stage)
+	}
 }

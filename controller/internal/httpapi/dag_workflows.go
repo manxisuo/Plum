@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -132,7 +133,18 @@ func handleRunDAGWorkflow(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	runID, err := dagOrch.StartDAGRun(id)
+	var req struct {
+		TaskPayload map[string]any `json:"taskPayload"`
+	}
+	if r.Body != nil {
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+	}
+
+	runID, err := dagOrch.StartDAGRun(id, req.TaskPayload)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

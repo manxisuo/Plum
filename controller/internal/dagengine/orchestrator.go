@@ -76,7 +76,7 @@ func (o *DAGOrchestrator) tick() {
 }
 
 // StartDAGRun - 启动一个DAG运行
-func (o *DAGOrchestrator) StartDAGRun(workflowID string) (string, error) {
+func (o *DAGOrchestrator) StartDAGRun(workflowID string, payload map[string]any) (string, error) {
 	// 获取DAG定义
 	dag, ok, err := o.store.GetWorkflowDAG(workflowID)
 	if err != nil {
@@ -103,7 +103,7 @@ func (o *DAGOrchestrator) StartDAGRun(workflowID string) (string, error) {
 	}
 
 	// 创建executor
-	executor := NewDAGExecutor(runID, dag)
+	executor := NewDAGExecutor(runID, dag, payload)
 
 	o.mu.Lock()
 	o.executors[runID] = executor

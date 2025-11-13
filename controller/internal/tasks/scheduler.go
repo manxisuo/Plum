@@ -68,6 +68,9 @@ func tick() {
 				continue
 			}
 			steps, _ := store.Current.ListWorkflowSteps(r.WorkflowID)
+			if len(steps) == 0 {
+				continue
+			}
 			srs, _ := store.Current.ListStepRuns(r.RunID)
 			nextOrd := -1
 			if len(srs) == 0 {
