@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Refresh, Files, Upload, Delete } from '@element-plus/icons-vue'
 
@@ -14,10 +14,21 @@ type Artifact = {
 	createdAt: number
 }
 
+type DeleteResult = {
+	success: boolean
+	messageKey?: string
+	params?: Record<string, any>
+	rawMessage?: string
+}
+
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 const loading = ref(false)
+const deleting = ref(false)
 const items = ref<Artifact[]>([])
+const selectedIds = ref<string[]>([])
 const uploadUrl = `${API_BASE}/v1/apps/upload`
+
+const { t } = useI18n()
 
 // 分页相关
 const currentPage = ref(1)
@@ -31,6 +42,7 @@ async function load() {
 		if (!res.ok) throw new Error(`HTTP ${res.status}`)
 		const data = await res.json() as Artifact[]
 		items.value = Array.isArray(data) ? data : []
+		selectedIds.value = []
 	} catch (e:any) {
 		ElMessage.error(e?.message || '加载失败')
 		// 确保在错误情况下也重置为安全值
@@ -104,19 +116,79 @@ function beforeUpload(file: File) {
 	return true
 }
 
+async function deleteArtifact(id: string): Promise<DeleteResult> {
+	try {
+		const res = await fetch(`${API_BASE}/v1/apps/${encodeURIComponent(id)}`, { method: 'DELETE' })
+		if (res.status === 409) {
+			return { success: false, messageKey: 'apps.messages.inUse' }
+		}
+		if (!res.ok) {
+			return { success: false, messageKey: 'apps.messages.httpError', params: { status: res.status } }
+		}
+		return { success: true }
+	} catch (e: any) {
+		return { success: false, rawMessage: e?.message }
+	}
+}
+
 async function del(id: string) {
-  try {
-    const res = await fetch(`${API_BASE}/v1/apps/${encodeURIComponent(id)}`, { method: 'DELETE' })
-    if (res.status === 409) {
-      ElMessage.error('该应用包正在被部署使用，无法删除')
-      return
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    ElMessage.success('已删除')
-    load()
-  } catch (e:any) {
-    ElMessage.error(e?.message || '删除失败')
-  }
+	const result = await deleteArtifact(id)
+	if (result.success) {
+		ElMessage.success(t('apps.messages.deleteSuccess'))
+		load()
+	} else if (result.messageKey) {
+		ElMessage.error(t(result.messageKey, result.params ?? {}))
+	} else if (result.rawMessage) {
+		ElMessage.error(result.rawMessage)
+	} else {
+		ElMessage.error(t('apps.messages.deleteFailed'))
+	}
+}
+
+function handleSelectionChange(rows: Artifact[]) {
+	selectedIds.value = rows.map(row => row.artifactId)
+}
+
+async function deleteSelected() {
+	if (!selectedIds.value.length) return
+	try {
+		await ElMessageBox.confirm(
+			t('apps.confirmBatchDelete', { count: selectedIds.value.length }),
+			t('common.confirm'),
+			{
+				type: 'warning',
+				confirmButtonText: t('common.delete'),
+				cancelButtonText: t('common.cancel')
+			}
+		)
+	} catch {
+		return
+	}
+
+	deleting.value = true
+	const failed: string[] = []
+
+	for (const id of selectedIds.value) {
+		const result = await deleteArtifact(id)
+		if (!result.success) {
+			if (result.messageKey) {
+				failed.push(t(result.messageKey, result.params ?? {}))
+			} else if (result.rawMessage) {
+				failed.push(result.rawMessage)
+			} else {
+				failed.push(id)
+			}
+		}
+	}
+
+	deleting.value = false
+	load()
+
+	if (failed.length === 0) {
+		ElMessage.success(t('apps.messages.deleteSuccess'))
+	} else {
+		ElMessage.error(t('apps.messages.deletePartial', { detail: failed.join(', ') }))
+	}
 }
 
 // 计算属性：分页后的数据
@@ -142,7 +214,6 @@ function handleCurrentChange(val: number) {
 }
 
 onMounted(load)
-const { t } = useI18n()
 
 function artifactHref(row: Artifact): string {
   const u = row.url || ''
@@ -178,7 +249,7 @@ function formatTimestamp(timestamp: number): string {
          <el-upload
            :action="uploadUrl"
            name="file"
-           :multiple="false"
+           :multiple="true"
            :show-file-list="false"
            :before-upload="beforeUpload"
            :on-success="onSuccess"
@@ -190,6 +261,15 @@ function formatTimestamp(timestamp: number): string {
             {{ t('apps.buttons.selectUpload') }}
           </el-button>
         </el-upload>
+        <el-button
+          type="danger"
+          :disabled="!selectedIds.length"
+          :loading="deleting"
+          @click="deleteSelected"
+        >
+          <el-icon><Delete /></el-icon>
+          {{ t('apps.buttons.batchDelete') }}
+        </el-button>
       </div>
       
       <!-- 统计信息 -->
@@ -216,7 +296,15 @@ function formatTimestamp(timestamp: number): string {
         </div>
       </template>
       
-      <el-table v-loading="loading" :data="paginatedItems" style="width:100%;" stripe>
+      <el-table
+        v-loading="loading"
+        :data="paginatedItems"
+        style="width:100%;"
+        stripe
+        row-key="artifactId"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="48" />
         <el-table-column prop="name" :label="t('apps.columns.app')" width="200" />
         <el-table-column prop="version" :label="t('apps.columns.version')" width="100" />
         <el-table-column :label="t('apps.columns.artifact')">

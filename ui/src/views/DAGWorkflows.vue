@@ -142,6 +142,9 @@
                     </el-select>
                   </el-form-item>
                   <div v-if="editingNode.type === 'task'">
+                    <el-form-item label="超时时间">
+                      <el-input-number v-model="editingNode.timeoutSec" :min="1" :max="86400" style="width: 100%" />
+                    </el-form-item>
                     <el-form-item label="任务定义">
                       <el-select v-model="editingNode.taskDefId" style="width: 100%" size="small">
                         <el-option v-for="def in Object.values(taskDefs)" :key="def.DefID" :label="def.Name" :value="def.DefID" />

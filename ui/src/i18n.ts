@@ -26,13 +26,13 @@ const messages = {
     },
     nav: {
       home: 'Home',
-      assignments: 'Assignments',
+      assignments: 'Application Instances',
       nodes: 'Nodes',
       apps: 'Apps',
       services: 'Services',
       workflows: 'Workflows',
-      dagWorkflows: 'DAG Workflows',
-      tasks: 'Tasks',
+      dagWorkflows: 'Flow Orchestration',
+      tasks: 'Flow Task Management',
       deployments: 'Deployments',
       resources: 'Resources',
       workers: 'Workers',
@@ -97,6 +97,8 @@ const messages = {
         form: {
           name: 'Name',
           entries: 'Entries',
+          entriesByApp: 'Entries (by App)',
+          entriesByNode: 'Entries (by Node)',
           labels: 'Labels',
           selectArtifact: 'Select Artifact',
           selectNode: 'Select Node',
@@ -104,16 +106,25 @@ const messages = {
           keyPlaceholder: 'Key',
           valuePlaceholder: 'Value'
         },
+        tabs: {
+          byApp: 'By Application',
+          byNode: 'By Node'
+        },
         buttons: {
           addEntry: 'Add Entry',
           deleteEntry: 'Delete Entry',
           addReplica: 'Add Replica',
+          addNodeEntry: 'Add Node Entry',
+          deleteNodeEntry: 'Delete Node Entry',
+          addApp: 'Add App',
           addLabel: 'Add Label',
           create: 'Create'
         },
         validation: {
           nameRequired: 'Please enter Name',
           entriesRequired: 'Please add at least one entry',
+          nodeEntriesRequired: 'Please add at least one node entry',
+          nodeRequired: 'Please select Node',
           artifactRequired: 'Please select Artifact',
           artifactNotFound: 'Artifact not found',
           replicasRequired: 'Please configure replicas for entry'
@@ -159,11 +170,19 @@ const messages = {
       uploadZip: 'Upload App ZIP',
       zipTip: 'Package must include start.sh and meta.ini(name/version)',
       uploadDescription: 'Upload a ZIP file containing your application package with start.sh and meta.ini',
-      buttons: { refresh: 'Refresh', selectUpload: 'Select and upload ZIP' },
+      buttons: { refresh: 'Refresh', selectUpload: 'Select ZIP file(s)', batchDelete: 'Delete Selected' },
       stats: { total: 'Total' },
       table: { title: 'Application Packages', items: 'items' },
       columns: { app: 'App', version: 'Version', artifact: 'Artifact', sizeBytes: 'Size(Bytes)', uploadedAt: 'UploadedAt', action: 'Action' },
-      confirmDelete: 'Confirm delete this artifact?'
+      confirmDelete: 'Confirm delete this artifact?',
+      confirmBatchDelete: 'Delete {count} selected artifact(s)?',
+      messages: {
+        deleteSuccess: 'Deleted successfully',
+        deleteFailed: 'Delete failed',
+        deletePartial: 'Some artifacts failed to delete: {detail}',
+        inUse: 'The application package is referenced by deployments and cannot be deleted',
+        httpError: 'Request failed (HTTP {status})'
+      }
     },
     workers: {
       title: 'Worker Management',
@@ -463,17 +482,17 @@ const messages = {
     },
     nav: {
       home: '首页',
-      assignments: '分配',
+      assignments: '应用实例',
       nodes: '节点',
       apps: '应用',
       services: '服务',
       workflows: '工作流',
-      dagWorkflows: 'DAG工作流',
-      tasks: '任务',
+      dagWorkflows: '流程编排',
+      tasks: '任务管理',
       deployments: '部署',
       resources: '资源',
-      workers: '工作器',
-      kvStore: 'KV存储',
+      workers: '任务实例',
+      kvStore: '分布式存储',
       language: '语言'
     },
     home: {
@@ -534,6 +553,8 @@ const messages = {
         form: {
           name: '名称',
           entries: '条目',
+          entriesByApp: '条目（按应用）',
+          entriesByNode: '条目（按节点）',
           labels: '标签',
           selectArtifact: '选择制品',
           selectNode: '选择节点',
@@ -541,16 +562,25 @@ const messages = {
           keyPlaceholder: '键',
           valuePlaceholder: '值'
         },
+        tabs: {
+          byApp: '按应用',
+          byNode: '按节点'
+        },
         buttons: {
           addEntry: '新增条目',
           deleteEntry: '删除条目',
           addReplica: '新增副本行',
+          addNodeEntry: '新增节点条目',
+          deleteNodeEntry: '删除节点条目',
+          addApp: '新增应用',
           addLabel: '新增标签',
           create: '创建'
         },
         validation: {
           nameRequired: '请输入名称',
           entriesRequired: '请添加至少一条条目',
+          nodeEntriesRequired: '请添加至少一个节点条目',
+          nodeRequired: '请选择节点',
           artifactRequired: '请选择制品',
           artifactNotFound: '制品不存在',
           replicasRequired: '请为条目配置副本'
@@ -596,11 +626,19 @@ const messages = {
       uploadZip: '上传应用包（ZIP）',
       zipTip: '包内需包含 start.sh 与 meta.ini(name/version)',
       uploadDescription: '上传包含应用程序包的ZIP文件，需要包含start.sh和meta.ini文件',
-      buttons: { refresh: '刷新', selectUpload: '选择并上传 ZIP' },
+      buttons: { refresh: '刷新', selectUpload: '选择并上传 ZIP', batchDelete: '批量删除' },
       stats: { total: '总数' },
       table: { title: '应用包列表', items: '项' },
       columns: { app: '应用', version: '版本', artifact: '制品', sizeBytes: '大小(字节)', uploadedAt: '上传时间', action: '操作' },
-      confirmDelete: '确认删除该包？'
+      confirmDelete: '确认删除该包？',
+      confirmBatchDelete: '确认删除选中的 {count} 个应用包？',
+      messages: {
+        deleteSuccess: '删除成功',
+        deleteFailed: '删除失败',
+        deletePartial: '部分应用删除失败：{detail}',
+        inUse: '该应用包正在被部署使用，无法删除',
+        httpError: '请求失败（HTTP {status}）'
+      }
     },
     workers: {
       title: '工作器管理',
@@ -714,7 +752,7 @@ const messages = {
     },
     taskDefs: {
       title: '任务定义',
-      buttons: { refresh: '刷新', create: '创建定义', run: '运行', details: '详情' },
+      buttons: { refresh: '刷新', create: '创建任务定义', run: '运行', details: '详情' },
       columns: { defId: '定义ID', name: '名称', executor: '执行器', target: '目标', latestState: '最新状态', latestTime: '最新时间', action: '操作' },
       dialog: { 
         title: '创建任务定义', 

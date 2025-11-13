@@ -60,7 +60,6 @@ function handleMenuSelect(index: string) {
           <el-menu-item index="/services">{{ t('nav.services') }}</el-menu-item>
           <el-menu-item index="/tasks">{{ t('nav.tasks') }}</el-menu-item>
           <el-menu-item index="/workers">{{ t('nav.workers') }}</el-menu-item>
-          <el-menu-item index="/workflows">{{ t('nav.workflows') }}</el-menu-item>
           <el-menu-item index="/dag-workflows">{{ t('nav.dagWorkflows') }}</el-menu-item>
           <el-menu-item index="/kv-store">{{ t('nav.kvStore') }}</el-menu-item>
           <el-menu-item index="/resources">{{ t('nav.resources') }}</el-menu-item>
