@@ -6,7 +6,7 @@ SHELL := /bin/bash
 .PHONY: plumclient service_client_example service_client_example-run
 .PHONY: examples_worker_demo examples_worker_demo-pkg
 .PHONY: examples_FSL_Plan examples_FSL_Statistics examples_FSL_Sweep examples_FSL_Investigate examples_FSL_Destroy examples_FSL_Evaluate examples_FSL_All examples_FSL_All_Pkg
-.PHONY: examples_SimRoutePlan examples_SimNaviControl examples_SimSonar examples_SimTargetHit examples_SimTargetRecognize examples_Sim_All
+.PHONY: examples_Sim_RoutePlan examples_Sim_NaviControl examples_Sim_Sonar examples_Sim_TargetHit examples_Sim_TargetRecognize examples_Sim__All
 .PHONY: help stop-agent
 
 controller:
@@ -254,34 +254,34 @@ examples_FSL_Evaluate:
 examples_FSL_All: examples_FSL_Plan examples_FSL_Statistics examples_FSL_Sweep examples_FSL_Investigate examples_FSL_Destroy examples_FSL_Evaluate
 	@echo "🎉 All FSL components built."
 
-# ============ Sim 示例 ============
-examples_SimRoutePlan:
-	@echo "Building SimRoutePlan (qmake)..."
-	@cd examples-local/SimRoutePlan && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
-	@echo "✅ SimRoutePlan built: examples-local/SimRoutePlan/bin/SimRoutePlan"
+# ============ Sim_ 示例 ============
+examples_Sim_RoutePlan:
+	@echo "Building Sim_RoutePlan (qmake)..."
+	@cd examples-local/Sim_RoutePlan && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ Sim_RoutePlan built: examples-local/Sim_RoutePlan/bin/Sim_RoutePlan"
 
-examples_SimNaviControl:
-	@echo "Building SimNaviControl (qmake)..."
-	@cd examples-local/SimNaviControl && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
-	@echo "✅ SimNaviControl built: examples-local/SimNaviControl/bin/SimNaviControl"
+examples_Sim_NaviControl:
+	@echo "Building Sim_NaviControl (qmake)..."
+	@cd examples-local/Sim_NaviControl && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ Sim_NaviControl built: examples-local/Sim_NaviControl/bin/Sim_NaviControl"
 
-examples_SimSonar:
-	@echo "Building SimSonar (qmake)..."
-	@cd examples-local/SimSonar && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
-	@echo "✅ SimSonar built: examples-local/SimSonar/bin/SimSonar"
+examples_Sim_Sonar:
+	@echo "Building Sim_Sonar (qmake)..."
+	@cd examples-local/Sim_Sonar && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ Sim_Sonar built: examples-local/Sim_Sonar/bin/Sim_Sonar"
 
-examples_SimTargetHit:
-	@echo "Building SimTargetHit (qmake)..."
-	@cd examples-local/SimTargetHit && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
-	@echo "✅ SimTargetHit built: examples-local/SimTargetHit/bin/SimTargetHit"
+examples_Sim_TargetHit:
+	@echo "Building Sim_TargetHit (qmake)..."
+	@cd examples-local/Sim_TargetHit && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ Sim_TargetHit built: examples-local/Sim_TargetHit/bin/Sim_TargetHit"
 
-examples_SimTargetRecognize:
-	@echo "Building SimTargetRecognize (qmake)..."
-	@cd examples-local/SimTargetRecognize && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
-	@echo "✅ SimTargetRecognize built: examples-local/SimTargetRecognize/bin/SimTargetRecognize"
+examples_Sim_TargetRecognize:
+	@echo "Building Sim_TargetRecognize (qmake)..."
+	@cd examples-local/Sim_TargetRecognize && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ Sim_TargetRecognize built: examples-local/Sim_TargetRecognize/bin/Sim_TargetRecognize"
 
-examples_Sim_All: examples_SimRoutePlan examples_SimNaviControl examples_SimSonar examples_SimTargetHit examples_SimTargetRecognize
-	@echo "🎉 All Sim components built."
+examples_Sim__All: examples_Sim_RoutePlan examples_Sim_NaviControl examples_Sim_Sonar examples_Sim_TargetHit examples_Sim_TargetRecognize
+	@echo "🎉 All Sim_ components built."
 
 examples_FSL_All_Pkg:
 	@echo "📦 Packaging all FSL components..."

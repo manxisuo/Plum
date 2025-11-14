@@ -8,4 +8,4 @@ echo "应用名称: $PLUM_APP_NAME" >> log
 echo "应用版本: $PLUM_APP_VERSION" >> log
 echo "实例ID: $PLUM_INSTANCE_ID" >> log
 
-exec "$SCRIPT_DIR/SimRoutePlan" "$@"
+exec "$SCRIPT_DIR/Sim_RoutePlan" "$@"
