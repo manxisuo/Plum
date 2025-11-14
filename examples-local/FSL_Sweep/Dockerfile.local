@@ -6,12 +6,18 @@
 #   3. 构建镜像: docker build -f examples-local/FSL_Sweep/Dockerfile.local -t fsl-sweep:1.0.0 /tmp/fsl-sweep-deps
 
 # ========== 运行时阶段 ==========
-FROM ubuntu:22.04
+FROM ubuntu:24.04
+
+# 使用国内镜像源加速（可选，如果网络慢可以取消注释）
+# 注意：这会修改 apt 源，如果不需要可以删除这几行
+# RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list || \
+#     sed -i 's|http://archive.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list || true
 
 # 安装运行时依赖（只需要运行时库，不需要编译工具）
+# 这层会被缓存，除非你修改了依赖列表
 RUN apt-get update && apt-get install -y \
     libqt5core5a \
-    libprotobuf23 \
+    libprotobuf32t64 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

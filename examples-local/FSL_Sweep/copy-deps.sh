@@ -139,8 +139,9 @@ if [ -s "$DEPS_FILE" ]; then
     while IFS= read -r lib_path; do
         if [ -n "$lib_path" ] && [ -f "$lib_path" ]; then
             lib_name=$(basename "$lib_path")
-            # 复制 gRPC、protobuf、absl 以及 gRPC 的依赖库（gpr, cares, re2, upb 等）
-            if echo "$lib_name" | grep -qE "(grpc|protobuf|absl|gpr|cares|re2|upb)"; then
+            # 复制 gRPC、protobuf、absl 以及 gRPC 的依赖库（gpr, cares, re2, upb, address_sorting 等）
+            # 同时复制系统库（libc, libstdc++）以解决 GLIBC 版本不匹配问题
+            if echo "$lib_name" | grep -qE "(grpc|protobuf|absl|gpr|cares|re2|upb|address_sorting|ssl|crypto|libc\.so|libstdc\+\+\.so|libm\.so|libgcc_s\.so|libpthread\.so)"; then
                 # 避免重复复制
                 if [[ ! " ${copied_libs[@]} " =~ " ${lib_name} " ]]; then
                     echo "  复制系统库: $lib_name"

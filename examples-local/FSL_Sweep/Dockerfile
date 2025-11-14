@@ -2,7 +2,7 @@
 # 多阶段构建：先编译，再打包运行时镜像
 
 # ========== 构建阶段 ==========
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 # 安装构建依赖
 RUN apt-get update && apt-get install -y \
