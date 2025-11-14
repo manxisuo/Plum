@@ -20,7 +20,6 @@ ui/.eslintcache
 # Go build outputs
 controller/bin/
 controller/dist/
-bin/
 controller/server
 
 # Agent build outputs
@@ -42,10 +41,14 @@ examples/*/*.zip
 
 #examples-local
 examples-local/**/build
+examples-local/**/bin/*
 examples-local/**/*.whl
 examples-local/**/__pycache__
 examples-local/**/*.o
 examples-local/**/tiles
+!examples-local/**/bin/meta.ini
+!examples-local/**/bin/start.sh
+
 
 # gRPC generated files (keep proto files, ignore generated code)
 *.pb.cc
