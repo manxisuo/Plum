@@ -396,6 +396,7 @@ func (m *ProcessManager) GetStatus(instanceID string) (AppStatus, error) {
 		return AppStatus{
 			InstanceID: instanceID,
 			Running:    false,
+			ExitCode:   -1, // 进程不存在，视为异常
 		}, nil
 	}
 
@@ -403,20 +404,28 @@ func (m *ProcessManager) GetStatus(instanceID string) (AppStatus, error) {
 		return AppStatus{
 			InstanceID: instanceID,
 			Running:    false,
+			ExitCode:   -1, // 进程不存在，视为异常
 		}, nil
 	}
 
 	// 检查进程是否还活着
 	running := m.IsRunning(instanceID)
 	pid := 0
+	exitCode := -1
 	if running {
 		pid = cmd.Process.Pid
+	} else {
+		// 进程已退出，尝试获取退出码
+		// 注意：如果进程已经退出，cmd.Wait() 可能已经被调用过
+		// 这里我们无法获取退出码，默认设为 -1（异常退出）
+		exitCode = -1
 	}
 
 	return AppStatus{
 		InstanceID: instanceID,
 		Running:    running,
 		Pid:        pid,
+		ExitCode:   exitCode,
 	}, nil
 }
 

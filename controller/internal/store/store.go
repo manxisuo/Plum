@@ -59,13 +59,17 @@ type Task struct {
 }
 
 type Artifact struct {
-	ArtifactID string
-	AppName    string
-	Version    string
-	Path       string // served URL path, e.g. /artifacts/xxx.zip
-	SHA256     string
-	SizeBytes  int64
-	CreatedAt  int64
+	ArtifactID     string
+	AppName        string
+	Version        string
+	Path           string // served URL path, e.g. /artifacts/xxx.zip (for zip) or empty (for image)
+	SHA256         string
+	SizeBytes      int64
+	CreatedAt      int64
+	Type           string // "zip" or "image"
+	ImageRepository string // Docker image repository, e.g. "openeuler/openeuler"
+	ImageTag       string // Docker image tag, e.g. "22.03"
+	PortMappings   string // JSON string for port mappings, e.g. [{"host":8080,"container":80}]
 }
 
 type DeploymentStatus string

@@ -3,6 +3,7 @@ package grpc
 import (
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -315,7 +316,13 @@ func GetServer() *TaskStreamServer {
 
 // StartServer 启动 gRPC 服务器
 func StartServer(addr string, s store.Store) (*grpc.Server, error) {
-	lis, err := net.Listen("tcp", addr)
+	// 如果 addr 是 0.0.0.0，强制使用 IPv4（tcp4）以确保容器可以连接
+	network := "tcp"
+	if strings.HasPrefix(addr, "0.0.0.0:") {
+		network = "tcp4"
+		log.Printf("[gRPC] Using tcp4 network for %s to ensure IPv4 compatibility", addr)
+	}
+	lis, err := net.Listen(network, addr)
 	if err != nil {
 		return nil, err
 	}

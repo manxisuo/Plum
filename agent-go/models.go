@@ -2,14 +2,18 @@ package main
 
 // Assignment 部署分配
 type Assignment struct {
-	InstanceID   string `json:"instanceId"`
-	DeploymentID string `json:"deploymentId"`
-	NodeID       string `json:"nodeId"`
-	Desired      string `json:"desired"`
-	ArtifactURL  string `json:"artifactUrl"`
-	StartCmd     string `json:"startCmd"`
-	AppName      string `json:"appName"`
-	AppVersion   string `json:"appVersion"`
+	InstanceID      string `json:"instanceId"`
+	DeploymentID    string `json:"deploymentId"`
+	NodeID          string `json:"nodeId"`
+	Desired         string `json:"desired"`
+	ArtifactURL     string `json:"artifactUrl"`
+	StartCmd        string `json:"startCmd"`
+	AppName         string `json:"appName"`
+	AppVersion      string `json:"appVersion"`
+	ArtifactType    string `json:"artifactType,omitempty"` // "zip" or "image"
+	ImageRepository string `json:"imageRepository,omitempty"`
+	ImageTag        string `json:"imageTag,omitempty"`
+	PortMappings    string `json:"portMappings,omitempty"` // JSON string
 }
 
 // InstanceStatus 实例状态

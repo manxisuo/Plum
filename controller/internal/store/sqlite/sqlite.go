@@ -33,7 +33,12 @@ func New(dbPath string) (store.Store, error) {
 		return nil, err
 	}
 	// 在线迁移：为已存在的deployments表添加status列（忽略错误，如果列已存在）
-	db.Exec(`ALTER TABLE deployments ADD COLUMN status TEXT DEFAULT 'Stopped'`)
+	_ = ensureColumn(db, "deployments", "status", "TEXT DEFAULT 'Stopped'")
+	// 在线迁移：为已存在的artifacts表添加新列（忽略错误，如果列已存在）
+	_ = ensureColumn(db, "artifacts", "type", "TEXT DEFAULT 'zip'")
+	_ = ensureColumn(db, "artifacts", "image_repository", "TEXT")
+	_ = ensureColumn(db, "artifacts", "image_tag", "TEXT")
+	_ = ensureColumn(db, "artifacts", "port_mappings", "TEXT")
 	ttl := int64(15)
 	if v := os.Getenv("SERVICE_HEALTH_TTL_SEC"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
@@ -81,7 +86,11 @@ func migrate(db *sql.DB) error {
 			path TEXT,
 			sha256 TEXT,
 			size_bytes INTEGER,
-			created_at INTEGER
+			created_at INTEGER,
+			type TEXT DEFAULT 'zip',
+			image_repository TEXT,
+			image_tag TEXT,
+			port_mappings TEXT
 		);`,
 		`CREATE TABLE IF NOT EXISTS endpoints (
             service_name TEXT,
@@ -556,8 +565,12 @@ func (s *sqliteStore) SaveArtifact(a store.Artifact) (string, error) {
 	if a.ArtifactID == "" {
 		a.ArtifactID = newID()
 	}
-	_, err := s.db.Exec(`INSERT INTO artifacts(artifact_id, app_name, version, path, sha256, size_bytes, created_at) VALUES(?,?,?,?,?,?,?)`,
-		a.ArtifactID, a.AppName, a.Version, a.Path, a.SHA256, a.SizeBytes, a.CreatedAt,
+	// 如果 Type 为空，默认为 "zip"（向后兼容）
+	if a.Type == "" {
+		a.Type = "zip"
+	}
+	_, err := s.db.Exec(`INSERT INTO artifacts(artifact_id, app_name, version, path, sha256, size_bytes, created_at, type, image_repository, image_tag, port_mappings) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+		a.ArtifactID, a.AppName, a.Version, a.Path, a.SHA256, a.SizeBytes, a.CreatedAt, a.Type, a.ImageRepository, a.ImageTag, a.PortMappings,
 	)
 	if err != nil {
 		return "", err
@@ -763,7 +776,7 @@ func (s *sqliteStore) ListServices() ([]string, error) {
 }
 
 func (s *sqliteStore) ListArtifacts() ([]store.Artifact, error) {
-	rows, err := s.db.Query(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at FROM artifacts ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at, type, image_repository, image_tag, port_mappings FROM artifacts ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -771,8 +784,12 @@ func (s *sqliteStore) ListArtifacts() ([]store.Artifact, error) {
 	var out []store.Artifact
 	for rows.Next() {
 		var a store.Artifact
-		if err := rows.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt, &a.Type, &a.ImageRepository, &a.ImageTag, &a.PortMappings); err != nil {
 			return nil, err
+		}
+		// 向后兼容：如果 Type 为空，默认为 "zip"
+		if a.Type == "" {
+			a.Type = "zip"
 		}
 		out = append(out, a)
 	}
@@ -780,9 +797,9 @@ func (s *sqliteStore) ListArtifacts() ([]store.Artifact, error) {
 }
 
 func (s *sqliteStore) GetArtifact(id string) (store.Artifact, bool, error) {
-	row := s.db.QueryRow(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at FROM artifacts WHERE artifact_id=?`, id)
+	row := s.db.QueryRow(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at, type, image_repository, image_tag, port_mappings FROM artifacts WHERE artifact_id=?`, id)
 	var a store.Artifact
-	if err := row.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt); err != nil {
+	if err := row.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt, &a.Type, &a.ImageRepository, &a.ImageTag, &a.PortMappings); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.Artifact{}, false, nil
 		}
@@ -792,13 +809,17 @@ func (s *sqliteStore) GetArtifact(id string) (store.Artifact, bool, error) {
 }
 
 func (s *sqliteStore) GetArtifactByPath(path string) (store.Artifact, bool, error) {
-	row := s.db.QueryRow(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at FROM artifacts WHERE path=?`, path)
+	row := s.db.QueryRow(`SELECT artifact_id, app_name, version, path, sha256, size_bytes, created_at, type, image_repository, image_tag, port_mappings FROM artifacts WHERE path=?`, path)
 	var a store.Artifact
-	if err := row.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt); err != nil {
+	if err := row.Scan(&a.ArtifactID, &a.AppName, &a.Version, &a.Path, &a.SHA256, &a.SizeBytes, &a.CreatedAt, &a.Type, &a.ImageRepository, &a.ImageTag, &a.PortMappings); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return store.Artifact{}, false, nil
 		}
 		return store.Artifact{}, false, err
+	}
+	// 向后兼容：如果 Type 为空，默认为 "zip"
+	if a.Type == "" {
+		a.Type = "zip"
 	}
 	return a, true, nil
 }

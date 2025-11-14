@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 
-type Artifact = { artifactId: string; name: string; version: string; url: string }
+type Artifact = { artifactId: string; name: string; version: string; url: string; type?: string }
 type NodeDTO = { nodeId: string; ip: string }
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
@@ -69,7 +69,12 @@ async function doCreate() {
           }
         }
         if (!Object.keys(replicas).length) throw new Error(t('deployments.create.validation.replicasRequired'))
-        entries.push({ artifactUrl: art.url, startCmd: e.startCmd, replicas })
+        // 对于镜像应用，使用 image://{artifactId} 作为标识符
+        let artifactUrl = art.url
+        if (!artifactUrl && art.type === 'image') {
+          artifactUrl = `image://${art.artifactId}`
+        }
+        entries.push({ artifactUrl: artifactUrl, startCmd: e.startCmd, replicas })
       }
     } else {
       if (!nodeEntriesRows.value.length) throw new Error(t('deployments.create.validation.nodeEntriesRequired'))
@@ -91,8 +96,13 @@ async function doCreate() {
       }
       if (!agg.size) throw new Error(t('deployments.create.validation.replicasRequired'))
       agg.forEach((value) => {
+        // 对于镜像应用，使用 image://{artifactId} 作为标识符
+        let artifactUrl = value.artifact.url
+        if (!artifactUrl && value.artifact.type === 'image') {
+          artifactUrl = `image://${value.artifact.artifactId}`
+        }
         entries.push({
-          artifactUrl: value.artifact.url,
+          artifactUrl: artifactUrl,
           startCmd: value.startCmd,
           replicas: value.replicas
         })

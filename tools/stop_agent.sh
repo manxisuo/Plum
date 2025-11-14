@@ -29,8 +29,4 @@ else
     fi
 fi
 
-# 清理可能的孤儿进程
-echo "清理HelloUI进程..."
-pkill -f HelloUI
-
 echo "停止完成"

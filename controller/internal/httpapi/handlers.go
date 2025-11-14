@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/manxisuo/plum/controller/internal/failover"
@@ -30,16 +31,20 @@ type LeaseAck struct {
 }
 
 type Assignment struct {
-	InstanceID   string `json:"instanceId"`
-	DeploymentID string `json:"deploymentId"`
-	Desired      string `json:"desired"`
-	ArtifactURL  string `json:"artifactUrl"`
-	StartCmd     string `json:"startCmd"`
-	AppName      string `json:"appName"`    // 应用名称
-	AppVersion   string `json:"appVersion"` // 应用版本
-	Phase        string `json:"phase"`
-	Healthy      bool   `json:"healthy"`
-	LastReport   int64  `json:"lastReportAt"`
+	InstanceID      string `json:"instanceId"`
+	DeploymentID    string `json:"deploymentId"`
+	Desired         string `json:"desired"`
+	ArtifactURL     string `json:"artifactUrl"`
+	StartCmd        string `json:"startCmd"`
+	AppName         string `json:"appName"`                // 应用名称
+	AppVersion      string `json:"appVersion"`             // 应用版本
+	ArtifactType    string `json:"artifactType,omitempty"` // "zip" or "image"
+	ImageRepository string `json:"imageRepository,omitempty"`
+	ImageTag        string `json:"imageTag,omitempty"`
+	PortMappings    string `json:"portMappings,omitempty"` // JSON string
+	Phase           string `json:"phase"`
+	Healthy         bool   `json:"healthy"`
+	LastReport      int64  `json:"lastReportAt"`
 }
 
 type Assignments struct {
@@ -173,6 +178,44 @@ func handleGetAssignments(w http.ResponseWriter, r *http.Request) {
 			AppName:      a.AppName,
 			AppVersion:   a.AppVersion,
 		}
+
+		// 获取 artifact 信息（类型、镜像信息等）
+		var artifact store.Artifact
+		var artifactFound bool
+		if strings.HasPrefix(a.ArtifactURL, "image://") {
+			// 镜像应用标识符格式：image://{artifactId}
+			artifactID := strings.TrimPrefix(a.ArtifactURL, "image://")
+			if art, ok, _ := store.Current.GetArtifact(artifactID); ok {
+				artifact = art
+				artifactFound = true
+			}
+		} else if a.ArtifactURL != "" {
+			// ZIP 应用：通过路径查找
+			if art, ok, _ := store.Current.GetArtifactByPath(a.ArtifactURL); ok {
+				artifact = art
+				artifactFound = true
+			}
+		}
+		// 如果通过路径找不到，尝试通过 AppName 和 AppVersion 查找（向后兼容）
+		if !artifactFound && a.AppName != "" && a.AppVersion != "" {
+			artifacts, _ := store.Current.ListArtifacts()
+			for _, art := range artifacts {
+				if art.AppName == a.AppName && art.Version == a.AppVersion {
+					artifact = art
+					artifactFound = true
+					break
+				}
+			}
+		}
+		if artifactFound {
+			item.ArtifactType = artifact.Type
+			if artifact.Type == "image" {
+				item.ImageRepository = artifact.ImageRepository
+				item.ImageTag = artifact.ImageTag
+				item.PortMappings = artifact.PortMappings
+			}
+		}
+
 		if ok {
 			item.Phase = st.Phase
 			item.Healthy = st.Healthy
@@ -236,16 +279,32 @@ func handleCreateDeployment(w http.ResponseWriter, r *http.Request) {
 				iid := store.Current.NewInstanceID(deploymentID)
 				// 从artifact URL中获取app信息
 				var appName, appVersion string
-				if artifact, ok, _ := store.Current.GetArtifactByPath(e.Artifact); ok {
-					appName = artifact.AppName
-					appVersion = artifact.Version
+				artifactURL := e.Artifact
+				var artifact store.Artifact
+
+				// 检查是否是镜像应用的标识符格式 image://{artifactId}
+				if strings.HasPrefix(e.Artifact, "image://") {
+					artifactID := strings.TrimPrefix(e.Artifact, "image://")
+					if art, ok, _ := store.Current.GetArtifact(artifactID); ok {
+						artifact = art
+						appName = artifact.AppName
+						appVersion = artifact.Version
+					}
+				} else if e.Artifact != "" {
+					// 通过路径查找（ZIP 应用）
+					if art, ok, _ := store.Current.GetArtifactByPath(e.Artifact); ok {
+						artifact = art
+						appName = artifact.AppName
+						appVersion = artifact.Version
+					}
 				}
+
 				_ = store.Current.AddAssignment(nodeID, store.Assignment{
 					InstanceID:   iid,
 					DeploymentID: deploymentID,
 					NodeID:       nodeID,
 					Desired:      store.DesiredRunning,
-					ArtifactURL:  e.Artifact,
+					ArtifactURL:  artifactURL,
 					StartCmd:     e.StartCmd,
 					AppName:      appName,
 					AppVersion:   appVersion,

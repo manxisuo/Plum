@@ -170,7 +170,25 @@ const messages = {
       uploadZip: 'Upload App ZIP',
       zipTip: 'Package must include start.sh and meta.ini(name/version)',
       uploadDescription: 'Upload a ZIP file containing your application package with start.sh and meta.ini',
-      buttons: { refresh: 'Refresh', selectUpload: 'Select ZIP file(s)', batchDelete: 'Delete Selected' },
+      buttons: { refresh: 'Refresh', selectUpload: 'Select ZIP file(s)', createFromImage: 'Create from Image', batchDelete: 'Delete Selected' },
+      createImage: {
+        title: 'Create App from Image',
+        name: 'App Name',
+        version: 'Version',
+        imageRepository: 'Image Repository',
+        imageTag: 'Image Tag',
+        portMappings: 'Port Mappings',
+        addPortMapping: 'Add Port Mapping',
+        hostPort: 'Host Port',
+        containerPort: 'Container Port',
+        remove: 'Remove',
+        submit: 'Create',
+        cancel: 'Cancel',
+        example: {
+          repository: 'e.g., openeuler/openeuler',
+          tag: 'e.g., 22.03'
+        }
+      },
       stats: { total: 'Total' },
       table: { title: 'Application Packages', items: 'items' },
       columns: { app: 'App', version: 'Version', artifact: 'Artifact', sizeBytes: 'Size(Bytes)', uploadedAt: 'UploadedAt', action: 'Action' },
@@ -626,7 +644,25 @@ const messages = {
       uploadZip: '上传应用包（ZIP）',
       zipTip: '包内需包含 start.sh 与 meta.ini(name/version)',
       uploadDescription: '上传包含应用程序包的ZIP文件，需要包含start.sh和meta.ini文件',
-      buttons: { refresh: '刷新', selectUpload: '选择并上传 ZIP', batchDelete: '批量删除' },
+      buttons: { refresh: '刷新', selectUpload: '选择并上传 ZIP', createFromImage: '使用镜像创建', batchDelete: '批量删除' },
+      createImage: {
+        title: '使用镜像创建应用',
+        name: '应用名称',
+        version: '版本',
+        imageRepository: '镜像仓库',
+        imageTag: '镜像标签',
+        portMappings: '端口映射',
+        addPortMapping: '添加端口映射',
+        hostPort: '主机端口',
+        containerPort: '容器端口',
+        remove: '删除',
+        submit: '创建',
+        cancel: '取消',
+        example: {
+          repository: '例如：openeuler/openeuler',
+          tag: '例如：22.03'
+        }
+      },
       stats: { total: '总数' },
       table: { title: '应用包列表', items: '项' },
       columns: { app: '应用', version: '版本', artifact: '制品', sizeBytes: '大小(字节)', uploadedAt: '上传时间', action: '操作' },

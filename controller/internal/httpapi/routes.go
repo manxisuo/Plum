@@ -30,6 +30,8 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/discovery/one", withCORS(handleDiscoverOne))
 	mux.HandleFunc("/v1/apps", withCORS(handleListApps))
 	mux.HandleFunc("/v1/apps/upload", withCORS(handleAppUpload))
+	mux.HandleFunc("/v1/apps/create-image", withCORS(handleCreateImageApp))
+	mux.HandleFunc("/v1/apps/docker-images", withCORS(handleListDockerImages))
 	mux.HandleFunc("/v1/apps/", withCORS(handleDeleteApp))
 	mux.HandleFunc("/v1/assignments", withCORS(handleGetAssignments))
 	mux.HandleFunc("/v1/assignments/", withCORS(handleAssignmentByID))

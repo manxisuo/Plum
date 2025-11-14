@@ -2,12 +2,16 @@ package httpapi
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,13 +20,17 @@ import (
 )
 
 type AppInfo struct {
-	ArtifactID string `json:"artifactId"`
-	Name       string `json:"name"`
-	Version    string `json:"version"`
-	URL        string `json:"url"` // /artifacts/<file>
-	SHA256     string `json:"sha256"`
-	SizeBytes  int64  `json:"sizeBytes"`
-	CreatedAt  int64  `json:"createdAt"`
+	ArtifactID      string `json:"artifactId"`
+	Name            string `json:"name"`
+	Version         string `json:"version"`
+	URL             string `json:"url"` // /artifacts/<file> (for zip) or empty (for image)
+	SHA256          string `json:"sha256"`
+	SizeBytes       int64  `json:"sizeBytes"`
+	CreatedAt       int64  `json:"createdAt"`
+	Type            string `json:"type"` // "zip" or "image"
+	ImageRepository string `json:"imageRepository,omitempty"`
+	ImageTag        string `json:"imageTag,omitempty"`
+	PortMappings    string `json:"portMappings,omitempty"` // JSON string
 }
 
 // POST /v1/apps/upload (multipart/form-data: file)
@@ -139,6 +147,86 @@ func handleAppUpload(w http.ResponseWriter, r *http.Request) {
 		SHA256:     sum,
 		SizeBytes:  size,
 		CreatedAt:  time.Now().Unix(),
+		Type:       "zip",
+	})
+}
+
+// POST /v1/apps/create-image (JSON body)
+func handleCreateImageApp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name            string                   `json:"name"`
+		Version         string                   `json:"version"`
+		ImageRepository string                   `json:"imageRepository"`
+		ImageTag        string                   `json:"imageTag"`
+		PortMappings    []map[string]interface{} `json:"portMappings"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" || req.Version == "" || req.ImageRepository == "" || req.ImageTag == "" {
+		http.Error(w, "name, version, imageRepository, and imageTag are required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if app with same name and version already exists
+	artifacts, err := store.Current.ListArtifacts()
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	for _, a := range artifacts {
+		if a.AppName == req.Name && a.Version == req.Version {
+			http.Error(w, fmt.Sprintf("应用 %s 版本 %s 已存在", req.Name, req.Version), http.StatusConflict)
+			return
+		}
+	}
+
+	// Serialize port mappings to JSON
+	portMappingsJSON := ""
+	if len(req.PortMappings) > 0 {
+		bytes, err := json.Marshal(req.PortMappings)
+		if err != nil {
+			http.Error(w, "invalid port mappings: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		portMappingsJSON = string(bytes)
+	}
+
+	// Generate artifact ID and save
+	id, err := store.Current.SaveArtifact(store.Artifact{
+		AppName:         req.Name,
+		Version:         req.Version,
+		Path:            "", // No file path for image-based apps
+		SHA256:          "", // No SHA256 for image-based apps
+		SizeBytes:       0,  // No size for image-based apps
+		CreatedAt:       time.Now().Unix(),
+		Type:            "image",
+		ImageRepository: req.ImageRepository,
+		ImageTag:        req.ImageTag,
+		PortMappings:    portMappingsJSON,
+	})
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, AppInfo{
+		ArtifactID:      id,
+		Name:            req.Name,
+		Version:         req.Version,
+		URL:             "",
+		SHA256:          "",
+		SizeBytes:       0,
+		CreatedAt:       time.Now().Unix(),
+		Type:            "image",
+		ImageRepository: req.ImageRepository,
+		ImageTag:        req.ImageTag,
+		PortMappings:    portMappingsJSON,
 	})
 }
 
@@ -156,13 +244,17 @@ func handleListApps(w http.ResponseWriter, r *http.Request) {
 	out := make([]AppInfo, 0, len(arts))
 	for _, a := range arts {
 		out = append(out, AppInfo{
-			ArtifactID: a.ArtifactID,
-			Name:       a.AppName,
-			Version:    a.Version,
-			URL:        a.Path,
-			SHA256:     a.SHA256,
-			SizeBytes:  a.SizeBytes,
-			CreatedAt:  a.CreatedAt,
+			ArtifactID:      a.ArtifactID,
+			Name:            a.AppName,
+			Version:         a.Version,
+			URL:             a.Path,
+			SHA256:          a.SHA256,
+			SizeBytes:       a.SizeBytes,
+			CreatedAt:       a.CreatedAt,
+			Type:            a.Type,
+			ImageRepository: a.ImageRepository,
+			ImageTag:        a.ImageTag,
+			PortMappings:    a.PortMappings,
 		})
 	}
 	writeJSON(w, out)
@@ -242,4 +334,60 @@ func getDataDir() string {
 		return v
 	}
 	return "."
+}
+
+// DockerImageInfo Docker 镜像信息
+type DockerImageInfo struct {
+	Repository string `json:"repository"`
+	Tag        string `json:"tag"`
+	ImageID    string `json:"imageId"`
+	Created    string `json:"created"`
+	Size       string `json:"size"`
+}
+
+// GET /v1/apps/docker-images
+// 查询本地 Docker 镜像列表
+func handleListDockerImages(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 执行 docker images 命令
+	cmd := exec.Command("docker", "images", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}\t{{.Size}}")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		// Docker 命令执行失败，返回空列表而不是错误
+		// 这样前端可以正常显示，只是没有可选的镜像列表
+		log.Printf("Failed to list docker images: %v, stderr: %s", err, stderr.String())
+		writeJSON(w, []DockerImageInfo{})
+		return
+	}
+
+	// 解析输出
+	output := stdout.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	images := make([]DockerImageInfo, 0, len(lines))
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 5 {
+			images = append(images, DockerImageInfo{
+				Repository: parts[0],
+				Tag:        parts[1],
+				ImageID:    parts[2],
+				Created:    parts[3],
+				Size:       parts[4],
+			})
+		}
+	}
+
+	writeJSON(w, images)
 }

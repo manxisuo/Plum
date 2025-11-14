@@ -12,6 +12,10 @@ type Artifact = {
 	sha256: string
 	sizeBytes: number
 	createdAt: number
+	type?: string // "zip" or "image"
+	imageRepository?: string
+	imageTag?: string
+	portMappings?: string // JSON string
 }
 
 type DeleteResult = {
@@ -27,6 +31,21 @@ const deleting = ref(false)
 const items = ref<Artifact[]>([])
 const selectedIds = ref<string[]>([])
 const uploadUrl = `${API_BASE}/v1/apps/upload`
+
+// 镜像创建相关
+const showImageDialog = ref(false)
+const imageForm = ref({
+	name: '',
+	version: '',
+	imageRepository: '',
+	imageTag: '',
+	portMappings: [] as Array<{ host: number; container: number }>
+})
+const creating = ref(false)
+const dockerImages = ref<Array<{ repository: string; tag: string; imageId: string; created: string; size: string }>>([])
+const loadingImages = ref(false)
+const imageRepositoryOptions = ref<string[]>([])
+const imageTagOptions = ref<string[]>([])
 
 const { t } = useI18n()
 
@@ -234,6 +253,110 @@ function formatTimestamp(timestamp: number): string {
   if (!timestamp) return ''
   return new Date(timestamp * 1000).toLocaleString()
 }
+
+function resetImageForm() {
+  imageForm.value = {
+    name: '',
+    version: '',
+    imageRepository: '',
+    imageTag: '',
+    portMappings: []
+  }
+}
+
+// 加载 Docker 镜像列表
+async function loadDockerImages() {
+  loadingImages.value = true
+  try {
+    const res = await fetch(`${API_BASE}/v1/apps/docker-images`)
+    if (!res.ok) {
+      // 如果 API 失败，静默处理（可能是 Docker 不可用）
+      dockerImages.value = []
+      return
+    }
+    const data = await res.json()
+    dockerImages.value = Array.isArray(data) ? data : []
+    
+    // 提取唯一的仓库名称
+    const repos = new Set<string>()
+    dockerImages.value.forEach(img => {
+      if (img.repository && img.repository !== '<none>') {
+        repos.add(img.repository)
+      }
+    })
+    imageRepositoryOptions.value = Array.from(repos).sort()
+    
+    // 更新标签选项（基于选中的仓库）
+    updateTagOptions()
+  } catch (e: any) {
+    // 静默处理错误（Docker 可能不可用）
+    dockerImages.value = []
+    imageRepositoryOptions.value = []
+    imageTagOptions.value = []
+  } finally {
+    loadingImages.value = false
+  }
+}
+
+// 根据选中的仓库更新标签选项
+function updateTagOptions() {
+  if (!imageForm.value.imageRepository) {
+    imageTagOptions.value = []
+    return
+  }
+  const tags = dockerImages.value
+    .filter(img => img.repository === imageForm.value.imageRepository && img.tag !== '<none>')
+    .map(img => img.tag)
+  imageTagOptions.value = Array.from(new Set(tags)).sort()
+}
+
+// 当仓库改变时，更新标签选项并清空当前标签
+function onRepositoryChange() {
+  updateTagOptions()
+  // 如果当前标签不在新选项中，清空它
+  if (imageForm.value.imageTag && !imageTagOptions.value.includes(imageForm.value.imageTag)) {
+    imageForm.value.imageTag = ''
+  }
+}
+
+// 打开镜像创建对话框时加载镜像列表
+function openImageDialog() {
+  showImageDialog.value = true
+  loadDockerImages()
+}
+
+async function createImageApp() {
+  if (!imageForm.value.name || !imageForm.value.version || !imageForm.value.imageRepository || !imageForm.value.imageTag) {
+    ElMessage.error('请填写所有必填字段')
+    return
+  }
+  creating.value = true
+  try {
+    const portMappings = imageForm.value.portMappings.filter(m => m.host > 0 && m.container > 0)
+    const res = await fetch(`${API_BASE}/v1/apps/create-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: imageForm.value.name,
+        version: imageForm.value.version,
+        imageRepository: imageForm.value.imageRepository,
+        imageTag: imageForm.value.imageTag,
+        portMappings: portMappings
+      })
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text || `HTTP ${res.status}`)
+    }
+    ElMessage.success('创建成功')
+    showImageDialog.value = false
+    load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '创建失败')
+  } finally {
+    creating.value = false
+  }
+}
 </script>
 
 <template>
@@ -261,6 +384,9 @@ function formatTimestamp(timestamp: number): string {
             {{ t('apps.buttons.selectUpload') }}
           </el-button>
         </el-upload>
+                <el-button type="primary" @click="openImageDialog">
+                  {{ t('apps.buttons.createFromImage') }}
+                </el-button>
         <el-button
           type="danger"
           :disabled="!selectedIds.length"
@@ -307,11 +433,25 @@ function formatTimestamp(timestamp: number): string {
         <el-table-column type="selection" width="48" />
         <el-table-column prop="name" :label="t('apps.columns.app')" width="200" />
         <el-table-column prop="version" :label="t('apps.columns.version')" width="100" />
+        <el-table-column label="类型" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.type === 'image' ? 'success' : 'info'" size="small">
+              {{ row.type === 'image' ? '镜像' : 'ZIP' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('apps.columns.artifact')">
           <template #default="{ row }">
-            <a :href="artifactHref(row)" target="_blank" style="color:#409EFF; text-decoration:none;">
-              {{ artifactHref(row) }}
-            </a>
+            <template v-if="row.type === 'image'">
+              <span style="color:#67C23A; font-family: monospace;">
+                {{ row.imageRepository }}:{{ row.imageTag }}
+              </span>
+            </template>
+            <template v-else>
+              <a :href="artifactHref(row)" target="_blank" style="color:#409EFF; text-decoration:none;">
+                {{ artifactHref(row) }}
+              </a>
+            </template>
           </template>
         </el-table-column>
         <el-table-column prop="sizeBytes" :label="t('apps.columns.sizeBytes')" width="140">
@@ -349,6 +489,90 @@ function formatTimestamp(timestamp: number): string {
         />
       </div>
     </el-card>
+
+    <!-- 使用镜像创建应用弹窗 -->
+    <el-dialog
+      v-model="showImageDialog"
+      :title="t('apps.createImage.title')"
+      width="600px"
+      @close="resetImageForm"
+    >
+      <el-form :model="imageForm" label-width="120px">
+        <el-form-item :label="t('apps.createImage.name')" required>
+          <el-input v-model="imageForm.name" :placeholder="t('apps.createImage.name')" />
+        </el-form-item>
+        <el-form-item :label="t('apps.createImage.version')" required>
+          <el-input v-model="imageForm.version" :placeholder="t('apps.createImage.version')" />
+        </el-form-item>
+        <el-form-item :label="t('apps.createImage.imageRepository')" required>
+          <el-select
+            v-model="imageForm.imageRepository"
+            :placeholder="t('apps.createImage.example.repository')"
+            filterable
+            allow-create
+            default-first-option
+            style="width: 100%"
+            @change="onRepositoryChange"
+          >
+            <el-option
+              v-for="repo in imageRepositoryOptions"
+              :key="repo"
+              :label="repo"
+              :value="repo"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('apps.createImage.imageTag')" required>
+          <el-select
+            v-model="imageForm.imageTag"
+            :placeholder="t('apps.createImage.example.tag')"
+            filterable
+            allow-create
+            default-first-option
+            style="width: 100%"
+            :disabled="!imageForm.imageRepository"
+          >
+            <el-option
+              v-for="tag in imageTagOptions"
+              :key="tag"
+              :label="tag"
+              :value="tag"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('apps.createImage.portMappings')">
+          <div v-for="(mapping, index) in imageForm.portMappings" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <el-input-number
+              v-model="mapping.host"
+              :placeholder="t('apps.createImage.hostPort')"
+              :min="1"
+              :max="65535"
+              style="flex: 1"
+            />
+            <span style="line-height: 32px;">:</span>
+            <el-input-number
+              v-model="mapping.container"
+              :placeholder="t('apps.createImage.containerPort')"
+              :min="1"
+              :max="65535"
+              style="flex: 1"
+            />
+            <el-button type="danger" size="small" @click="imageForm.portMappings.splice(index, 1)">
+              {{ t('apps.createImage.remove') }}
+            </el-button>
+          </div>
+          <el-button type="primary" size="small" @click="imageForm.portMappings.push({ host: 0, container: 0 })">
+            {{ t('apps.createImage.addPortMapping') }}
+          </el-button>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showImageDialog = false">{{ t('apps.createImage.cancel') }}</el-button>
+        <el-button type="primary" :loading="creating" @click="createImageApp">
+          {{ t('apps.createImage.submit') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

@@ -40,6 +40,7 @@ type AppStatus struct {
 	Running     bool
 	Pid         int    // 进程模式：进程ID；容器模式：容器PID（通常为0）
 	ContainerID string // 容器模式：容器ID；进程模式：空
+	ExitCode    int    // 退出码（仅当 Running=false 时有效，0表示正常退出，非0表示异常退出）
 }
 
 // ManagerConfig 管理器配置

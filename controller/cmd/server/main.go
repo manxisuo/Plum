@@ -2,10 +2,12 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/joho/godotenv"
@@ -51,7 +53,8 @@ func main() {
 
 	addr := os.Getenv("CONTROLLER_ADDR")
 	if addr == "" {
-		addr = ":8080"
+		// 默认监听所有 IPv4 接口，确保容器可以连接
+		addr = "0.0.0.0:8080"
 	}
 
 	// init sqlite store (pure go driver)
@@ -109,7 +112,8 @@ func main() {
 	// start gRPC server for worker connections
 	grpcAddr := os.Getenv("CONTROLLER_GRPC_ADDR")
 	if grpcAddr == "" {
-		grpcAddr = ":9090"
+		// 默认监听所有 IPv4 接口，确保容器可以连接
+		grpcAddr = "0.0.0.0:9090"
 	}
 	grpcServer, err := grpcserver.StartServer(grpcAddr, store.Current)
 	if err != nil {
@@ -130,6 +134,13 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// 启动服务器
+	// 如果 addr 是 0.0.0.0，强制使用 IPv4（tcp4）以确保容器可以连接
+	network := "tcp"
+	if strings.HasPrefix(addr, "0.0.0.0:") {
+		network = "tcp4"
+		log.Printf("Using tcp4 network for %s to ensure IPv4 compatibility", addr)
+	}
+	
 	server := &http.Server{
 		Addr:    addr,
 		Handler: wrappedMux, // 使用包装后的处理器
@@ -137,7 +148,12 @@ func main() {
 
 	go func() {
 		log.Printf("controller listening on %s", addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		// 使用自定义 Listener 强制 IPv4
+		lis, err := net.Listen(network, addr)
+		if err != nil {
+			log.Fatalf("failed to listen on %s: %v", addr, err)
+		}
+		if err := server.Serve(lis); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
 	}()
