@@ -4,7 +4,8 @@
 set -euo pipefail
 
 TARGET_DIR="offline-pip-packages"
-PYTHON_VERSION="${PYTHON_VERSION:-38}"
+# Ubuntu 24.04 使用 Python 3.12，但也可以使用 3.11 的包（兼容）
+PYTHON_VERSION="${PYTHON_VERSION:-312}"
 PLATFORM="${PLATFORM:-manylinux2014_aarch64}"
 
 echo "🚀 下载 Flask 与 Requests 的离线包（目标平台: ${PLATFORM}, Python 版本: ${PYTHON_VERSION})"

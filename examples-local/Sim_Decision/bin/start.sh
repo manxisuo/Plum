@@ -1,25 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # SimDecision 启动脚本
 
-cd "$(dirname "$0")"
+set -euo pipefail
 
-# 检查 Python 环境
-if ! command -v python3 &> /dev/null; then
-    echo "错误: 未找到 python3，请先安装 Python 3"
-    exit 1
-fi
+# 在 Docker 容器中，start.sh 在 /app/start.sh，app.py 在 /app/app.py
+# Dockerfile 已经设置了 WORKDIR /app，所以直接使用当前目录
+cd /app
 
-# 检查依赖
-if ! python3 -c "import flask" 2>/dev/null; then
-    echo "警告: Flask 未安装，正在尝试安装..."
-    pip3 install -r ../requirements.txt || {
-        echo "错误: 无法安装依赖，请手动执行: pip3 install -r requirements.txt"
-        exit 1
-    }
-fi
+export PYTHONUNBUFFERED=1
+export FLASK_APP=app.py
+export FLASK_ENV=production
 
 # 启动应用
-export FLASK_APP=../app.py
-export FLASK_ENV=production
-python3 ../app.py
-
+exec python3 app.py
