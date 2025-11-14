@@ -2,8 +2,10 @@ SHELL := /bin/bash
 
 .PHONY: controller controller-run agent agent-run agent-run-multi agent-clean agent-help demo ui ui-dev ui-build proto proto-clean
 .PHONY: sdk_cpp sdk_cpp_mirror sdk_cpp_echo_worker sdk_cpp_echo_worker-run
+.PHONY: sdk_cpp_offline sdk_cpp_radar_sensor sdk_cpp_radar_sensor-run
 .PHONY: plumclient service_client_example service_client_example-run
 .PHONY: examples_worker_demo examples_worker_demo-pkg
+.PHONY: examples_FSL_Plan examples_FSL_Statistics examples_FSL_Sweep examples_FSL_Investigate examples_FSL_Destroy examples_FSL_Evaluate examples_FSL_All examples_FSL_All_Pkg
 .PHONY: help stop-agent
 
 controller:
@@ -123,7 +125,7 @@ ui-build:
 
 # SDK C++ (library and examples)
 sdk_cpp:
-	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release
+	cmake -S sdk/cpp -B sdk/cpp/build -DCMAKE_BUILD_TYPE=Release -DUSE_OFFLINE_DEPS=OFF
 	cmake --build sdk/cpp/build --config Release -j
 
 # SDK C++ (离线模式，不使用网络下载依赖)
@@ -214,6 +216,52 @@ examples_worker_demo-pkg: examples_worker_demo
 		rm -rf package
 	@echo "✅ Package created: examples/worker-demo/worker-demo-$$(grep '^version=' examples/worker-demo/meta.ini | cut -d'=' -f2 | tr -d ' ').zip"
 	@ls -lh examples/worker-demo/worker-demo-*.zip | tail -1
+
+# ============ FSL 示例 ============
+QMAKE ?= qmake
+
+examples_FSL_Plan:
+	@echo "Building FSL_Plan (qmake)..."
+	@cd examples-local/FSL_Plan && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ FSL_Plan built: examples-local/FSL_Plan/bin/FSL_Plan"
+
+examples_FSL_Statistics:
+	@echo "Building FSL_Statistics (qmake)..."
+	@cd examples-local/FSL_Statistics && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ FSL_Statistics built: examples-local/FSL_Statistics/bin/FSL_Statistics"
+
+examples_FSL_Sweep:
+	@echo "Building FSL_Sweep (qmake)..."
+	@cd examples-local/FSL_Sweep && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ FSL_Sweep built: examples-local/FSL_Sweep/bin/FSL_Sweep"
+
+examples_FSL_Investigate:
+	@echo "Building FSL_Investigate (qmake)..."
+	@cd examples-local/FSL_Investigate && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ FSL_Investigate built: examples-local/FSL_Investigate/bin/FSL_Investigate"
+
+examples_FSL_Destroy:
+	@echo "Building FSL_Destroy (qmake)..."
+	@cd examples-local/FSL_Destroy && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ FSL_Destroy built: examples-local/FSL_Destroy/bin/FSL_Destroy"
+
+examples_FSL_Evaluate:
+	@echo "Building FSL_Evaluate (qmake)..."
+	@cd examples-local/FSL_Evaluate && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
+	@echo "✅ FSL_Evaluate built: examples-local/FSL_Evaluate/bin/FSL_Evaluate"
+
+examples_FSL_All: examples_FSL_Plan examples_FSL_Statistics examples_FSL_Sweep examples_FSL_Investigate examples_FSL_Destroy examples_FSL_Evaluate
+	@echo "🎉 All FSL components built."
+
+examples_FSL_All_Pkg:
+	@echo "📦 Packaging all FSL components..."
+	@tools/pkg_app.sh examples-local/FSL_Destroy/bin && \
+	 tools/pkg_app.sh examples-local/FSL_Sweep/bin && \
+	 tools/pkg_app.sh examples-local/FSL_Investigate/bin && \
+	 tools/pkg_app.sh examples-local/FSL_Plan/bin && \
+	 tools/pkg_app.sh examples-local/FSL_Evaluate/bin && \
+	 tools/pkg_app.sh examples-local/FSL_Statistics/bin
+	@echo "✅ All FSL components packaged."
 
 # ============ 帮助信息 ============
 help:

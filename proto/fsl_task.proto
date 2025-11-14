@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package fsl;
+
+option go_package = "github.com/plum/fsl";
+
+message LatLon {
+  double lat = 1;
+  double lon = 2;
+}
+
+message Rectangle {
+  LatLon top_left = 1;
+  LatLon bottom_right = 2;
+}
+
+message Ting {
+  string id = 1;
+  string name = 2;
+  LatLon position = 3;
+  double speed_mps = 4;
+  double sonar_range_m = 5;
+  double suspect_prob = 6;
+  double confirm_prob = 7;
+}
+
+message Mine {
+  string id = 1;
+  LatLon position = 2;
+  string status = 3; // suspect|confirmed|destroyed|cleared
+  string assigned_ting = 4;
+}
+
+message TrackPoint {
+  string ting_id = 1;
+  string phase = 2;
+  string timestamp = 3;
+  LatLon position = 4;
+}
+
+message SweepRequest {
+  repeated Ting tings = 1;
+  repeated Rectangle work_zones = 2;
+  int32 random_seed = 3;
+}
+
+message SweepResponse {
+  repeated Mine mines = 1;
+  repeated TrackPoint tracks = 2;
+}
+
+message InvestigateRequest {
+  repeated Ting tings = 1;
+  repeated Mine suspect_mines = 2;
+}
+
+message InvestigateResponse {
+  repeated Mine confirmed_mines = 1;
+  repeated Mine cleared_mines = 2;
+  repeated TrackPoint tracks = 3;
+}
+
+message DestroyRequest {
+  repeated Ting tings = 1;
+  repeated Mine confirmed_mines = 2;
+}
+
+message DestroyResponse {
+  repeated Mine destroyed_mines = 1;
+  repeated TrackPoint tracks = 2;
+}
+
+service FslSweep {
+  rpc Execute(SweepRequest) returns (SweepResponse);
+}
+
+service FslInvestigate {
+  rpc Execute(InvestigateRequest) returns (InvestigateResponse);
+}
+
+service FslDestroy {
+  rpc Execute(DestroyRequest) returns (DestroyResponse);
+}
+
