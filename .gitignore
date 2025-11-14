@@ -46,6 +46,7 @@ examples-local/**/*.whl
 examples-local/**/__pycache__
 examples-local/**/*.o
 examples-local/**/tiles
+examples-local/**/pro.user
 !examples-local/**/bin/meta.ini
 !examples-local/**/bin/start.sh
 

@@ -1,15 +1,15 @@
-# FSL_Sweep Docker 镜像（使用宿主机构建产物）
+# FSL 项目通用 Dockerfile（使用宿主机构建产物）
 # 此 Dockerfile 假设已经使用 copy-deps.sh 脚本准备了依赖文件
 # 使用方法：
-#   1. 在项目根目录执行: make examples_FSL_Sweep
-#   2. 执行: ./examples-local/FSL_Sweep/copy-deps.sh /tmp/fsl-sweep-deps
-#   3. 构建镜像: docker build -f examples-local/FSL_Sweep/Dockerfile.local -t fsl-sweep:1.0.0 /tmp/fsl-sweep-deps
+#   1. 在项目根目录执行: make examples_<项目名>
+#   2. 执行: ./examples-local/copy-deps.sh <项目名> /tmp/<项目名>-deps
+#   3. 构建镜像: docker buildx build --platform linux/arm64 --load -f examples-local/Dockerfile.local.template --build-arg APP_NAME=<项目名> -t <项目名>:1.0.0 /tmp/<项目名>-deps
 
-# ========== 运行时阶段 ==========
 FROM ubuntu:24.04
 
+ARG APP_NAME
+
 # 使用国内镜像源加速（可选，如果网络慢可以取消注释）
-# 注意：这会修改 apt 源，如果不需要可以删除这几行
 # RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list || \
 #     sed -i 's|http://archive.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list || true
 
@@ -25,7 +25,9 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # 从构建上下文复制已准备的文件（由 copy-deps.sh 脚本准备）
-COPY bin/FSL_Sweep /app/FSL_Sweep
+# 注意：APP_NAME 通过 --build-arg 传递
+ARG APP_NAME
+COPY bin/${APP_NAME} /app/${APP_NAME}
 COPY bin/start.sh /app/start.sh
 COPY bin/meta.ini /app/meta.ini
 
@@ -33,7 +35,7 @@ COPY bin/meta.ini /app/meta.ini
 COPY lib/ /app/lib/
 
 # 设置可执行权限
-RUN chmod +x /app/FSL_Sweep /app/start.sh
+RUN chmod +x /app/${APP_NAME} /app/start.sh
 
 # 设置环境变量
 ENV LD_LIBRARY_PATH=/app/lib

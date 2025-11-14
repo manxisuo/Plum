@@ -1,28 +1,36 @@
 #!/bin/bash
-# 复制 FSL_Sweep 的依赖库到指定目录，用于 Docker 镜像构建
-# 使用方法: ./copy-deps.sh <target_dir>
+# 通用的 FSL 项目依赖库复制脚本
+# 使用方法: ./copy-deps.sh <项目名> <target_dir>
+# 示例: ./copy-deps.sh FSL_Sweep /tmp/fsl-sweep-deps
 
 set -e
 
-if [ $# -lt 1 ]; then
-    echo "用法: $0 <target_dir>"
-    echo "示例: $0 /tmp/fsl-sweep-deps"
+if [ $# -lt 2 ]; then
+    echo "用法: $0 <项目名> <target_dir>"
+    echo "示例: $0 FSL_Sweep /tmp/fsl-sweep-deps"
     exit 1
 fi
 
-TARGET_DIR="$1"
+APP_NAME="$1"
+TARGET_DIR="$2"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
-# 检查 FSL_Sweep 是否已编译
-if [ ! -f "examples-local/FSL_Sweep/bin/FSL_Sweep" ]; then
-    echo "错误: FSL_Sweep 未编译，请先执行: make examples_FSL_Sweep"
+APP_DIR="examples-local/$APP_NAME"
+
+# 检查项目是否已编译（所有项目的可执行文件都在项目目录的 bin/ 目录）
+# 统一路径：examples-local/<项目名>/bin/<项目名>
+BIN_FILE="$APP_DIR/bin/$APP_NAME"
+
+# 检查项目是否已编译
+if [ ! -f "$BIN_FILE" ]; then
+    echo "错误: $APP_NAME 未编译，请先执行: make examples_$APP_NAME"
     exit 1
 fi
 
-echo "📦 复制 FSL_Sweep 依赖库到 $TARGET_DIR..."
+echo "📦 复制 $APP_NAME 依赖库到 $TARGET_DIR..."
 
 # 创建目标目录
 mkdir -p "$TARGET_DIR/lib"
@@ -30,10 +38,18 @@ mkdir -p "$TARGET_DIR/bin"
 
 # 复制可执行文件和脚本
 echo "复制可执行文件..."
-cp examples-local/FSL_Sweep/bin/FSL_Sweep "$TARGET_DIR/bin/"
-cp examples-local/FSL_Sweep/bin/start.sh "$TARGET_DIR/bin/"
-cp examples-local/FSL_Sweep/bin/meta.ini "$TARGET_DIR/bin/"
-chmod +x "$TARGET_DIR/bin/FSL_Sweep" "$TARGET_DIR/bin/start.sh"
+cp "$BIN_FILE" "$TARGET_DIR/bin/"
+
+# 复制 start.sh 和 meta.ini（如果存在）
+# FSL 项目：在项目目录的 bin/ 下
+# Sim 项目：也在项目目录的 bin/ 下（虽然可执行文件在 examples-local/bin/）
+if [ -f "$APP_DIR/bin/start.sh" ]; then
+    cp "$APP_DIR/bin/start.sh" "$TARGET_DIR/bin/"
+fi
+if [ -f "$APP_DIR/bin/meta.ini" ]; then
+    cp "$APP_DIR/bin/meta.ini" "$TARGET_DIR/bin/"
+fi
+chmod +x "$TARGET_DIR/bin/$APP_NAME"
 
 # 复制 SDK 库（.so 或 .a）
 echo "复制 SDK 库..."
@@ -54,7 +70,7 @@ fi
 # 使用 ldd 查找并复制系统依赖库
 echo "查找系统依赖库..."
 DEPS_FILE=$(mktemp)
-ldd examples-local/FSL_Sweep/bin/FSL_Sweep 2>/dev/null | grep -E "\.so" | awk '{print $3}' > "$DEPS_FILE" || true
+ldd "$BIN_FILE" 2>/dev/null | grep -E "\.so" | awk '{print $3}' > "$DEPS_FILE" || true
 
 # 复制函数：复制库文件及其所有符号链接
 copy_lib_with_symlinks() {
@@ -177,7 +193,4 @@ ls -lh "$TARGET_DIR/lib/" 2>/dev/null | tail -n +2 || echo "  (无)"
 echo "✅ 依赖库复制完成"
 echo "   可执行文件: $TARGET_DIR/bin/"
 echo "   库文件: $TARGET_DIR/lib/"
-echo ""
-echo "现在可以使用以下命令构建镜像："
-echo "  docker build -f examples-local/FSL_Sweep/Dockerfile.local -t fsl-sweep:1.0.0 $TARGET_DIR"
 

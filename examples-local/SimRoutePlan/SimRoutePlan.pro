@@ -1,19 +1,14 @@
-QT -= gui
-
-CONFIG += c++11 console
+QT += core
+CONFIG += console c++17
 CONFIG -= app_bundle
+TEMPLATE = app
 
-DEFINES += QT_DEPRECATED_WARNINGS
+DESTDIR = ../bin
+OBJECTS_DIR = build/obj
+MOC_DIR = build/moc
+RCC_DIR = build/rcc
+UI_DIR = build/ui
 
-MOC_DIR=build
-OBJECTS_DIR=build
-UI_DIR=build
-RCC_DIR=build
-DESTDIR=bin
+SOURCES += main.cpp
 
-SOURCES += \
-    main.cpp
-
-HEADERS += \
-    httplib.h \
-    json.hpp
+INCLUDEPATH += $$PWD/../FSL_Common

@@ -1,15 +1,14 @@
-QT -= gui
 QT += core
-
-CONFIG += c++11 console
+CONFIG += console c++17
 CONFIG -= app_bundle
-
-TARGET = SimTargetRecognize
 TEMPLATE = app
+
+DESTDIR = ../bin
+OBJECTS_DIR = build/obj
+MOC_DIR = build/moc
+RCC_DIR = build/rcc
+UI_DIR = build/ui
 
 SOURCES += main.cpp
 
-HEADERS += httplib.h json.hpp
-
-DESTDIR = bin
-
+INCLUDEPATH += $$PWD/../FSL_Common
