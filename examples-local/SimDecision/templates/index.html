@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimDecision - 决策系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+
+        .status-offline {
+            background: #ef4444;
+        }
+
+        .workflow-steps {
+            margin-top: 20px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .step.running {
+            border-left-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .step.success {
+            border-left-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .step.failed {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .step-name {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .step-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .step-status.running {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .step-status.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .step-status.failed {
+            background: #ef4444;
+            color: white;
+        }
+
+        .step-endpoint {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f0f9ff;
+            border-left: 3px solid #3b82f6;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .step-endpoint strong {
+            color: #1e40af;
+        }
+
+        .step-result {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .result-summary {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .result-summary h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .result-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .result-item strong {
+            color: #667eea;
+        }
+
+        .target-list {
+            margin-top: 10px;
+        }
+
+        .target-item {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .service-status {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .service-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: help;
+        }
+
+        .error-message {
+            color: #ef4444;
+            font-size: 0.9em;
+            margin-top: 5px;
+            padding: 8px;
+            background: #fef2f2;
+            border-left: 3px solid #ef4444;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚢 SimDecision 决策系统</h1>
+            <p>航路规划 → 航控启动 → 声纳探测 → 目标识别 → 目标打击</p>
+        </div>
+
+        <div class="content">
+            <!-- 服务状态 -->
+            <div class="section">
+                <h2>服务状态</h2>
+                        <div class="service-status" id="serviceStatus">
+                            <div class="service-item">
+                                <span class="status-indicator status-offline" id="statusRoutePlan"></span>
+                                <span>SimRoutePlan</span>
+                            </div>
+                            <div class="service-item">
+                                <span class="status-indicator status-offline" id="statusNaviControl"></span>
+                                <span>SimNaviControl</span>
+                            </div>
+                            <div class="service-item">
+                                <span class="status-indicator status-offline" id="statusSonar"></span>
+                                <span>SimSonar</span>
+                            </div>
+                            <div class="service-item">
+                                <span class="status-indicator status-offline" id="statusTargetRecognize"></span>
+                                <span>SimTargetRecognize</span>
+                            </div>
+                            <div class="service-item">
+                                <span class="status-indicator status-offline" id="statusTargetHit"></span>
+                                <span>SimTargetHit</span>
+                            </div>
+                        </div>
+                <div id="serviceMessages"></div>
+            </div>
+
+            <!-- 输入参数 -->
+            <div class="section">
+                <h2>输入参数</h2>
+                <form id="workflowForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>起点经度 (longitude)</label>
+                            <input type="number" id="point1Lon" step="0.000001" value="116.0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>起点纬度 (latitude)</label>
+                            <input type="number" id="point1Lat" step="0.000001" value="39.0" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>终点经度 (longitude)</label>
+                            <input type="number" id="point2Lon" step="0.000001" value="116.1" required>
+                        </div>
+                        <div class="form-group">
+                            <label>终点纬度 (latitude)</label>
+                            <input type="number" id="point2Lat" step="0.000001" value="39.1" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn" id="executeBtn">执行决策流程</button>
+                </form>
+            </div>
+
+            <!-- 执行流程 -->
+            <div class="section" id="workflowSection" style="display: none;">
+                <h2>执行流程</h2>
+                <div class="workflow-steps" id="workflowSteps"></div>
+                <div class="result-summary" id="resultSummary" style="display: none;">
+                    <h3>执行结果</h3>
+                    <div id="resultContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 检查服务状态
+        async function checkServiceStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                
+                updateStatusIndicator('statusRoutePlan', status.route_plan, status.messages?.route_plan || '');
+                updateStatusIndicator('statusNaviControl', status.navi_control, status.messages?.navi_control || '');
+                updateStatusIndicator('statusSonar', status.sonar, status.messages?.sonar || '');
+                updateStatusIndicator('statusTargetRecognize', status.target_recognize, status.messages?.target_recognize || '');
+                updateStatusIndicator('statusTargetHit', status.target_hit, status.messages?.target_hit || '');
+            } catch (error) {
+                console.error('检查服务状态失败:', error);
+            }
+        }
+
+        function updateStatusIndicator(id, online, message) {
+            const indicator = document.getElementById(id);
+            indicator.className = 'status-indicator ' + (online ? 'status-online' : 'status-offline');
+            
+            // 更新提示信息
+            const serviceItem = indicator.parentElement;
+            if (serviceItem && message) {
+                serviceItem.title = message;
+            }
+            
+            // 显示错误消息
+            const messagesDiv = document.getElementById('serviceMessages');
+            if (messagesDiv) {
+                let html = '';
+                const serviceNames = {
+                    'statusRoutePlan': 'SimRoutePlan',
+                    'statusNaviControl': 'SimNaviControl',
+                    'statusSonar': 'SimSonar'
+                };
+                
+                if (!online && message) {
+                    const serviceName = serviceNames[id] || id;
+                    html += `<div class="error-message"><strong>${serviceName}:</strong> ${message}</div>`;
+                }
+                messagesDiv.innerHTML = html;
+            }
+        }
+
+        // 执行流程
+        document.getElementById('workflowForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const point1 = {
+                longitude: parseFloat(document.getElementById('point1Lon').value),
+                latitude: parseFloat(document.getElementById('point1Lat').value)
+            };
+            
+            const point2 = {
+                longitude: parseFloat(document.getElementById('point2Lon').value),
+                latitude: parseFloat(document.getElementById('point2Lat').value)
+            };
+
+            const executeBtn = document.getElementById('executeBtn');
+            executeBtn.disabled = true;
+            executeBtn.textContent = '执行中...';
+
+            document.getElementById('workflowSection').style.display = 'block';
+            document.getElementById('workflowSteps').innerHTML = '';
+            document.getElementById('resultSummary').style.display = 'none';
+
+            const steps = [
+                { name: '航路规划', id: 'step1' },
+                { name: '启动航控', id: 'step2' },
+                { name: '声纳探测', id: 'step3' }
+            ];
+
+            steps.forEach((step, index) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'step';
+                stepDiv.id = step.id;
+                stepDiv.innerHTML = `
+                    <div class="step-header">
+                        <span class="step-name">${step.name}</span>
+                        <span class="step-status">等待中</span>
+                    </div>
+                `;
+                document.getElementById('workflowSteps').appendChild(stepDiv);
+            });
+
+            try {
+                const startTime = Date.now();
+                let allResults = {
+                    route_plan: null,
+                    navi_control: null,
+                    sonar: null
+                };
+                let allEndpoints = {};
+                
+                // 步骤1：航路规划
+                updateStepStatus(1, 'running', null, null);
+                try {
+                    const response1 = await fetch('/api/call_route_plan', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ point1, point2 })
+                    });
+                    const result1 = await response1.json();
+                    
+                    if (result1.success && result1.result) {
+                        allResults.route_plan = result1.result;
+                        allEndpoints.route_plan = result1.service_endpoint;
+                        updateStepStatus(1, 'success', result1.result, result1.service_endpoint);
+                    } else {
+                        updateStepStatus(1, 'failed', { error: result1.error || '未知错误' }, result1.service_endpoint);
+                        throw new Error(result1.error || '航路规划失败');
+                    }
+                } catch (error) {
+                    updateStepStatus(1, 'failed', { error: error.message }, null);
+                    throw error;
+                }
+                
+                // 步骤2：启动航控
+                updateStepStatus(2, 'running', null, null);
+                try {
+                    const route = allResults.route_plan.route || [];
+                    const response2 = await fetch('/api/call_navi_control', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ route })
+                    });
+                    const result2 = await response2.json();
+                    
+                    if (result2.success && result2.result) {
+                        allResults.navi_control = result2.result;
+                        allEndpoints.navi_control = result2.service_endpoint;
+                        updateStepStatus(2, 'success', result2.result, result2.service_endpoint);
+                    } else {
+                        updateStepStatus(2, 'failed', { error: result2.error || '未知错误' }, result2.service_endpoint);
+                        throw new Error(result2.error || '航控启动失败');
+                    }
+                } catch (error) {
+                    updateStepStatus(2, 'failed', { error: error.message }, null);
+                    throw error;
+                }
+                
+                // 步骤3：声纳探测
+                updateStepStatus(3, 'running', null, null);
+                try {
+                    const response3 = await fetch('/api/call_sonar', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    const result3 = await response3.json();
+                    
+                    if (result3.success && result3.result) {
+                        allResults.sonar = result3.result;
+                        allEndpoints.sonar = result3.service_endpoint;
+                        updateStepStatus(3, 'success', result3.result, result3.service_endpoint);
+                    } else {
+                        updateStepStatus(3, 'failed', { error: result3.error || '未知错误' }, result3.service_endpoint);
+                        throw new Error(result3.error || '声纳探测失败');
+                    }
+                } catch (error) {
+                    updateStepStatus(3, 'failed', { error: error.message }, null);
+                    throw error;
+                }
+                
+                // 步骤4：目标识别（对每个检测到的目标进行识别）
+                const targets = allResults.sonar?.targets || [];
+                allResults.target_recognize = [];
+                
+                console.log('[SimDecision] 声纳探测结果:', allResults.sonar);
+                console.log('[SimDecision] 检测到的目标数量:', targets.length);
+                console.log('[SimDecision] 目标列表:', targets);
+                
+                if (targets.length > 0) {
+                    // 为每个目标创建识别步骤
+                    for (let i = 0; i < targets.length; i++) {
+                        const target = targets[i];
+                        const imagePath = target.image_path;
+                        const targetId = target.id || (i + 1);
+                        
+                        console.log(`[SimDecision] 处理目标 ${targetId}, image_path: ${imagePath}`);
+                        
+                        if (imagePath) {
+                            // 创建步骤（步骤4, 5, 6...）
+                            const stepNum = 4 + i;
+                            const stepName = `目标识别 (目标 ${targetId})`;
+                            
+                            // 动态添加步骤到UI
+                            const stepDiv = document.createElement('div');
+                            stepDiv.className = 'step';
+                            stepDiv.id = `step${stepNum}`;
+                            stepDiv.innerHTML = `
+                                <div class="step-header">
+                                    <span class="step-name">${stepName}</span>
+                                    <span class="step-status">等待中</span>
+                                </div>
+                            `;
+                            document.getElementById('workflowSteps').appendChild(stepDiv);
+                            
+                            updateStepStatus(stepNum, 'running', null, null);
+                            try {
+                                console.log(`[SimDecision] 调用目标识别服务，image_path: ${imagePath}`);
+                                const response4 = await fetch('/api/call_target_recognize', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ image_path: imagePath })
+                                });
+                                const result4 = await response4.json();
+                                
+                                console.log(`[SimDecision] 目标识别结果:`, result4);
+                                
+                                if (result4.success && result4.result) {
+                                    allResults.target_recognize.push(result4.result);
+                                    allEndpoints[`target_recognize_${targetId}`] = result4.service_endpoint;
+                                    updateStepStatus(stepNum, 'success', result4.result, result4.service_endpoint);
+                                } else {
+                                    console.error(`[SimDecision] 目标识别失败:`, result4.error);
+                                    updateStepStatus(stepNum, 'failed', { error: result4.error || '未知错误' }, result4.service_endpoint);
+                                }
+                            } catch (error) {
+                                console.error(`[SimDecision] 目标识别异常:`, error);
+                                updateStepStatus(stepNum, 'failed', { error: error.message }, null);
+                            }
+                        } else {
+                            console.warn(`[SimDecision] 目标 ${targetId} 没有 image_path，跳过识别`);
+                        }
+                    }
+                } else {
+                    // 如果没有检测到目标，显示一个提示步骤
+                    console.log('[SimDecision] 未检测到目标，跳过目标识别');
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'step';
+                    stepDiv.id = 'step4';
+                    stepDiv.innerHTML = `
+                        <div class="step-header">
+                            <span class="step-name">目标识别</span>
+                            <span class="step-status">等待中</span>
+                        </div>
+                    `;
+                    document.getElementById('workflowSteps').appendChild(stepDiv);
+                    updateStepStatus(4, 'success', { message: '未检测到目标，跳过目标识别' }, null);
+                }
+                
+                // 步骤5：目标打击（对每个识别成功的目标进行打击）
+                allResults.target_hit = [];
+                const recognizeResults = allResults.target_recognize || [];
+                
+                if (targets.length > 0 && recognizeResults.length > 0) {
+                    for (let i = 0; i < targets.length; i++) {
+                        const target = targets[i];
+                        const imagePath = target.image_path;
+                        const targetId = target.id || (i + 1);
+                        const longitude = target.longitude;
+                        const latitude = target.latitude;
+                        
+                        // 检查是否有对应的识别结果且识别成功
+                        const recognizeResult = recognizeResults.find(r => r && r.image_path === imagePath);
+                        
+                        if (recognizeResult && recognizeResult.success && longitude && latitude) {
+                            // 创建步骤（步骤4+N, 4+N+1...）
+                            const stepNum = 4 + targets.length + i;
+                            const stepName = `目标打击 (目标 ${targetId})`;
+                            
+                            // 动态添加步骤到UI
+                            const stepDiv = document.createElement('div');
+                            stepDiv.className = 'step';
+                            stepDiv.id = `step${stepNum}`;
+                            stepDiv.innerHTML = `
+                                <div class="step-header">
+                                    <span class="step-name">${stepName}</span>
+                                    <span class="step-status">等待中</span>
+                                </div>
+                            `;
+                            document.getElementById('workflowSteps').appendChild(stepDiv);
+                            
+                            updateStepStatus(stepNum, 'running', null, null);
+                            try {
+                                console.log(`[SimDecision] 调用目标打击服务，target_id: ${targetId}, longitude: ${longitude}, latitude: ${latitude}`);
+                                const response5 = await fetch('/api/call_target_hit', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({ 
+                                        id: targetId,
+                                        longitude: longitude,
+                                        latitude: latitude
+                                    })
+                                });
+                                const result5 = await response5.json();
+                                
+                                console.log(`[SimDecision] 目标打击结果:`, result5);
+                                
+                                if (result5.success && result5.result) {
+                                    allResults.target_hit.push(result5.result);
+                                    allEndpoints[`target_hit_${targetId}`] = result5.service_endpoint;
+                                    updateStepStatus(stepNum, 'success', result5.result, result5.service_endpoint);
+                                } else {
+                                    console.error(`[SimDecision] 目标打击失败:`, result5);
+                                    // 如果错误信息包含 JSON 解析错误，提供更友好的提示
+                                    let errorMsg = result5.error || '未知错误';
+                                    if (errorMsg.includes('Unexpected token') || errorMsg.includes('<!doctype')) {
+                                        errorMsg = '服务返回了非JSON响应，请检查 SimTargetHit 服务是否正常运行';
+                                    }
+                                    updateStepStatus(stepNum, 'failed', { error: errorMsg }, result5.service_endpoint);
+                                }
+                            } catch (error) {
+                                console.error(`[SimDecision] 目标打击异常:`, error);
+                                let errorMsg = error.message;
+                                if (errorMsg.includes('Unexpected token') || errorMsg.includes('<!doctype')) {
+                                    errorMsg = '服务返回了非JSON响应，请检查 SimTargetHit 服务是否正常运行';
+                                }
+                                updateStepStatus(stepNum, 'failed', { error: errorMsg }, null);
+                            }
+                        }
+                    }
+                }
+                
+                // 显示最终结果
+                const totalTime = (Date.now() - startTime) / 1000; // 转换为秒
+                displayResults({
+                    results: allResults,
+                    service_endpoints: allEndpoints,
+                    workflow: {
+                        total_time: totalTime
+                    }
+                });
+
+            } catch (error) {
+                console.error('执行失败:', error);
+                alert('执行失败: ' + error.message);
+            } finally {
+                executeBtn.disabled = false;
+                executeBtn.textContent = '执行决策流程';
+            }
+        });
+
+        function updateStepStatus(stepNum, status, result, endpointInfo) {
+            const stepDiv = document.getElementById(`step${stepNum}`);
+            if (!stepDiv) return;
+
+            stepDiv.className = `step ${status}`;
+            
+            const statusSpan = stepDiv.querySelector('.step-status');
+            const statusText = {
+                'running': '执行中',
+                'success': '成功',
+                'failed': '失败'
+            };
+            statusSpan.textContent = statusText[status] || status;
+            statusSpan.className = `step-status ${status}`;
+
+            // 显示服务端点信息（只显示从服务发现获取的地址）
+            // 先移除已存在的端点信息 div，避免重复显示
+            const existingEndpointDiv = stepDiv.querySelector('.step-endpoint');
+            if (existingEndpointDiv) {
+                existingEndpointDiv.remove();
+            }
+            
+            // 只有在有端点信息时才显示
+            if (endpointInfo) {
+                const endpointDiv = document.createElement('div');
+                endpointDiv.className = 'step-endpoint';
+                endpointDiv.style.cssText = 'margin-top: 10px; padding: 8px; background: #f0f9ff; border-left: 3px solid #3b82f6; border-radius: 4px; font-size: 0.9em;';
+                let endpointHtml = '<strong>服务地址:</strong> ';
+                
+                // 检查端点信息是否存在且有有效数据
+                if (endpointInfo.ip && endpointInfo.port) {
+                    endpointHtml += `${endpointInfo.protocol || 'http'}://${endpointInfo.ip}:${endpointInfo.port}`;
+                    if (endpointInfo.nodeId) {
+                        endpointHtml += ` | <strong>节点:</strong> ${endpointInfo.nodeId}`;
+                    }
+                    if (endpointInfo.instanceId) {
+                        endpointHtml += ` | <strong>实例:</strong> ${endpointInfo.instanceId}`;
+                    }
+                } else if (endpointInfo.ip || endpointInfo.port) {
+                    // 有部分信息但可能不完整
+                    const ip = endpointInfo.ip || 'N/A';
+                    const port = endpointInfo.port || 'N/A';
+                    endpointHtml += `${endpointInfo.protocol || 'http'}://${ip}:${port}`;
+                    if (endpointInfo.nodeId) {
+                        endpointHtml += ` | <strong>节点:</strong> ${endpointInfo.nodeId}`;
+                    }
+                    if (endpointInfo.instanceId) {
+                        endpointHtml += ` | <strong>实例:</strong> ${endpointInfo.instanceId}`;
+                    }
+                    endpointHtml += ' <span style="color: #f59e0b;">(部分信息)</span>';
+                } else {
+                    // 没有有效的端点信息，不显示端点信息
+                    // 但不 return，继续显示结果
+                }
+                
+                if (endpointHtml !== '<strong>服务地址:</strong> ') {
+                    endpointDiv.innerHTML = endpointHtml;
+                    stepDiv.appendChild(endpointDiv);
+                }
+            }
+
+            if (result) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'step-result';
+                resultDiv.textContent = JSON.stringify(result, null, 2);
+                stepDiv.appendChild(resultDiv);
+            }
+        }
+
+        function displayResults(result) {
+            const summaryDiv = document.getElementById('resultSummary');
+            const contentDiv = document.getElementById('resultContent');
+            
+            summaryDiv.style.display = 'block';
+            
+            let html = '';
+            
+            // 确保 result.results 存在
+            const results = result.results || {};
+            
+            if (results.route_plan) {
+                html += '<div class="result-item">';
+                html += '<strong>航路规划:</strong> ';
+                if (results.route_plan.success) {
+                    html += `成功，生成 ${(results.route_plan.route || []).length} 个航点`;
+                } else {
+                    html += `失败: ${results.route_plan.error || '未知错误'}`;
+                }
+                html += '</div>';
+            }
+
+            if (results.navi_control) {
+                html += '<div class="result-item">';
+                html += '<strong>航控启动:</strong> ';
+                if (results.navi_control.success) {
+                    html += results.navi_control.message || '成功';
+                } else {
+                    html += `失败: ${results.navi_control.error || '未知错误'}`;
+                }
+                html += '</div>';
+            }
+
+            if (results.sonar) {
+                html += '<div class="result-item">';
+                html += '<strong>声纳探测:</strong> ';
+                if (results.sonar.success) {
+                    html += `检测到 ${results.sonar.target_count || 0} 个目标`;
+                    if (results.sonar.targets && results.sonar.targets.length > 0) {
+                        html += '<div class="target-list">';
+                        results.sonar.targets.forEach((target, index) => {
+                            html += `<div class="target-item">`;
+                            html += `目标 ${target.id || (index + 1)}: `;
+                            // 只显示声纳探测信息（位置、距离、图像路径）
+                            html += `位置: (${target.longitude.toFixed(6)}, ${target.latitude.toFixed(6)}) `;
+                            html += `距离: ${target.distance || 0}m`;
+                            if (target.image_path) {
+                                html += ` | 图像: ${target.image_path}`;
+                            }
+                            html += `</div>`;
+                        });
+                        html += '</div>';
+                    }
+                } else {
+                    html += `失败: ${results.sonar.error || '未知错误'}`;
+                }
+                html += '</div>';
+            }
+            
+            // 显示目标识别结果
+            if (results.target_recognize && results.target_recognize.length > 0) {
+                html += '<div class="result-item">';
+                html += '<strong>目标识别:</strong> ';
+                const successCount = results.target_recognize.filter(r => r && r.success).length;
+                html += `成功识别 ${successCount}/${results.target_recognize.length} 个目标`;
+                
+                // 显示每个目标的识别结果
+                if (results.sonar && results.sonar.targets && results.sonar.targets.length > 0) {
+                    html += '<div class="target-list">';
+                    results.sonar.targets.forEach((target, index) => {
+                        const imagePath = target.image_path;
+                        if (imagePath) {
+                            const recognizeResult = results.target_recognize.find(r => r && r.image_path === imagePath);
+                            if (recognizeResult && recognizeResult.success) {
+                                html += `<div class="target-item">`;
+                                html += `目标 ${target.id || (index + 1)}: `;
+                                html += `${recognizeResult.target_type || '未知'} (${recognizeResult.size || '未知'}) `;
+                                html += `位置: (${target.longitude.toFixed(6)}, ${target.latitude.toFixed(6)}) `;
+                                html += `置信度: ${((recognizeResult.confidence || 0) * 100).toFixed(1)}% `;
+                                if (imagePath) {
+                                    html += ` | 图像: ${imagePath}`;
+                                }
+                                html += `</div>`;
+                            }
+                        }
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+            
+            // 显示目标打击结果
+            if (results.target_hit && results.target_hit.length > 0) {
+                html += '<div class="result-item">';
+                html += '<strong>目标打击:</strong> ';
+                const successCount = results.target_hit.filter(r => r && r.success).length;
+                html += `成功打击 ${successCount}/${results.target_hit.length} 个目标`;
+                
+                // 显示每个目标的打击结果
+                if (successCount > 0) {
+                    html += '<div class="target-list">';
+                    results.target_hit.forEach((hit, index) => {
+                        if (hit && hit.success) {
+                            html += `<div class="target-item">`;
+                            html += `目标 ${hit.target_id || (index + 1)}: `;
+                            html += `${hit.status || '已打击'} `;
+                            html += `位置: (${hit.longitude?.toFixed(6) || 'N/A'}, ${hit.latitude?.toFixed(6) || 'N/A'}) `;
+                            html += `损伤: ${hit.damage || 'N/A'}`;
+                            if (hit.message) {
+                                html += ` | ${hit.message}`;
+                            }
+                            html += `</div>`;
+                        }
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
+            if (result.workflow && result.workflow.total_time) {
+                html += `<div class="result-item"><strong>总耗时:</strong> ${result.workflow.total_time.toFixed(2)} 秒</div>`;
+            }
+
+            contentDiv.innerHTML = html;
+        }
+
+        // 页面加载时检查服务状态
+        checkServiceStatus();
+        setInterval(checkServiceStatus, 5000); // 每5秒检查一次
+    </script>
+</body>
+</html>
+

@@ -40,7 +40,12 @@ examples/*/build/
 examples/*/package/
 examples/*/*.zip
 
-examples-local
+#examples-local
+examples-local/**/build
+examples-local/**/*.whl
+examples-local/**/__pycache__
+examples-local/**/*.o
+examples-local/**/tiles
 
 # gRPC generated files (keep proto files, ignore generated code)
 *.pb.cc

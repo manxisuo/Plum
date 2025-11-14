@@ -1,0 +1,10 @@
+# 排除不需要的文件
+build/
+.git/
+.gitignore
+*.o
+*.a
+*.so
+*.pro.user
+*.qmake.stash
+

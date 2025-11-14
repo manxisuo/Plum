@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>FSL Main Control</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>FSL Main Control</h1>
+        <button id="btn-open-config">设置参数</button>
+        <button id="btn-load-defaults">加载默认参数</button>
+        <button id="btn-start-task">启动任务</button>
+        <span id="current-task">未启动任务</span>
+      </header>
+
+      <section id="config-panel">
+        <h2>任务控制</h2>
+        <div id="workflow-selector">
+          <label for="workflow-list">选择工作流：</label>
+          <select id="workflow-list"></select>
+          <button id="btn-refresh-workflows">刷新</button>
+        </div>
+        <div class="config-actions">
+          <span>请先设置任务参数后启动任务。</span>
+        </div>
+      </section>
+
+      <section id="map-panel">
+        <div id="map"></div>
+        <div id="map-legend">
+          <h3>图例</h3>
+          <ul>
+            <li><span class="legend-icon legend-task-area"></span>任务区域</li>
+            <li><span class="legend-icon legend-work-zone"></span>作业区</li>
+            <li><span class="legend-icon legend-ting"></span>USV</li>
+            <li><span class="legend-icon legend-suspect"></span>疑似水雷</li>
+            <li><span class="legend-icon legend-confirmed"></span>确认水雷</li>
+            <li><span class="legend-icon legend-destroyed"></span>已销毁</li>
+            <li><span class="legend-icon legend-track"></span>航迹</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="info-panel">
+        <h2>任务状态</h2>
+        <div class="status-block">
+          <div class="status-item">
+            <label>阶段</label>
+            <span id="status-stage">未启动</span>
+          </div>
+          <div class="status-item">
+            <label>疑似水雷</label>
+            <span id="status-suspect">0</span>
+          </div>
+          <div class="status-item">
+            <label>确认水雷</label>
+            <span id="status-confirmed">0</span>
+          </div>
+          <div class="status-item">
+            <label>已销毁</label>
+            <span id="status-destroyed">0</span>
+          </div>
+        </div>
+
+        <h3>阶段时间线</h3>
+        <ul id="timeline"></ul>
+
+        <h3>服务调用</h3>
+        <div id="service-calls-panel">
+          <div id="service-calls-list"></div>
+        </div>
+
+        <h3>实时日志</h3>
+        <pre id="status-log">等待任务开始...</pre>
+      </section>
+    </div>
+
+    <div id="config-modal" class="modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>设置参数</h2>
+          <button id="btn-config-close" class="modal-close" type="button">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="config-group">
+            <h3>总体参数</h3>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="input-ting-count">USV 数量</label>
+                <input type="number" id="input-ting-count" min="1" max="12" step="1" />
+              </div>
+            </div>
+          </div>
+
+          <div class="config-group">
+            <h3>任务区域</h3>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="input-top-left-lat">左上纬度</label>
+                <input type="number" id="input-top-left-lat" step="0.000001" />
+              </div>
+              <div class="form-field">
+                <label for="input-top-left-lon">左上经度</label>
+                <input type="number" id="input-top-left-lon" step="0.000001" />
+              </div>
+              <div class="form-field">
+                <label for="input-bottom-right-lat">右下纬度</label>
+                <input type="number" id="input-bottom-right-lat" step="0.000001" />
+              </div>
+              <div class="form-field">
+                <label for="input-bottom-right-lon">右下经度</label>
+                <input type="number" id="input-bottom-right-lon" step="0.000001" />
+              </div>
+            </div>
+          </div>
+
+          <div class="config-group">
+            <h3>USV 参数</h3>
+            <div class="tabs">
+              <div class="tab-list" id="ting-tab-list"></div>
+              <div class="tab-panels" id="ting-tab-panels"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-config-close-footer" type="button">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
+
