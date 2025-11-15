@@ -9,16 +9,37 @@ FROM ubuntu:24.04
 
 ARG APP_NAME
 
-# 使用国内镜像源加速（可选，如果网络慢可以取消注释）
-# RUN sed -i 's|http://ports.ubuntu.com/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list || \
-#     sed -i 's|http://archive.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list || true
+# 使用国内镜像源加速（使用清华镜像源）
+# Ubuntu 24.04 使用 deb822 格式，源文件在 /etc/apt/sources.list.d/ubuntu.sources
+# 注意：先使用 HTTP 源安装 ca-certificates，然后再切换到 HTTPS 源
+RUN if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
+        sed -i 's|http://ports.ubuntu.com/ubuntu-ports|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources && \
+        sed -i 's|https://ports.ubuntu.com/ubuntu-ports|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources && \
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources; \
+    elif [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|http://ports.ubuntu.com/ubuntu-ports|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list && \
+        sed -i 's|https://ports.ubuntu.com/ubuntu-ports|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list && \
+        sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list; \
+    fi
+
+# 先安装 ca-certificates（使用 HTTP 源，不需要证书验证）
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# 现在切换到 HTTPS 源（已安装 ca-certificates，可以验证证书）
+RUN if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
+        sed -i 's|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources && \
+        sed -i 's|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources; \
+    elif [ -f /etc/apt/sources.list ]; then \
+        sed -i 's|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list && \
+        sed -i 's|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' /etc/apt/sources.list; \
+    fi
 
 # 安装运行时依赖（只需要运行时库，不需要编译工具）
 # 这层会被缓存，除非你修改了依赖列表
-RUN apt-get update && apt-get install -y \
+# 使用 --no-install-recommends 减少不必要的包，加快安装速度
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libqt5core5a \
     libprotobuf32t64 \
-    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建应用目录
