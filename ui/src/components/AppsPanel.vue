@@ -310,6 +310,18 @@ function updateTagOptions() {
   imageTagOptions.value = Array.from(new Set(tags)).sort()
 }
 
+// 为 autocomplete 提供仓库建议
+function queryRepositorySuggestions(queryString: string, cb: (suggestions: Array<{ value: string }>) => void) {
+  const suggestions = imageRepositoryOptions.value
+    .filter(repo => repo.toLowerCase().includes(queryString.toLowerCase()))
+    .map(repo => ({ value: repo }))
+  // 如果用户输入的内容不在建议列表中，也添加进去（允许自定义输入）
+  if (queryString && !suggestions.some(s => s.value === queryString)) {
+    suggestions.unshift({ value: queryString })
+  }
+  cb(suggestions)
+}
+
 // 当仓库改变时，更新标签选项并清空当前标签
 function onRepositoryChange() {
   updateTagOptions()
@@ -519,22 +531,22 @@ async function createImageApp() {
           </div>
         </el-form-item>
         <el-form-item :label="t('apps.createImage.imageRepository')" required>
-          <el-select
+          <el-autocomplete
             v-model="imageForm.imageRepository"
-            :placeholder="t('apps.createImage.example.repository')"
-            filterable
-            allow-create
-            default-first-option
+            :placeholder="t('apps.createImage.example.repository') || '例如: nginx 或 registry.example.com/namespace/image'"
+            :fetch-suggestions="queryRepositorySuggestions"
             style="width: 100%"
+            clearable
+            @select="onRepositoryChange"
             @change="onRepositoryChange"
           >
-            <el-option
-              v-for="repo in imageRepositoryOptions"
-              :key="repo"
-              :label="repo"
-              :value="repo"
-            />
-          </el-select>
+            <template #default="{ item }">
+              <div>{{ item.value }}</div>
+            </template>
+          </el-autocomplete>
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            可以输入本地镜像或完整的镜像仓库路径（如: registry.example.com/namespace/image）
+          </div>
         </el-form-item>
         <el-form-item :label="t('apps.createImage.imageTag')" required>
           <el-select
