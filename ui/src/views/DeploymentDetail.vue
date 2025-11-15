@@ -261,6 +261,14 @@ async function stopDeployment() {
       </template>
       
       <el-table :data="paginatedAssigns" v-loading="loading" style="width:100%" stripe>
+        <el-table-column :label="t('deploymentDetail.columns.app')" width="200" min-width="150">
+          <template #default="{ row }">
+            <span v-if="row.appName || row.appVersion || row.AppName || row.AppVersion">
+              {{ (row.appName || row.AppName || '-') }}:{{ (row.appVersion || row.AppVersion || '-') }}
+            </span>
+            <span v-else style="color: #909399;">-</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('deploymentDetail.columns.instanceId')" width="120">
           <template #default="{ row }">
             <IdDisplay :id="row.instanceId || row.InstanceID" :length="8" />
@@ -270,7 +278,17 @@ async function stopDeployment() {
           <template #default="{ row }">{{ row.nodeId || row.NodeID }}</template>
         </el-table-column>
         <el-table-column :label="t('deploymentDetail.columns.artifact')" width="320">
-          <template #default="{ row }">{{ row.artifactUrl || row.ArtifactURL }}</template>
+          <template #default="{ row }">
+            <span v-if="(row.artifactType || row.ArtifactType) === 'image' && (row.imageRepository || row.ImageRepository) && (row.imageTag || row.ImageTag)">
+              <el-tag type="info" size="small" style="margin-right: 4px;">镜像</el-tag>
+              {{ (row.imageRepository || row.ImageRepository) }}:{{ (row.imageTag || row.ImageTag) }}
+            </span>
+            <span v-else-if="(row.artifactUrl || row.ArtifactURL) && (row.artifactUrl || row.ArtifactURL).startsWith('image://')">
+              <el-tag type="info" size="small" style="margin-right: 4px;">镜像</el-tag>
+              <span style="color: #909399; font-family: monospace;">{{ row.artifactUrl || row.ArtifactURL }}</span>
+            </span>
+            <span v-else>{{ row.artifactUrl || row.ArtifactURL || '-' }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="startCmd" :label="t('deploymentDetail.columns.startCmd')" />
         <el-table-column :label="t('deploymentDetail.columns.desired')" width="130">

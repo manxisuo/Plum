@@ -651,6 +651,82 @@ func getHostLibraryPaths() []string {
 	return validPaths
 }
 
+// readFileFromContainer 从容器内读取文件内容
+func (m *DockerManager) readFileFromContainer(containerID, filePath string) (string, error) {
+	// 使用 docker exec 读取文件
+	execConfig := types.ExecConfig{
+		Cmd:          []string{"cat", filePath},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+	
+	execResp, err := m.client.ContainerExecCreate(m.ctx, containerID, execConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec: %w", err)
+	}
+	
+	// 连接到 exec
+	attachResp, err := m.client.ContainerExecAttach(m.ctx, execResp.ID, types.ExecStartCheck{})
+	if err != nil {
+		return "", fmt.Errorf("failed to attach exec: %w", err)
+	}
+	defer attachResp.Close()
+	
+	// 读取输出（Docker exec 输出格式：8字节头部 + 数据）
+	// 头部格式：STREAM_TYPE (1 byte) + PADDING (3 bytes) + LENGTH (4 bytes, big-endian)
+	var allData bytes.Buffer
+	_, err = io.Copy(&allData, attachResp.Reader)
+	if err != nil {
+		return "", fmt.Errorf("failed to read exec output: %w", err)
+	}
+	
+	// 检查 exec 是否成功
+	execInspect, err := m.client.ContainerExecInspect(m.ctx, execResp.ID)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect exec: %w", err)
+	}
+	if execInspect.ExitCode != 0 {
+		// 尝试提取错误信息（跳过头部）
+		data := allData.Bytes()
+		errorMsg := ""
+		if len(data) > 8 {
+			errorMsg = string(data[8:])
+		} else {
+			errorMsg = allData.String()
+		}
+		return "", fmt.Errorf("exec failed with exit code %d, output: %s", execInspect.ExitCode, errorMsg)
+	}
+	
+	// 解析 Docker 流格式：跳过 8 字节头部，提取实际内容
+	data := allData.Bytes()
+	content := ""
+	if len(data) > 8 {
+		// 跳过头部，读取所有数据块
+		pos := 0
+		var parts []string
+		for pos < len(data) {
+			if pos+8 > len(data) {
+				break
+			}
+			// 读取长度（big-endian，4字节，位置 4-7）
+			length := int(data[pos+4])<<24 | int(data[pos+5])<<16 | int(data[pos+6])<<8 | int(data[pos+7])
+			if length <= 0 || pos+8+length > len(data) {
+				break
+			}
+			// 提取数据（跳过 8 字节头部）
+			part := string(data[pos+8 : pos+8+length])
+			parts = append(parts, part)
+			pos += 8 + length
+		}
+		content = strings.Join(parts, "")
+	} else {
+		// 如果没有头部，直接使用全部内容
+		content = allData.String()
+	}
+	
+	return strings.TrimSpace(content), nil
+}
+
 // getNetworkMode 从环境变量获取 Docker 容器网络模式
 // 支持的值：host, bridge, none（默认：bridge）
 func getNetworkMode() container.NetworkMode {

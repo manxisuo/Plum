@@ -497,6 +497,24 @@ body.modal-open {
   gap: 6px;
 }
 
+/* 疑似水雷 - 黄色系（与海图颜色一致：fillColor: #f9a825, color: #fdd835） */
+.status-item.status-suspect {
+  background-color: rgba(249, 168, 37, 0.15);
+  border-color: rgba(253, 216, 53, 0.4);
+}
+
+/* 确认水雷 - 粉红色系（与海图颜色一致：fillColor: #f48fb1, color: #d81b60） */
+.status-item.status-confirmed {
+  background-color: rgba(244, 143, 177, 0.15);
+  border-color: rgba(216, 27, 96, 0.4);
+}
+
+/* 已销毁 - 绿色系（与海图颜色一致：fillColor: #81c784, color: #4caf50） */
+.status-item.status-destroyed {
+  background-color: rgba(129, 199, 132, 0.15);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
 .status-item label {
   font-size: 12px;
   color: #607d8b;

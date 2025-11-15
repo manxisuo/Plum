@@ -3,7 +3,6 @@ import Home from './views/Home.vue'
 import DeploymentsList from './views/DeploymentsList.vue'
 import DeploymentCreate from './views/DeploymentCreate.vue'
 import DeploymentDetail from './views/DeploymentDetail.vue'
-import DeploymentConfig from './views/DeploymentConfig.vue'
 import Nodes from './views/Nodes.vue'
 import Apps from './views/Apps.vue'
 import Assignments from './views/Assignments.vue'
@@ -52,7 +51,6 @@ export const router = createRouter({
     { path: '/deployments', component: DeploymentsList },
     { path: '/deployments/create', component: DeploymentCreate },
     { path: '/deployments/:id', component: DeploymentDetail, props: true },
-    { path: '/deployments/:id/config', component: DeploymentConfig, props: true },
   ]
 })
 

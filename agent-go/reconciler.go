@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -21,6 +22,7 @@ type Reconciler struct {
 	knownInstances     map[string]bool      // 已知实例列表（用于故障检测）
 	instanceTypes      map[string]string    // 实例类型映射：instanceID -> "image" 或 "zip"
 	completedInstances map[string]bool      // 已完成的镜像应用实例（避免重复标记）
+	registeredServices map[string]bool      // 已注册服务的实例（避免重复注册）
 }
 
 func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconciler {
@@ -64,6 +66,7 @@ func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconci
 		knownInstances:     make(map[string]bool),
 		instanceTypes:      make(map[string]string),
 		completedInstances: make(map[string]bool),
+		registeredServices: make(map[string]bool),
 	}
 }
 
@@ -483,14 +486,117 @@ func (r *Reconciler) postStatus(instanceID, phase string, exitCode int, healthy 
 // RegisterServices 注册服务
 // 采用增量注册模式：只注册meta.ini中定义的服务端点，不影响手动注册的其他服务
 // 这样可以在真实应用实例上手动注册额外服务，而不会被Agent覆盖
-func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string) {
-	metaPath := filepath.Join(r.baseDir, instanceID, "app", "meta.ini")
-	if !FileExists(metaPath) {
-		return
+// 使用缓存机制避免重复注册：如果实例已经注册过服务且容器还在运行，就跳过注册
+func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment *Assignment) {
+	// 检查是否已经注册过服务
+	if r.registeredServices[instanceID] {
+		// 检查容器是否还在运行（如果容器重启了，需要重新注册）
+		if assignment != nil && assignment.ArtifactType == "image" {
+			if r.dockerManager != nil && r.dockerManager.IsRunning(instanceID) {
+				// 容器还在运行，且已经注册过，跳过注册
+				return
+			}
+			// 容器不在运行，清除缓存，稍后会重新注册
+			delete(r.registeredServices, instanceID)
+		} else {
+			// ZIP 应用，如果已经注册过就跳过
+			return
+		}
 	}
 
-	endpoints, err := ParseMetaINI(metaPath)
-	if err != nil || len(endpoints) == 0 {
+	var endpoints []ServiceEndpoint
+
+	// 优先尝试从本地 meta.ini 读取（ZIP 应用）
+	metaPath := filepath.Join(r.baseDir, instanceID, "app", "meta.ini")
+	if FileExists(metaPath) {
+		eps, err := ParseMetaINI(metaPath)
+		if err == nil && len(eps) > 0 {
+			endpoints = eps
+		}
+	}
+
+	// 如果是镜像应用且没有从本地 meta.ini 读取到服务，尝试从容器内读取 meta.ini
+	if len(endpoints) == 0 && assignment != nil && assignment.ArtifactType == "image" {
+		// 尝试从容器内读取 meta.ini（镜像应用可能在镜像中包含 meta.ini）
+		// 常见的 meta.ini 路径：/app/meta.ini, /meta.ini, /app/bin/meta.ini
+		metaContent := r.readMetaFromContainer(instanceID)
+		if metaContent != "" {
+			// 将内容写入临时文件，然后解析
+			instDir := filepath.Join(r.baseDir, instanceID)
+			EnsureDir(instDir) // 确保目录存在
+			tmpFile := filepath.Join(instDir, "meta.ini.tmp")
+			if err := os.WriteFile(tmpFile, []byte(metaContent), 0644); err == nil {
+				eps, err := ParseMetaINI(tmpFile)
+				if err != nil {
+					log.Printf("ERROR: Failed to parse meta.ini for instance %s: %v", instanceID, err)
+				} else if len(eps) == 0 {
+					// 没有服务端点（如 gRPC Worker），这是正常的，不需要警告
+					// 标记为已处理，避免重复读取
+					r.registeredServices[instanceID] = true
+				} else {
+					endpoints = eps
+					log.Printf("Read meta.ini from container for instance %s, found %d endpoint(s)", instanceID, len(eps))
+					for i, ep := range eps {
+						log.Printf("  Endpoint %d: %s:%s:%d", i+1, ep.ServiceName, ep.Protocol, ep.Port)
+					}
+				}
+				// 清理临时文件
+				os.Remove(tmpFile)
+			} else {
+				log.Printf("ERROR: Failed to write temp meta.ini file for instance %s: %v", instanceID, err)
+			}
+		}
+	}
+
+	// 如果还是没有读取到服务，且是镜像应用，尝试从 PortMappings 提取
+	if len(endpoints) == 0 && assignment != nil && assignment.ArtifactType == "image" && assignment.PortMappings != "" {
+		// 从 PortMappings JSON 解析端口映射
+		// 支持两种格式：
+		// 1. 简单格式：{"host": 4100, "container": 4100} - 使用 AppName 作为服务名称
+		// 2. 完整格式：{"serviceName": "planArea", "protocol": "http", "host": 4100, "container": 4100} - 使用指定的服务名称和协议
+		var portMaps []map[string]interface{}
+		if err := json.Unmarshal([]byte(assignment.PortMappings), &portMaps); err == nil {
+			// 默认服务名称（如果端口映射中没有指定）
+			defaultServiceName := assignment.AppName
+			if defaultServiceName == "" {
+				defaultServiceName = "unknown"
+			}
+			// 为每个端口映射创建一个服务端点
+			for _, pm := range portMaps {
+				hostPort, _ := pm["host"].(float64)
+				containerPort, _ := pm["container"].(float64)
+				// 使用 host 端口（因为使用 host 网络模式时，容器端口就是 host 端口）
+				// 但如果没有 host 端口，使用 container 端口
+				port := int(hostPort)
+				if port <= 0 {
+					port = int(containerPort)
+				}
+				if port > 0 {
+					// 优先使用端口映射中指定的服务名称和协议（与 meta.ini 格式一致）
+					serviceName, _ := pm["serviceName"].(string)
+					if serviceName == "" {
+						serviceName = defaultServiceName
+					}
+					protocol, _ := pm["protocol"].(string)
+					if protocol == "" {
+						protocol = "http" // 默认协议为 http
+					}
+					endpoints = append(endpoints, ServiceEndpoint{
+						ServiceName: serviceName,
+						Protocol:    protocol,
+						Port:        port,
+					})
+					log.Printf("Registered service endpoint from port mapping: %s:%s:%d (instance: %s)", serviceName, protocol, port, instanceID)
+				}
+			}
+		} else {
+			log.Printf("Failed to parse port mappings for instance %s: %v", instanceID, err)
+		}
+	}
+
+	// 如果没有找到任何服务端点，标记为已处理（避免重复读取），然后返回
+	if len(endpoints) == 0 {
+		r.registeredServices[instanceID] = true
 		return
 	}
 
@@ -500,11 +606,15 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string) {
 		IP:         ip,
 		Endpoints:  endpoints,
 	}
-	// 使用增量注册模式（不传replace=true），只添加/更新meta.ini中的服务端点
+	// 使用增量注册模式（不传replace=true），只添加/更新服务端点
 	// 不会删除手动注册的其他服务端点
 	url := r.controller + "/v1/services/register"
 	if err := r.http.PostJSON(url, reg); err != nil {
-		log.Printf("Failed to register services: %v", err)
+		log.Printf("ERROR: Failed to register services for instance %s: %v", instanceID, err)
+	} else {
+		log.Printf("Successfully registered %d service endpoint(s) for instance %s", len(endpoints), instanceID)
+		// 标记为已注册，避免重复注册
+		r.registeredServices[instanceID] = true
 	}
 }
 
@@ -516,8 +626,52 @@ func (r *Reconciler) HeartbeatServices(instanceID string) {
 	}
 }
 
+// readMetaFromContainer 从容器内读取 meta.ini 文件
+// 尝试多个常见路径：/app/meta.ini, /meta.ini, /app/bin/meta.ini
+func (r *Reconciler) readMetaFromContainer(instanceID string) string {
+	// 需要访问 DockerManager，进行类型断言
+	if r.dockerManager == nil {
+		return ""
+	}
+	
+	// 类型断言获取 DockerManager
+	dm, ok := r.dockerManager.(*DockerManager)
+	if !ok {
+		return ""
+	}
+	
+	// 获取容器ID
+	containerID, exists := dm.containers[instanceID]
+	if !exists {
+		// 尝试通过容器名查找
+		containerName := fmt.Sprintf("plum-app-%s", instanceID)
+		info, err := dm.client.ContainerInspect(dm.ctx, containerName)
+		if err != nil {
+			return ""
+		}
+		containerID = info.ID
+		if !info.State.Running {
+			return ""
+		}
+	}
+	
+	// 尝试多个常见路径
+	metaPaths := []string{"/app/meta.ini", "/meta.ini", "/app/bin/meta.ini", "/usr/local/app/meta.ini"}
+	for _, metaPath := range metaPaths {
+		content, err := dm.readFileFromContainer(containerID, metaPath)
+		if err == nil && content != "" {
+			log.Printf("Found meta.ini at %s in container %s", metaPath, containerID[:12])
+			return content
+		}
+	}
+	
+	return ""
+}
+
 // deleteServices 删除服务
 func (r *Reconciler) deleteServices(instanceID string) {
 	url := fmt.Sprintf("%s/v1/services?instanceId=%s", r.controller, instanceID)
 	r.http.Delete(url)
+	// 清除注册缓存，这样如果实例重新启动，可以重新注册服务
+	delete(r.registeredServices, instanceID)
 }

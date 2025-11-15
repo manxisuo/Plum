@@ -151,6 +151,10 @@ sudo apt install -y build-essential
 sudo apt install -y cmake g++ make git pkg-config
 ```
 
+```bash
+sudo apt install net-tools
+```
+
 ## protoc / protoc-gen-go / protoc-gen-go-grpc / gRPC C++开发包 / Protobuf C++开发包
 
 ### 1️⃣ 更新系统 & 安装基础工具

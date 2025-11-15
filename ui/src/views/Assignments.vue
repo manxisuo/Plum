@@ -6,7 +6,7 @@ import { Refresh, Monitor, List, CircleCheck, CircleClose, VideoPlay, VideoPause
 import IdDisplay from '../components/IdDisplay.vue'
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
-type Assignment = { instanceId: string; deploymentId?: string; desired: string; artifactUrl: string; startCmd: string; healthy?: boolean; phase?: string; lastReportAt?: number }
+type Assignment = { instanceId: string; deploymentId?: string; desired: string; artifactUrl: string; startCmd: string; healthy?: boolean; phase?: string; lastReportAt?: number; appName?: string; appVersion?: string; artifactType?: string; imageRepository?: string; imageTag?: string }
 type Assignments = { items: Assignment[] }
 type NodeDTO = { nodeId: string; ip: string }
 const nodeId = ref('nodeA')
@@ -185,9 +185,12 @@ const { t } = useI18n()
       </template>
       
       <el-table v-loading="loading" :data="paginatedItems" style="width:100%;" stripe>
-        <el-table-column :label="t('assignments.columns.deployment')" width="100">
+        <el-table-column :label="t('assignments.columns.app')" width="200" min-width="150">
           <template #default="{ row }">
-            <IdDisplay :id="row.deploymentId" :length="8" />
+            <span v-if="row.appName || row.appVersion">
+              {{ row.appName || '-' }}:{{ row.appVersion || '-' }}
+            </span>
+            <span v-else style="color: #909399;">-</span>
           </template>
         </el-table-column>
         <el-table-column :label="t('assignments.columns.instance')" width="100">
@@ -222,7 +225,19 @@ const { t } = useI18n()
           <template #default="{ row }">{{ row.lastReportAt ? new Date(row.lastReportAt*1000).toLocaleString() : '-' }}</template>
         </el-table-column>
         <el-table-column prop="startCmd" :label="t('assignments.columns.startCmd')"  width="100" />
-        <el-table-column prop="artifactUrl" :label="t('assignments.columns.artifact')" />
+        <el-table-column :label="t('assignments.columns.artifact')">
+          <template #default="{ row }">
+            <span v-if="row.artifactType === 'image' && row.imageRepository && row.imageTag">
+              <el-tag type="info" size="small" style="margin-right: 4px;">镜像</el-tag>
+              {{ row.imageRepository }}:{{ row.imageTag }}
+            </span>
+            <span v-else-if="row.artifactUrl && row.artifactUrl.startsWith('image://')">
+              <el-tag type="info" size="small" style="margin-right: 4px;">镜像</el-tag>
+              <span style="color: #909399; font-family: monospace;">{{ row.artifactUrl }}</span>
+            </span>
+            <span v-else>{{ row.artifactUrl || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('common.action')" width="180" fixed="right">
           <template #default="{ row }">
             <div style="display:flex; gap:6px; flex-wrap:wrap;">

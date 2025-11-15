@@ -168,7 +168,6 @@ const totalInstances = computed(() => items.value.reduce((sum, item) => sum + it
               {{ t('deployments.buttons.stop') }}
             </el-button>
             <router-link :to="'/deployments/'+row.deploymentId"><el-button size="small">{{ t('common.details') }}</el-button></router-link>
-            <router-link :to="'/deployments/'+row.deploymentId+'/config'"><el-button size="small">{{ t('common.config') }}</el-button></router-link>
             <el-popconfirm :title="t('deployments.confirmDelete')" @confirm="removeDeployment(row.deploymentId)">
               <template #reference>
                 <el-button type="danger" size="small">{{ t('common.delete') }}</el-button>

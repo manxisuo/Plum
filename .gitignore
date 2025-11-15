@@ -127,5 +127,7 @@ offline-images/
 controller/vendor/
 agent-go/vendor/
 
+venv
+
 # Keep main deployment documentation for reference
 # OFFLINE_DEPLOYMENT_SUMMARY.md - keep this file

@@ -359,13 +359,25 @@ echo "   - protobuf-compiler_*_arm64.deb"
 cd ../..
 
 # 下载 get-pip.py 供离线安装 pip
-if [ -f "plum-offline-deploy/scripts-prepare/download-pip.sh" ]; then
-    echo "⬇️  下载 get-pip.py（离线安装 pip）..."
-    bash ./plum-offline-deploy/scripts-prepare/download-pip.sh || {
-        echo "⚠️  get-pip.py 下载失败，请在联网环境手动获取 https://bootstrap.pypa.io/pip/3.8/get-pip.py"
-    }
+echo "📥 下载 get-pip.py 供离线安装 pip"
+if [ -t 0 ] && [ -t 1 ]; then
+    read -p "是否下载 get-pip.py？(y/N): " download_pip
 else
-    echo "⚠️  未找到 download-pip.sh，跳过 get-pip.py 下载"
+    echo "非交互式环境，跳过 get-pip.py 下载"
+    download_pip="n"
+fi
+
+if [[ $download_pip =~ ^[Yy]$ ]]; then
+    if [ -f "plum-offline-deploy/scripts-prepare/download-pip.sh" ]; then
+        echo "⬇️  下载 get-pip.py（离线安装 pip）..."
+        bash ./plum-offline-deploy/scripts-prepare/download-pip.sh || {
+            echo "⚠️  get-pip.py 下载失败，请在联网环境手动获取 https://bootstrap.pypa.io/pip/3.8/get-pip.py"
+        }
+    else
+        echo "⚠️  未找到 download-pip.sh，跳过 get-pip.py 下载"
+    fi
+else
+    echo "跳过 get-pip.py 下载"
 fi
 
 # 准备C++ SDK离线依赖

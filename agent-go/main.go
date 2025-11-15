@@ -157,7 +157,7 @@ func main() {
 				// 注册服务
 				for _, a := range assignments {
 					if a.Desired == "Running" {
-						reconciler.RegisterServices(a.InstanceID, nodeID, agentIP)
+						reconciler.RegisterServices(a.InstanceID, nodeID, agentIP, &a)
 						reconciler.HeartbeatServices(a.InstanceID)
 					}
 				}

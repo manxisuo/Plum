@@ -139,7 +139,7 @@ const messages = {
       title: 'Deployment Detail',
       buttons: { stopAll: 'Stop All', stopByNode: 'Stop By Node' },
       desc: { deploymentId: 'DeploymentID', name: 'Name', labels: 'Labels' },
-      columns: { instanceId: 'InstanceID', nodeId: 'NodeID', artifact: 'Artifact', startCmd: 'StartCmd', desired: 'Desired', action: 'Action' },
+      columns: { app: 'App', instanceId: 'InstanceID', nodeId: 'NodeID', artifact: 'Artifact', startCmd: 'StartCmd', desired: 'Desired', action: 'Action' },
       stats: { instances: 'Instances', running: 'Running', stopped: 'Stopped', healthy: 'Healthy' },
       table: { title: 'Instance List', items: 'items' }
     },
@@ -154,7 +154,7 @@ const messages = {
     },
     assignments: {
       form: { nodeId: 'Node ID' },
-      columns: { deployment: 'Deployment', instance: 'Instance', desired: 'Desired', phase: 'Phase', healthy: 'Healthy', lastReportAt: 'LastReportAt', startCmd: 'StartCmd', artifact: 'Artifact', action: 'Action' },
+      columns: { app: 'App', instance: 'Instance', desired: 'Desired', phase: 'Phase', healthy: 'Healthy', lastReportAt: 'LastReportAt', startCmd: 'StartCmd', artifact: 'Artifact', action: 'Action' },
       stats: { total: 'Total', running: 'Running', stopped: 'Stopped', healthy: 'Healthy' },
       table: { title: 'Instance Assignments', items: 'items' },
       error: { title: 'Error' }
@@ -613,7 +613,7 @@ const messages = {
       title: '部署详情',
       buttons: { stopAll: '全部停止', stopByNode: '按节点停止' },
       desc: { deploymentId: '部署ID', name: '名称', labels: '标签' },
-      columns: { instanceId: '实例ID', nodeId: '节点ID', artifact: '制品', startCmd: '启动命令', desired: '期望状态', action: '操作' },
+      columns: { app: '应用', instanceId: '实例ID', nodeId: '节点ID', artifact: '制品', startCmd: '启动命令', desired: '期望状态', action: '操作' },
       stats: { instances: '实例', running: '运行中', stopped: '已停止', healthy: '健康' },
       table: { title: '实例列表', items: '项' }
     },
@@ -628,7 +628,7 @@ const messages = {
     },
     assignments: {
       form: { nodeId: '节点 ID' },
-      columns: { deployment: '部署', instance: '实例', desired: '期望', phase: '阶段', healthy: '健康', lastReportAt: '最近上报', startCmd: '启动命令', artifact: '制品', action: '操作' },
+      columns: { app: '应用', instance: '实例', desired: '期望', phase: '阶段', healthy: '健康', lastReportAt: '最近上报', startCmd: '启动命令', artifact: '制品', action: '操作' },
       stats: { total: '总计', running: '运行中', stopped: '已停止', healthy: '健康' },
       table: { title: '实例分配', items: '项' },
       error: { title: '错误' }

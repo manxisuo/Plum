@@ -79,7 +79,59 @@ func handleDeploymentByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		assigns, _ := store.Current.ListAssignmentsForDeployment(id)
-		writeJSON(w, map[string]any{"deployment": t, "assignments": assigns})
+		// 为每个 assignment 查找 artifact 信息（类型、镜像信息等）
+		assignmentsWithArtifact := make([]map[string]any, 0, len(assigns))
+		for _, a := range assigns {
+			item := map[string]any{
+				"instanceId":   a.InstanceID,
+				"deploymentId": a.DeploymentID,
+				"nodeId":       a.NodeID,
+				"desired":      string(a.Desired),
+				"artifactUrl":  a.ArtifactURL,
+				"startCmd":     a.StartCmd,
+				"appName":      a.AppName,
+				"appVersion":   a.AppVersion,
+			}
+			
+			// 获取 artifact 信息（类型、镜像信息等）
+			var artifact store.Artifact
+			var artifactFound bool
+			if strings.HasPrefix(a.ArtifactURL, "image://") {
+				// 镜像应用标识符格式：image://{artifactId}
+				artifactID := strings.TrimPrefix(a.ArtifactURL, "image://")
+				if art, ok, _ := store.Current.GetArtifact(artifactID); ok {
+					artifact = art
+					artifactFound = true
+				}
+			} else if a.ArtifactURL != "" {
+				// ZIP 应用：通过路径查找
+				if art, ok, _ := store.Current.GetArtifactByPath(a.ArtifactURL); ok {
+					artifact = art
+					artifactFound = true
+				}
+			}
+			// 如果通过路径找不到，尝试通过 AppName 和 AppVersion 查找（向后兼容）
+			if !artifactFound && a.AppName != "" && a.AppVersion != "" {
+				artifacts, _ := store.Current.ListArtifacts()
+				for _, art := range artifacts {
+					if art.AppName == a.AppName && art.Version == a.AppVersion {
+						artifact = art
+						artifactFound = true
+						break
+					}
+				}
+			}
+			if artifactFound {
+				item["artifactType"] = artifact.Type
+				if artifact.Type == "image" {
+					item["imageRepository"] = artifact.ImageRepository
+					item["imageTag"] = artifact.ImageTag
+					item["portMappings"] = artifact.PortMappings
+				}
+			}
+			assignmentsWithArtifact = append(assignmentsWithArtifact, item)
+		}
+		writeJSON(w, map[string]any{"deployment": t, "assignments": assignmentsWithArtifact})
 	case http.MethodPatch:
 		var body struct {
 			Name   string            `json:"name"`

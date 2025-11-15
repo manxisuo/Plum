@@ -326,10 +326,18 @@ function openImageDialog() {
 }
 
 async function createImageApp() {
-  if (!imageForm.value.name || !imageForm.value.version || !imageForm.value.imageRepository || !imageForm.value.imageTag) {
-    ElMessage.error('请填写所有必填字段')
+  // 只验证必填字段：镜像仓库和镜像标签
+  if (!imageForm.value.imageRepository || !imageForm.value.imageTag) {
+    ElMessage.error('请填写镜像仓库和镜像标签')
     return
   }
+  
+  // 如果应用名称为空，自动使用镜像仓库的值
+  const appName = imageForm.value.name || imageForm.value.imageRepository
+  
+  // 如果版本为空，自动使用镜像标签的值
+  const appVersion = imageForm.value.version || imageForm.value.imageTag
+  
   creating.value = true
   try {
     const portMappings = imageForm.value.portMappings.filter(m => m.host > 0 && m.container > 0)
@@ -337,8 +345,8 @@ async function createImageApp() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: imageForm.value.name,
-        version: imageForm.value.version,
+        name: appName,
+        version: appVersion,
         imageRepository: imageForm.value.imageRepository,
         imageTag: imageForm.value.imageTag,
         portMappings: portMappings
@@ -498,11 +506,17 @@ async function createImageApp() {
       @close="resetImageForm"
     >
       <el-form :model="imageForm" label-width="120px">
-        <el-form-item :label="t('apps.createImage.name')" required>
+        <el-form-item :label="t('apps.createImage.name')">
           <el-input v-model="imageForm.name" :placeholder="t('apps.createImage.name')" />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            留空时自动使用镜像仓库的值
+          </div>
         </el-form-item>
-        <el-form-item :label="t('apps.createImage.version')" required>
+        <el-form-item :label="t('apps.createImage.version')">
           <el-input v-model="imageForm.version" :placeholder="t('apps.createImage.version')" />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            留空时自动使用镜像标签的值
+          </div>
         </el-form-item>
         <el-form-item :label="t('apps.createImage.imageRepository')" required>
           <el-select
