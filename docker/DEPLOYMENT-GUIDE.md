@@ -123,7 +123,7 @@ docker tag <IMAGE_ID> kylin/kylin:v10-release-020  # 需要添加标签
 #### 3. 构建Plum镜像（方案A需要）
 ```bash
 # 如果使用方案A，需要构建Plum镜像
-./docker/build-static-offline-fixed.sh
+./docker/build-static-offline.sh
 ```
 
 #### 4. 配置服务（可选：容器模式）

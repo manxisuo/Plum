@@ -23,7 +23,7 @@ docker-compose -f docker-compose.offline.yml down
 docker rmi plum-controller:latest plum-controller:offline plum-agent:latest plum-agent:offline
 
 # 使用ARM64构建脚本
-./docker/build-static-offline-fixed.sh
+./docker/build-static-offline.sh
 
 # 重新启动服务
 docker-compose -f docker-compose.offline.yml up -d
@@ -274,7 +274,7 @@ Docker构建过程中 `apk add` 命令试图联网下载包，但离线环境无
 ### 解决方案
 
 #### 方案1：移除apk add命令（推荐）
-修改 `docker/build-static-offline-fixed.sh`，移除网络依赖的包安装：
+修改 `docker/build-static-offline.sh`，移除网络依赖的包安装：
 
 ```bash
 # Controller静态Dockerfile
@@ -300,11 +300,13 @@ EOF
 # alpine-3.18-with-packages-arm64.tar.gz
 ```
 
-#### 方案3：使用scratch镜像
+#### 方案3：使用静态构建（推荐）
 ```bash
-# 使用完全静态的scratch镜像
-./docker/build-scratch-images.sh
+# 使用静态构建脚本（使用 alpine 基础镜像，包含基本工具）
+./docker/build-static-offline.sh
 ```
+
+**注意**：如果需要最小镜像（使用 `scratch` 基础镜像），可以修改 `build-static-offline.sh` 中的 `FROM alpine:3.18` 为 `FROM scratch`，但这样会失去调试能力（无法使用 `docker exec` 进入容器）。
 
 ### 预防措施
 - 在联网环境预先准备包含必要包的镜像
@@ -423,7 +425,7 @@ find /lib -name "libc.so*" 2>/dev/null
 #### 方案2：重新构建Agent镜像（推荐）
 ```bash
 # 确保使用alpine:3.18基础镜像（包含动态链接库）
-./docker/build-static-offline-fixed.sh
+./docker/build-static-offline.sh
 
 # 重新启动Agent服务
 docker-compose -f docker-compose.offline.yml restart plum-agent-a
@@ -673,7 +675,7 @@ docker-compose -f docker-compose.offline.yml down
 docker volume prune -f
 
 # 重新构建镜像
-./docker/build-static-offline-fixed.sh
+./docker/build-static-offline.sh
 
 # 重新启动服务
 docker-compose -f docker-compose.offline.yml up -d

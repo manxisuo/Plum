@@ -119,5 +119,5 @@ echo "ℹ️  提示: 文件名已包含架构后缀 (例如: -amd64 / -arm64)�
 echo "   验证镜像架构: docker inspect <image:tag> | grep -i Architecture"
 if [ "$HAS_PLUM_CONTROLLER" = false ] || [ "$HAS_PLUM_AGENT" = false ]; then
     echo "⚠️  注意: 缺少plum镜像，需要在离线环境中运行:"
-    echo "   ./docker/build-static-offline-fixed.sh"
+    echo "   ./docker/build-static-offline.sh"
 fi

@@ -59,7 +59,7 @@ cd plum-offline-deploy/source/Plum
 docker-compose -f docker-compose.offline.yml up -d
 
 # 方案B：在目标环境构建镜像
-./docker/build-static-offline-fixed.sh
+./docker/build-static-offline.sh
 docker-compose -f docker-compose.offline.yml up -d
 ```
 
