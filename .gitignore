@@ -7,8 +7,8 @@ Thumbs.db
 *.swo
 
 # Environment configuration
-.env
-**/.env
+# .env
+# **/.env
 
 # Node / Vite (UI)
 node_modules/
