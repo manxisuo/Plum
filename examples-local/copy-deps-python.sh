@@ -67,9 +67,21 @@ else
 fi
 
 # 复制静态文件目录（如果存在，否则创建空目录）
+# 注意：会递归复制所有子目录，包括 tiles/、leaflet/ 等
 if [ -d "$APP_DIR/static" ] && [ "$(ls -A $APP_DIR/static 2>/dev/null)" ]; then
-    echo "复制静态文件..."
+    echo "复制静态文件（包括 tiles 瓦片地图和 leaflet 库）..."
     cp -r "$APP_DIR/static" "$TARGET_DIR/"
+    # 检查并提示 tiles 目录
+    if [ -d "$APP_DIR/static/tiles" ] && [ "$(ls -A $APP_DIR/static/tiles 2>/dev/null)" ]; then
+        TILE_COUNT=$(find "$APP_DIR/static/tiles" -name "*.png" 2>/dev/null | wc -l)
+        echo "  ✓ 包含离线瓦片地图: $TILE_COUNT 张瓦片"
+    else
+        echo "  ⚠️  未找到瓦片地图目录，离线环境将使用空白占位图"
+    fi
+    # 检查并提示 leaflet 目录
+    if [ -d "$APP_DIR/static/leaflet" ]; then
+        echo "  ✓ 包含 Leaflet 库文件"
+    fi
 else
     mkdir -p "$TARGET_DIR/static"
     touch "$TARGET_DIR/static/.gitkeep"
