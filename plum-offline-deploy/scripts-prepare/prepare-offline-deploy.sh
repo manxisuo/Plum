@@ -384,23 +384,47 @@ fi
 echo "📦 准备C++ SDK离线依赖..."
 
 # 下载nlohmann/json
-if [ -f "plum-offline-deploy/scripts-prepare/download-nlohmann-json.sh" ]; then
-    echo "⬇️  下载nlohmann/json离线版本..."
-    bash ./plum-offline-deploy/scripts-prepare/download-nlohmann-json.sh || {
-        echo "⚠️  nlohmann/json下载失败，C++ SDK将无法在离线环境中构建"
-    }
+echo "📥 下载nlohmann/json 供离线安装"
+if [ -t 0 ] && [ -t 1 ]; then
+    read -p "是否下载nlohmann/json？(y/N): " download_nlohmann
 else
-    echo "⚠️  未找到download-nlohmann-json.sh，跳过nlohmann/json下载"
+    echo "非交互式环境，跳过nlohmann/json下载"
+    download_nlohmann="n"
+fi
+
+if [[ $download_nlohmann =~ ^[Yy]$ ]]; then
+    if [ -f "plum-offline-deploy/scripts-prepare/download-nlohmann-json.sh" ]; then
+        echo "⬇️  下载nlohmann/json离线版本..."
+        bash ./plum-offline-deploy/scripts-prepare/download-nlohmann-json.sh || {
+            echo "⚠️  nlohmann/json下载失败，C++ SDK将无法在离线环境中构建"
+        }
+    else
+        echo "⚠️  未找到download-nlohmann-json.sh，跳过nlohmann/json下载"
+    fi
+else
+    echo "跳过nlohmann/json下载"
 fi
 
 # 下载cpp-httplib
-if [ -f "plum-offline-deploy/scripts-prepare/download-cpp-httplib.sh" ]; then
-    echo "⬇️  下载cpp-httplib离线版本..."
-    bash ./plum-offline-deploy/scripts-prepare/download-cpp-httplib.sh || {
-        echo "⚠️  cpp-httplib下载失败，C++ SDK可能无法在离线环境中构建"
-    }
+echo "📥 下载cpp-httplib 供离线安装"
+if [ -t 0 ] && [ -t 1 ]; then
+    read -p "是否下载cpp-httplib？(y/N): " download_httplib
 else
-    echo "⚠️  未找到download-cpp-httplib.sh，跳过cpp-httplib下载"
+    echo "非交互式环境，跳过cpp-httplib下载"
+    download_httplib="n"
+fi
+
+if [[ $download_httplib =~ ^[Yy]$ ]]; then
+    if [ -f "plum-offline-deploy/scripts-prepare/download-cpp-httplib.sh" ]; then
+        echo "⬇️  下载cpp-httplib离线版本..."
+        bash ./plum-offline-deploy/scripts-prepare/download-cpp-httplib.sh || {
+            echo "⚠️  cpp-httplib下载失败，C++ SDK可能无法在离线环境中构建"
+        }
+    else
+        echo "⚠️  未找到download-cpp-httplib.sh，跳过cpp-httplib下载"
+    fi
+else
+    echo "跳过cpp-httplib下载"
 fi
 
 # 注意：build-essential 已在目标机器手动安装，跳过相关下载步骤
