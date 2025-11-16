@@ -15,7 +15,7 @@ fi
 VENV_DIR="${APP_ROOT}/venv"
 
 export PYTHONUNBUFFERED=1
-export PLAN_SERVICE_BASE="${PLAN_SERVICE_BASE:-http://127.0.0.1:4100}"
+export CONTROLLER_BASE="${CONTROLLER_BASE:-http://plum-controller:8080}"
 
 # 如果存在虚拟环境，使用虚拟环境中的 Python
 if [ -d "${VENV_DIR}" ] && [ -f "${VENV_DIR}/bin/uvicorn" ]; then
