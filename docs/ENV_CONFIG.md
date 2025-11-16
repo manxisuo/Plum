@@ -139,19 +139,47 @@ vim .env  # 修改配置
 | `PLUM_CONTAINER_MEMORY` | 容器内存限制 | 无限制 | `512m`, `1g`, `2048` | 格式：`512m`(MB), `1g`(GB), `2048`(字节) |
 | `PLUM_CONTAINER_CPUS` | 容器CPU限制 | 无限制 | `1.0`, `2`, `0.5` | 格式：CPU核数 |
 | `PLUM_CONTAINER_ENV` | 容器自定义环境变量 | 无 | `DISPLAY=:99`, `DISPLAY=:99,QT_QPA_PLATFORM=xcb` | 格式：`KEY1=value1,KEY2=value2` |
+| `PLUM_CONTAINER_NETWORK_MODE` | 容器网络模式 | `bridge` | `host`, `bridge`, `none` | 详见下方说明 |
+| `PLUM_CONTROLLER_HOST` | Controller主机地址（用于容器内访问） | 自动推导 | `172.17.0.1`, `192.168.1.100` | 仅Bridge模式有效，详见下方说明 |
 | `PLUM_HOST_LIB_PATHS` | 宿主机库路径映射 | 无 | `/usr/lib,/usr/local/lib`, `/opt/qt/lib` | 格式：`/path1,/path2,/path3`，只读挂载 |
 
 **特殊说明**：
+
+- `PLUM_CONTAINER_NETWORK_MODE`：容器网络模式配置
+  - `host`：容器使用宿主机网络，与宿主机共享网络栈（性能最好，但隔离性差）
+    - 容器内可以直接访问 `CONTROLLER_BASE` 中的地址
+    - 如果 `CONTROLLER_BASE=http://plum-controller:8080`，容器内可以直接解析 `plum-controller`
+    - 如果 `CONTROLLER_BASE=http://127.0.0.1:8080`，容器内直接使用 `127.0.0.1`
+  - `bridge`：容器使用 Docker 桥接网络（默认，推荐，隔离性好）
+    - Agent 会自动处理网络地址转换和主机映射
+    - 如果 `CONTROLLER_BASE` 是 `localhost/127.0.0.1`，会自动调整为 Docker 网关 IP
+  - `none`：容器无网络（极少使用）
+
+- `PLUM_CONTROLLER_HOST`：Controller 主机地址（仅 Bridge 网络模式有效）
+  - **Host 模式**：通常不需要设置此变量，容器和宿主机共享网络
+  - **Bridge 模式**：需要根据情况设置
+    - 如果 `CONTROLLER_BASE` 是 `localhost/127.0.0.1`：默认使用 `172.17.0.1`（Docker 默认网关 IP）
+    - 如果 `CONTROLLER_BASE` 是主机名（如 `plum-controller`）：
+      - Agent 会尝试从 `/etc/hosts` 解析该主机名
+      - 如果无法解析，使用 `172.17.0.1`
+    - 如果 Controller 在其他机器上，请设置为 Controller 的实际 IP
+  - **默认值（Bridge 模式）**：
+    - `localhost/127.0.0.1` → `172.17.0.1`
+    - 主机名无法解析 → `172.17.0.1`
+
 - `LD_LIBRARY_PATH`：如果应用目录有 `lib/` 子目录，Agent会自动添加 `LD_LIBRARY_PATH=/app/lib:/usr/lib:/lib`
   - 这对Qt应用很有用，可以将Qt库放在 `lib/` 目录中
+
 - `PLUM_CONTAINER_ENV`：用于传递应用需要的特殊环境变量
   - 例如Qt应用可能需要：`DISPLAY=:99` 或 `QT_QPA_PLATFORM=xcb`
+
 - `PLUM_HOST_LIB_PATHS`：将宿主机的库路径只读挂载到容器内
   - 适用于多个应用共享相同的系统库（如Qt库）
   - 避免每个应用都自包含库，减少重复存储
   - 注意：需要确保宿主机和容器架构兼容（都是x86_64或都是ARM64）
   - **Agent 以容器方式运行时**：必须先在 Agent 容器启动参数中通过 `volumes` 挂载宿主机目录，例如 `- /usr/lib64:/host-libs/usr/lib64:ro`，然后在 `.env` 中写 `PLUM_HOST_LIB_PATHS=/host-libs/usr/lib64`。否则 Agent 在容器内无法看到宿主机路径。
   - **Agent 直接运行在宿主机时**：`PLUM_HOST_LIB_PATHS` 可以直接填写宿主机实际路径，无需额外挂载。
+
 - **使用本地目录作为数据卷时**：若 `.env` 中 `AGENT_DATA_DIR=/tmp/plum-agent`（或其它宿主路径），请在宿主机提前创建并授予容器用户写权限，例如：
   ```bash
   sudo mkdir -p /tmp/plum-agent
@@ -187,15 +215,134 @@ vim .env  # 修改配置
 
 ## 📖 Agent 注入的环境变量（应用运行时）
 
-Agent会自动向应用注入以下环境变量（无需在`.env`中配置）：
+Agent会根据应用运行模式自动注入不同的环境变量。这些变量由Agent在启动应用时自动设置，应用可以直接使用，**无需在应用的`.env`中配置**。
 
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `PLUM_INSTANCE_ID` | 实例ID（每个实例唯一） | `3504f3c73a6aa13a14547f078799a9ec-5ffb69d9` |
-| `PLUM_APP_NAME` | 应用名称 | `demo-app`, `my-service` |
-| `PLUM_APP_VERSION` | 应用版本 | `1.0.0`, `v2.1.3` |
+### 1. ZIP 应用 - 进程模式（`AGENT_RUN_MODE=process`）
 
-**说明**：这些变量由Agent在启动应用时自动注入，应用可以直接使用。
+当应用以进程方式运行时，Agent会注入以下环境变量：
+
+| 变量名 | 说明 | 示例 | 备注 |
+|--------|------|------|------|
+| `PLUM_INSTANCE_ID` | 实例ID（每个实例唯一） | `3504f3c73a6aa13a14547f078799a9ec-5ffb69d9` | 用于标识应用实例 |
+| `PLUM_APP_NAME` | 应用名称 | `demo-app`, `my-service` | 应用标识 |
+| `PLUM_APP_VERSION` | 应用版本 | `1.0.0`, `v2.1.3` | 应用版本号 |
+| `WORKER_NODE_ID` | 节点ID（Agent所在节点） | `nodeA`, `nodeB` | 用于StreamWorker注册，值为Agent的 `AGENT_NODE_ID` |
+
+**说明**：
+- 进程模式只注入基础的应用标识信息
+- `WORKER_NODE_ID` 的值来自Agent的 `AGENT_NODE_ID` 配置，确保应用注册时使用正确的节点ID
+- 应用需要自行配置 `CONTROLLER_BASE` 等连接信息（通过 `.env` 文件或环境变量）
+
+### 2. ZIP 应用 - 容器模式（`AGENT_RUN_MODE=docker`）
+
+当ZIP应用以容器方式运行时，Agent会注入以下环境变量：
+
+| 变量名 | 说明 | 示例 | 备注 |
+|--------|------|------|------|
+| `PLUM_INSTANCE_ID` | 实例ID（每个实例唯一） | `3504f3c73a6aa13a14547f078799a9ec-5ffb69d9` | 基础标识 |
+| `PLUM_APP_NAME` | 应用名称 | `demo-app`, `my-service` | 基础标识 |
+| `PLUM_APP_VERSION` | 应用版本 | `1.0.0`, `v2.1.3` | 基础标识 |
+| `WORKER_NODE_ID` | 节点ID（Agent所在节点） | `nodeA`, `nodeB` | 用于StreamWorker注册，值为Agent的 `AGENT_NODE_ID` |
+| `CONTROLLER_BASE` | Controller HTTP API 地址 | `http://plum-controller:8080` | 用于HTTP API调用 |
+| `CONTROLLER_GRPC_ADDR` | Controller gRPC 地址 | `plum-controller:9090` | 用于StreamWorker连接 |
+| `LD_LIBRARY_PATH` | 库搜索路径 | `/app/lib:/usr/lib:/lib` | 仅当应用目录有 `lib/` 子目录时自动添加 |
+
+**网络模式说明**：
+- **Host 网络模式**：`CONTROLLER_BASE` 和 `CONTROLLER_GRPC_ADDR` 根据Agent的 `CONTROLLER_BASE` 配置自动设置
+  - 如果 `CONTROLLER_BASE=http://plum-controller:8080`，则 `CONTROLLER_GRPC_ADDR=plum-controller:9090`
+  - 如果 `CONTROLLER_BASE=http://127.0.0.1:8080`，则 `CONTROLLER_GRPC_ADDR=127.0.0.1:9090`
+- **Bridge 网络模式**：Agent会自动解析并添加主机映射（ExtraHosts），确保容器内可以访问Controller
+  - 如果 `CONTROLLER_BASE=http://127.0.0.1:8080`，会自动调整为 `http://172.17.0.1:8080`（Docker网关IP）
+  - 如果 `CONTROLLER_BASE=http://plum-controller:8080`，会保持原样并通过ExtraHosts映射
+
+### 3. 镜像应用（`ArtifactType=image`）
+
+镜像应用总是以容器方式运行，Agent会注入以下环境变量：
+
+| 变量名 | 说明 | 示例 | 备注 |
+|--------|------|------|------|
+| `PLUM_INSTANCE_ID` | 实例ID（每个实例唯一） | `3504f3c73a6aa13a14547f078799a9ec-5ffb69d9` | 基础标识 |
+| `PLUM_APP_NAME` | 应用名称 | `demo-app`, `my-service` | 基础标识 |
+| `PLUM_APP_VERSION` | 应用版本 | `1.0.0`, `v2.1.3` | 基础标识 |
+| `WORKER_NODE_ID` | 节点ID（Agent所在节点） | `nodeA`, `nodeB` | 用于StreamWorker注册，值为Agent的 `AGENT_NODE_ID` |
+| `CONTROLLER_BASE` | Controller HTTP API 地址 | `http://plum-controller:8080` | 用于HTTP API调用 |
+| `CONTROLLER_GRPC_ADDR` | Controller gRPC 地址 | `plum-controller:9090` | 用于StreamWorker连接 |
+
+**网络模式说明**：与ZIP应用容器模式相同，根据网络模式自动调整地址。
+
+### 4. 自定义环境变量（所有容器模式）
+
+对于容器模式（ZIP容器和镜像容器），Agent还会注入通过 `PLUM_CONTAINER_ENV` 配置的自定义环境变量：
+
+**配置方式**（在Agent的 `.env` 文件中）：
+```bash
+PLUM_CONTAINER_ENV=KEY1=value1,KEY2=value2
+```
+
+**示例**：
+```bash
+# Qt应用需要显示支持
+PLUM_CONTAINER_ENV=DISPLAY=:99,QT_QPA_PLATFORM=xcb
+
+# 自定义配置
+PLUM_CONTAINER_ENV=MY_CONFIG_PATH=/app/config,MY_LOG_LEVEL=debug
+```
+
+**说明**：
+- 这些环境变量会被注入到**所有**容器模式的应用中
+- 适用于需要统一配置的场景（如Qt应用的显示配置）
+
+### 环境变量使用示例
+
+#### C++ 应用（StreamWorker）
+```cpp
+#include "plumworker/stream_worker.hpp"
+
+// StreamWorker 会自动从环境变量读取：
+// - PLUM_INSTANCE_ID
+// - PLUM_APP_NAME
+// - PLUM_APP_VERSION
+// - WORKER_NODE_ID（用于注册到Controller，值为Agent的节点ID）
+// - CONTROLLER_GRPC_ADDR（如果使用默认值 127.0.0.1:9090）
+
+StreamWorkerOptions opts;
+// opts.controllerGrpcAddr 默认为 "127.0.0.1:9090"
+// 如果设置了 CONTROLLER_GRPC_ADDR 环境变量，会自动使用
+// opts.nodeId 如果为空，会从 WORKER_NODE_ID 环境变量读取（默认 "nodeA"）
+StreamWorker worker(opts);
+```
+
+#### Python 应用
+```python
+import os
+
+instance_id = os.environ.get("PLUM_INSTANCE_ID")
+app_name = os.environ.get("PLUM_APP_NAME")
+controller_base = os.environ.get("CONTROLLER_BASE", "http://127.0.0.1:8080")
+
+print(f"Instance: {instance_id}, App: {app_name}")
+print(f"Controller: {controller_base}")
+```
+
+#### Shell 脚本
+```bash
+#!/bin/bash
+echo "Instance ID: $PLUM_INSTANCE_ID"
+echo "App Name: $PLUM_APP_NAME"
+echo "Controller: $CONTROLLER_BASE"
+```
+
+### 注意事项
+
+1. **环境变量优先级**：Agent注入的环境变量会覆盖应用 `.env` 文件中的同名变量
+2. **WORKER_NODE_ID 说明**：
+   - Agent会自动将 `WORKER_NODE_ID` 设置为Agent的 `AGENT_NODE_ID` 配置值
+   - 确保应用注册到Controller时使用正确的节点ID
+   - 例如：如果Agent配置为 `AGENT_NODE_ID=nodeB`，则应用容器内 `WORKER_NODE_ID=nodeB`
+   - StreamWorker会使用此环境变量进行注册，确保在Web UI中显示正确的节点
+3. **网络模式影响**：容器模式下的 `CONTROLLER_BASE` 和 `CONTROLLER_GRPC_ADDR` 会根据网络模式自动调整
+4. **主机名解析**：Bridge模式下，Agent会自动添加ExtraHosts映射，确保容器内可以解析Controller主机名
+5. **进程模式限制**：进程模式不注入 `CONTROLLER_BASE`，应用需要自行配置
 
 ---
 
