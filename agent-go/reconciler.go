@@ -25,7 +25,7 @@ type Reconciler struct {
 	registeredServices map[string]bool      // 已注册服务的实例（避免重复注册）
 }
 
-func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconciler {
+func NewReconciler(baseDir string, http *HTTPClient, controller string, nodeID string) *Reconciler {
 	EnsureDir(baseDir)
 
 	// 根据环境变量选择 ZIP 应用的运行模式
@@ -37,6 +37,7 @@ func NewReconciler(baseDir string, http *HTTPClient, controller string) *Reconci
 		BaseDir:    baseDir,
 		HTTP:       http,
 		Controller: controller,
+		NodeID:     nodeID,
 	}
 
 	// 总是创建 DockerManager（镜像应用需要，ZIP 应用在 docker 模式下也需要）

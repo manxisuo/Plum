@@ -167,6 +167,7 @@ func (m *ProcessManager) StartApp(instanceID string, app Assignment, appDir stri
 		"PLUM_INSTANCE_ID="+app.InstanceID,
 		"PLUM_APP_NAME="+app.AppName,
 		"PLUM_APP_VERSION="+app.AppVersion,
+		"WORKER_NODE_ID="+m.config.NodeID,
 	)
 	// 创建新的进程组
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

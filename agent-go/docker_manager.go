@@ -77,8 +77,10 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 	existing, err := m.client.ContainerInspect(m.ctx, containerName)
 	if err == nil {
 		// 如果容器存在但不运行，先删除
+		// 注意：删除容器不会删除数据卷中的数据（数据存储在宿主机的数据目录中）
+		// 新容器会挂载同一个数据目录，所以业务数据不会丢失
 		if !existing.State.Running {
-			log.Printf("Removing existing stopped container %s", containerName)
+			log.Printf("Removing existing stopped container %s (data will be preserved in host data directory)", containerName)
 			m.client.ContainerRemove(m.ctx, containerName, types.ContainerRemoveOptions{Force: true})
 		}
 	}
@@ -128,25 +130,64 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		fmt.Sprintf("PLUM_INSTANCE_ID=%s", app.InstanceID),
 		fmt.Sprintf("PLUM_APP_NAME=%s", app.AppName),
 		fmt.Sprintf("PLUM_APP_VERSION=%s", app.AppVersion),
+		fmt.Sprintf("WORKER_NODE_ID=%s", m.config.NodeID),
 	}
 
-	// 添加 CONTROLLER_GRPC_ADDR 环境变量（用于 StreamWorker）
+	// 添加 CONTROLLER_BASE 和 CONTROLLER_GRPC_ADDR 环境变量
 	// 从 CONTROLLER_BASE 提取主机部分，转换为 gRPC 地址
 	// 同时准备主机映射（ExtraHosts），以便容器内可以解析 Controller 主机名
 	controllerBase := m.config.Controller
 	var extraHosts []string
 	networkMode := getNetworkMode()
 	if controllerBase != "" {
+		// 设置 CONTROLLER_BASE 环境变量（HTTP API 地址）
+		// 在 bridge 模式下，如果原始地址是 localhost/127.0.0.1，需要调整为容器可访问的地址
+		controllerBaseForContainer := controllerBase
+		if networkMode != container.NetworkMode("host") {
+			// bridge 模式下，如果是 localhost/127.0.0.1，需要调整为可访问的地址
+			u, err := url.Parse(controllerBase)
+			if err == nil {
+				originalHost := u.Hostname()
+				if originalHost == "localhost" || originalHost == "127.0.0.1" {
+					// 使用 Docker 网关 IP 或 PLUM_CONTROLLER_HOST
+					overrideHost := os.Getenv("PLUM_CONTROLLER_HOST")
+					if overrideHost != "" {
+						controllerBaseForContainer = fmt.Sprintf("%s://%s:%s", u.Scheme, overrideHost, u.Port())
+					} else {
+						// 默认使用 Docker 网关 IP
+						port := u.Port()
+						if port == "" {
+							port = "8080"
+						}
+						controllerBaseForContainer = fmt.Sprintf("%s://172.17.0.1:%s", u.Scheme, port)
+					}
+					log.Printf("Adjusted CONTROLLER_BASE from %s to %s for container (bridge mode)", controllerBase, controllerBaseForContainer)
+				}
+			}
+		}
+		envVars = append(envVars, fmt.Sprintf("CONTROLLER_BASE=%s", controllerBaseForContainer))
+		log.Printf("Set CONTROLLER_BASE=%s for instance %s", controllerBaseForContainer, instanceID)
+
 		if networkMode == container.NetworkMode("host") {
-			// host 模式下，直接使用 127.0.0.1（因为 Controller 在本地）
-			// 但仍然解析并添加 ExtraHosts，确保容器内可以解析主机名（用于 ping 等操作）
-			_, hostMapping := extractGrpcAddrWithMapping(controllerBase)
-			envVars = append(envVars, "CONTROLLER_GRPC_ADDR=127.0.0.1:9090")
-			log.Printf("Set CONTROLLER_GRPC_ADDR=127.0.0.1:9090 for instance %s (host network mode)", instanceID)
-			// 即使使用 127.0.0.1，也添加 ExtraHosts 确保主机名解析（Docker 可能覆盖 /etc/hosts）
-			if hostMapping != "" {
-				extraHosts = append(extraHosts, hostMapping)
-				log.Printf("Adding host mapping for instance %s: %s (host network mode, for hostname resolution)", instanceID, hostMapping)
+			// host 模式下，容器和宿主机共享网络
+			// 根据 CONTROLLER_BASE 的主机名构建 gRPC 地址
+			u, err := url.Parse(controllerBase)
+			if err == nil {
+				originalHost := u.Hostname()
+				if originalHost == "localhost" || originalHost == "127.0.0.1" {
+					// 如果是 localhost/127.0.0.1，使用 127.0.0.1:9090
+					envVars = append(envVars, "CONTROLLER_GRPC_ADDR=127.0.0.1:9090")
+					log.Printf("Set CONTROLLER_GRPC_ADDR=127.0.0.1:9090 for instance %s (host network mode, localhost)", instanceID)
+				} else {
+					// 如果是主机名（如 plum-controller），使用主机名:9090
+					grpcAddr := fmt.Sprintf("%s:9090", originalHost)
+					envVars = append(envVars, fmt.Sprintf("CONTROLLER_GRPC_ADDR=%s", grpcAddr))
+					log.Printf("Set CONTROLLER_GRPC_ADDR=%s for instance %s (host network mode)", grpcAddr, instanceID)
+				}
+			} else {
+				// 解析失败，使用默认值
+				envVars = append(envVars, "CONTROLLER_GRPC_ADDR=127.0.0.1:9090")
+				log.Printf("Failed to parse CONTROLLER_BASE, using default CONTROLLER_GRPC_ADDR=127.0.0.1:9090 for instance %s", instanceID)
 			}
 		} else {
 			// bridge 模式下，需要解析地址并添加主机映射
@@ -276,15 +317,39 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		containerConfig.WorkingDir = "/app"
 	}
 
-	// 构建挂载列表（仅对 ZIP 应用）
+	// 构建挂载列表
 	var mounts []mount.Mount
+	
 	if !isImageApp && appDir != "" {
+		// ZIP 应用：挂载应用目录
 		mounts = []mount.Mount{
 			{
 				Type:   mount.TypeBind,
 				Source: appDir,
 				Target: "/app",
 			},
+		}
+	} else if isImageApp {
+		// 镜像应用：为每个实例创建独立的数据目录，用于持久化业务数据
+		// 数据目录：{AGENT_DATA_DIR}/{nodeID}/data/{instanceID}
+		dataDir := os.Getenv("AGENT_DATA_DIR")
+		if dataDir == "" {
+			dataDir = "/tmp/plum-agent"
+		}
+		instanceDataDir := filepath.Join(dataDir, m.config.NodeID, "data", instanceID)
+		
+		// 确保数据目录存在
+		if err := os.MkdirAll(instanceDataDir, 0755); err != nil {
+			log.Printf("Warning: failed to create data directory %s: %v", instanceDataDir, err)
+		} else {
+			// 挂载数据目录到容器的 /app/data（应用可以在这里存储持久化数据）
+			// 如果应用使用其他路径（如 /data），可以通过环境变量配置
+			mounts = append(mounts, mount.Mount{
+				Type:   mount.TypeBind,
+				Source: instanceDataDir,
+				Target: "/app/data",
+			})
+			log.Printf("Mounted data directory %s to /app/data for instance %s", instanceDataDir, instanceID)
 		}
 	}
 
@@ -426,15 +491,26 @@ func (m *DockerManager) StopApp(instanceID string) error {
 	timeoutSeconds := 5
 	if err := m.client.ContainerStop(m.ctx, containerID, container.StopOptions{Timeout: &timeoutSeconds}); err != nil {
 		log.Printf("Failed to stop container %s: %v", containerID[:12], err)
-		// 如果优雅停止失败，强制删除
-		m.client.ContainerRemove(m.ctx, containerID, types.ContainerRemoveOptions{Force: true})
+		// 如果优雅停止失败，强制停止（但不删除容器，保留以便调试）
+		if err := m.client.ContainerKill(m.ctx, containerID, "SIGKILL"); err != nil {
+			log.Printf("Failed to kill container %s: %v", containerID[:12], err)
+		}
 	} else {
 		log.Printf("Stopped container %s for instance %s", containerID[:12], instanceID)
 	}
 
-	// 删除容器
-	if err := m.client.ContainerRemove(m.ctx, containerID, types.ContainerRemoveOptions{Force: true}); err != nil {
-		log.Printf("Failed to remove container %s: %v", containerID[:12], err)
+	// 注意：不删除容器，保留已停止的容器以便：
+	// 1. 查看日志：docker logs plum-app-{instanceID}
+	// 2. 调试问题：docker inspect plum-app-{instanceID}
+	// 3. 检查退出状态：docker ps -a
+	// 容器会在下次启动时被删除并重新创建（如果配置有变化）
+	log.Printf("Container %s stopped but kept for debugging (use 'docker rm' to remove manually)", containerID[:12])
+
+	// 检查是否需要自动清理数据目录
+	// 如果设置了 PLUM_AUTO_CLEAN_DATA=true，容器停止时自动清理数据目录
+	autoCleanData := os.Getenv("PLUM_AUTO_CLEAN_DATA")
+	if autoCleanData == "true" || autoCleanData == "1" {
+		m.cleanupInstanceData(instanceID)
 	}
 
 	delete(m.containers, instanceID)
@@ -856,4 +932,26 @@ func resolveControllerHost(hostname string) string {
 	}
 
 	return ""
+}
+
+// cleanupInstanceData 清理实例的数据目录
+// 当容器停止时，如果启用了自动清理，会删除该实例的数据目录
+func (m *DockerManager) cleanupInstanceData(instanceID string) {
+	dataDir := os.Getenv("AGENT_DATA_DIR")
+	if dataDir == "" {
+		dataDir = "/tmp/plum-agent"
+	}
+	instanceDataDir := filepath.Join(dataDir, m.config.NodeID, "data", instanceID)
+
+	// 检查目录是否存在
+	if _, err := os.Stat(instanceDataDir); os.IsNotExist(err) {
+		return // 目录不存在，无需清理
+	}
+
+	// 删除数据目录
+	if err := os.RemoveAll(instanceDataDir); err != nil {
+		log.Printf("Warning: failed to cleanup data directory %s for instance %s: %v", instanceDataDir, instanceID, err)
+	} else {
+		log.Printf("Cleaned up data directory %s for instance %s", instanceDataDir, instanceID)
+	}
 }

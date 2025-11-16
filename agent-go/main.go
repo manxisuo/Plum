@@ -66,7 +66,7 @@ func main() {
 	log.Printf("  AdvertiseIP: %s", agentIP)
 
 	httpClient := NewHTTPClient()
-	reconciler := NewReconciler(fmt.Sprintf("%s/%s", dataDir, nodeID), httpClient, controller)
+	reconciler := NewReconciler(fmt.Sprintf("%s/%s", dataDir, nodeID), httpClient, controller, nodeID)
 
 	// 信号处理
 	stopCh := make(chan bool, 1)

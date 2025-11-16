@@ -48,6 +48,7 @@ type ManagerConfig struct {
 	BaseDir    string
 	HTTP       *HTTPClient
 	Controller string
+	NodeID     string // Agent 节点ID，用于注入到应用环境变量
 }
 
 // NewAppManager 创建应用管理器
