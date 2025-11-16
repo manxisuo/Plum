@@ -48,11 +48,11 @@ void StreamWorker::loadFromEnvironment() {
     if (options_.appVersion.empty()) {
         options_.appVersion = getEnv("PLUM_APP_VERSION", "1.0.0");
     }
-    if (options_.controllerGrpcAddr == "127.0.0.1:9090") {
-        const char* addr = std::getenv("CONTROLLER_GRPC_ADDR");
-        if (addr) {
-            options_.controllerGrpcAddr = addr;
-        }
+    // 总是优先使用环境变量 CONTROLLER_GRPC_ADDR
+    // 这样 Agent 注入的环境变量总是会被使用
+    const char* addr = std::getenv("CONTROLLER_GRPC_ADDR");
+    if (addr) {
+        options_.controllerGrpcAddr = addr;
     }
 }
 
