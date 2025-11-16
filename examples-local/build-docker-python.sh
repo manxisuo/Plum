@@ -1,23 +1,29 @@
 #!/bin/bash
 # 通用的 Python 项目 Docker 镜像构建脚本
-# 使用方法: ./build-docker-python.sh <项目名>
+# 使用方法: ./build-docker-python.sh <项目名> [主题]
 # 示例: ./build-docker-python.sh FSL_MainControl
+#       ./build-docker-python.sh FSL_MainControl blue
 #       ./build-docker-python.sh Sim_Decision
 
 set -e
 
 if [ $# -lt 1 ]; then
-    echo "用法: $0 <项目名>"
+    echo "用法: $0 <项目名> [主题]"
     echo "示例: $0 FSL_MainControl"
+    echo "      $0 FSL_MainControl blue"
     echo "      $0 Sim_Decision"
     echo ""
     echo "可用的 Python 项目:"
     echo "  - FSL_MainControl"
     echo "  - Sim_Decision"
+    echo ""
+    echo "主题参数（可选）:"
+    echo "  - blue: 使用蓝色主题样式（仅对 FSL_MainControl 有效）"
     exit 1
 fi
 
 APP_NAME="$1"
+THEME="${2:-default}"
 APP_DIR="examples-local/$APP_NAME"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -91,16 +97,32 @@ fi
 # 构建镜像
 # 注意：Docker 镜像名称必须是小写，所以需要转换
 APP_NAME_LOWER=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]')
+IMAGE_TAG="${APP_NAME_LOWER}:1.0.0"
+
 echo ""
-echo "🐳 构建 Docker 镜像: $APP_NAME_LOWER:1.0.0"
+if [ "$THEME" != "default" ]; then
+    echo "🐳 构建 Docker 镜像（主题: ${THEME}）: $IMAGE_TAG"
+else
+    echo "🐳 构建 Docker 镜像: $IMAGE_TAG"
+fi
+
+# 构建参数
+BUILD_ARGS=(
+    --platform linux/arm64
+    --load
+    -f "$DOCKERFILE"
+    --build-arg APP_NAME="$APP_NAME"
+)
+
+# 如果指定了主题，传递 THEME 构建参数
+if [ "$THEME" != "default" ]; then
+    BUILD_ARGS+=(--build-arg THEME="$THEME")
+fi
+
+BUILD_ARGS+=(-t "$IMAGE_TAG" "$DEPS_DIR")
+
 # 使用 buildx 确保使用正确的架构
-docker buildx build \
-  --platform linux/arm64 \
-  --load \
-  -f "$DOCKERFILE" \
-  --build-arg APP_NAME="$APP_NAME" \
-  -t "${APP_NAME_LOWER}:1.0.0" \
-  "$DEPS_DIR"
+docker buildx build "${BUILD_ARGS[@]}"
 
 # 清理临时目录
 echo ""
@@ -117,11 +139,11 @@ else
 fi
 
 echo ""
-echo "✅ 镜像构建完成: ${APP_NAME_LOWER}:1.0.0"
+echo "✅ 镜像构建完成: $IMAGE_TAG"
 echo ""
 echo "镜像大小:"
-docker images "${APP_NAME_LOWER}:1.0.0" --format "  {{.Repository}}:{{.Tag}} - {{.Size}}"
+docker images "$IMAGE_TAG" --format "  {{.Repository}}:{{.Tag}} - {{.Size}}"
 echo ""
 echo "测试镜像:"
-echo "  docker run --rm -p ${PORT}:${PORT} ${APP_NAME_LOWER}:1.0.0"
+echo "  docker run --rm -p ${PORT}:${PORT} $IMAGE_TAG"
 

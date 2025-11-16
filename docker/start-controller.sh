@@ -65,6 +65,24 @@ log_info "清理已存在的容器..."
 docker stop plum-controller plum-nginx 2>/dev/null || true
 docker rm plum-controller plum-nginx 2>/dev/null || true
 
+# 查找 docker 可执行文件路径（用于挂载到容器内）
+DOCKER_BIN=$(command -v docker 2>/dev/null || echo "")
+if [ -z "$DOCKER_BIN" ]; then
+    # 尝试常见路径
+    for path in /usr/bin/docker /usr/local/bin/docker /opt/docker/bin/docker; do
+        if [ -f "$path" ]; then
+            DOCKER_BIN="$path"
+            break
+        fi
+    done
+fi
+
+if [ -z "$DOCKER_BIN" ] || [ ! -f "$DOCKER_BIN" ]; then
+    log_warn "未找到 docker 可执行文件，Controller 将无法列出 Docker 镜像"
+    log_warn "如果需要在界面中查看镜像列表，请确保 docker 命令可用"
+    DOCKER_BIN=""
+fi
+
 # 启动 Controller
 log_info "启动 Controller..."
 CONTROLLER_CMD=(
@@ -83,6 +101,18 @@ CONTROLLER_CMD=(
     -e HEARTBEAT_TTL_SEC=3
     -e AUTO_MIGRATION_ENABLED=false
 )
+
+# 挂载 docker 可执行文件和 socket（如果找到）
+if [ -n "$DOCKER_BIN" ]; then
+    CONTROLLER_CMD+=(-v "${DOCKER_BIN}:/usr/bin/docker:ro")
+    log_info "挂载 docker 可执行文件: $DOCKER_BIN"
+    
+    # 挂载 docker socket（如果存在）
+    if [ -S /var/run/docker.sock ]; then
+        CONTROLLER_CMD+=(-v /var/run/docker.sock:/var/run/docker.sock)
+        log_info "挂载 docker socket: /var/run/docker.sock"
+    fi
+fi
 
 if [ -n "${ENV_FILE}" ]; then
     CONTROLLER_CMD+=(-v "${ENV_FILE}:/app/.env:ro")

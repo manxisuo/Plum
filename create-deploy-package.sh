@@ -78,7 +78,7 @@ for dir in "docker/agent" "docker/controller" "docker/nginx"; do
 done
 
 # 检查 docker 根目录下的文件
-for file in "docker/build-docker.sh" "docker/build-static-offline.sh" "docker/start-agent.sh" "docker/start-controller.sh"; do
+for file in "docker/build-docker.sh" "docker/build-static-offline.sh" "docker/start-agent.sh" "docker/start-controller.sh" "docker/stop-agent.sh" "docker/stop-controller.sh"; do
     if [ ! -f "$file" ]; then
         echo -e "${RED}错误: 文件不存在: $file${NC}"
         MISSING_FILES=1
@@ -159,6 +159,8 @@ cp "docker/build-docker.sh" "$TEMP_DIR/$DEPLOY_DIR/docker/build-docker.sh"
 cp "docker/build-static-offline.sh" "$TEMP_DIR/$DEPLOY_DIR/docker/build-static-offline.sh"
 cp "docker/start-agent.sh" "$TEMP_DIR/$DEPLOY_DIR/docker/start-agent.sh"
 cp "docker/start-controller.sh" "$TEMP_DIR/$DEPLOY_DIR/docker/start-controller.sh"
+cp "docker/stop-agent.sh" "$TEMP_DIR/$DEPLOY_DIR/docker/stop-agent.sh"
+cp "docker/stop-controller.sh" "$TEMP_DIR/$DEPLOY_DIR/docker/stop-controller.sh"
 
 # 复制根目录文件
 cp "docker-compose.agent.yml" "$TEMP_DIR/$DEPLOY_DIR/"
@@ -225,7 +227,9 @@ if [ -f "$OUTPUT_FILE" ]; then
     echo "│   │   ├── nginx.conf"
     echo "│   │   └── nginx.conf.host"
     echo "│   ├── start-agent.sh"
-    echo "│   └── start-controller.sh"
+    echo "│   ├── start-controller.sh"
+    echo "│   ├── stop-agent.sh"
+    echo "│   └── stop-controller.sh"
     echo "├── docker-compose.agent.yml"
     echo "├── docker-compose.main.yml"
     echo "├── export-docker-images.sh"

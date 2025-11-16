@@ -518,18 +518,6 @@ async function createImageApp() {
       @close="resetImageForm"
     >
       <el-form :model="imageForm" label-width="120px">
-        <el-form-item :label="t('apps.createImage.name')">
-          <el-input v-model="imageForm.name" :placeholder="t('apps.createImage.name')" />
-          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-            留空时自动使用镜像仓库的值
-          </div>
-        </el-form-item>
-        <el-form-item :label="t('apps.createImage.version')">
-          <el-input v-model="imageForm.version" :placeholder="t('apps.createImage.version')" />
-          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
-            留空时自动使用镜像标签的值
-          </div>
-        </el-form-item>
         <el-form-item :label="t('apps.createImage.imageRepository')" required>
           <el-autocomplete
             v-model="imageForm.imageRepository"
@@ -565,6 +553,18 @@ async function createImageApp() {
               :value="tag"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item :label="t('apps.createImage.name')">
+          <el-input v-model="imageForm.name" :placeholder="t('apps.createImage.name')" />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            留空时自动使用镜像仓库的值
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('apps.createImage.version')">
+          <el-input v-model="imageForm.version" :placeholder="t('apps.createImage.version')" />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            留空时自动使用镜像标签的值
+          </div>
         </el-form-item>
         <el-form-item :label="t('apps.createImage.portMappings')">
           <div v-for="(mapping, index) in imageForm.portMappings" :key="index" style="display: flex; gap: 8px; margin-bottom: 8px;">

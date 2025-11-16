@@ -12,6 +12,10 @@ services:
     volumes:
       - plum-controller-data:/app/data
       - ./controller/.env:/app/.env:ro
+      # 挂载 docker 可执行文件和 socket，使 Controller 可以列出 Docker 镜像
+      # 注意：如果 docker 不在 /usr/bin/docker，请修改为实际路径
+      - /usr/bin/docker:/usr/bin/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - CONTROLLER_ADDR=:8080
       - CONTROLLER_DB=file:/app/data/controller.db?_pragma=busy_timeout(5000)

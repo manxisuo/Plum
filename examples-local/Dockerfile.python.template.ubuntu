@@ -10,6 +10,7 @@
 FROM ubuntu:24.04
 
 ARG APP_NAME
+ARG THEME=default
 
 # 使用国内镜像源加速（使用清华镜像源）
 # Ubuntu 24.04 使用 deb822 格式，源文件在 /etc/apt/sources.list.d/ubuntu.sources
@@ -62,6 +63,15 @@ COPY templates/ /app/templates/
 COPY static/ /app/static/
 COPY scripts/ /app/scripts/
 COPY offline-packages/ /app/offline-packages/
+
+# 主题切换：仅对 FSL_MainControl 生效
+# 当构建参数 THEME=blue 且存在 style-blue.css 时，覆盖为默认样式文件
+RUN if [ "${APP_NAME}" = "FSL_MainControl" ] && [ "${THEME}" = "blue" ] && [ -f "/app/static/style-blue.css" ]; then \
+      echo "Apply blue theme for FSL_MainControl"; \
+      cp /app/static/style-blue.css /app/static/style.css; \
+    else \
+      echo "Use default theme (${THEME})"; \
+    fi
 
 # 安装 Python 依赖
 # 如果有离线包目录且不为空（排除 .gitkeep），优先使用离线包

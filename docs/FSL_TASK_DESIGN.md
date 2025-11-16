@@ -169,7 +169,7 @@ Web 前端基于 Vite + React，地图采用 MapLibre GL。前端每 1s 请求 `
    - 自动编排：使用 Plum Workflow（YAML）串联任务。
 6. UI 细化：在任务流程稳定后，完善地图图层、阶段提示与日志展示。
 
-> 快速联调脚本：`examples-local/FSL_MainControl/scripts/orchestrate_task.py`。启动所有服务后运行，可自动调用三个阶段并回传结果。
+> 注意：现在系统已使用正式的工作流编排（DAG）系统，可通过 UI 界面自动触发和管理任务流程。
 
 ### 5.1 构建说明（qmake）
 

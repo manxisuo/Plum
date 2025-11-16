@@ -3,9 +3,8 @@
 
 ```bash
 ./plum-offline-deploy/scripts-prepare/prepare-offline-deploy.sh
-tar -cvf plum-offline-deploy-1114.tar ./plum-offline-deploy
-scp plum-offline-deploy-1114.tar jari@192.168.1.192:/data/usershare
-scp plum-offline-deploy-1114.tar pi@192.168.1.2:~/plum
+tar -cvf plum-offline-deploy-1115.tar ./plum-offline-deploy
+scp plum-offline-deploy-1115.tar pi@192.168.1.2:~/plum
 ```
 
 ## FSL_MainControl
