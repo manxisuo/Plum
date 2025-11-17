@@ -203,6 +203,40 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		}
 	}
 
+	// 自动注入 MAIN_CONTROL_BASE 环境变量（如果 MainControl 服务可用）
+	// 所有应用都可以使用此环境变量来访问 MainControl 服务（如发送进度更新）
+	mainControlBase := m.discoverMainControlBase()
+	if mainControlBase != "" {
+		// 根据网络模式调整 MainControl 地址（类似 CONTROLLER_BASE 的处理）
+		mainControlBaseForContainer := mainControlBase
+		if networkMode != container.NetworkMode("host") {
+			// bridge 模式下，需要确保地址可以从容器访问
+			u, err := url.Parse(mainControlBase)
+			if err == nil {
+				originalHost := u.Hostname()
+				// 如果是 localhost/127.0.0.1，需要调整为容器可访问的地址
+				if originalHost == "localhost" || originalHost == "127.0.0.1" {
+					overrideHost := os.Getenv("PLUM_CONTROLLER_HOST")
+					if overrideHost == "" {
+						overrideHost = "172.17.0.1" // 默认使用 Docker 网关 IP
+					}
+					port := u.Port()
+					if port == "" {
+						port = "4000" // MainControl 默认端口
+					}
+					mainControlBaseForContainer = fmt.Sprintf("%s://%s:%s", u.Scheme, overrideHost, port)
+					log.Printf("Adjusted MAIN_CONTROL_BASE from %s to %s for container (bridge mode)", mainControlBase, mainControlBaseForContainer)
+				}
+				// 如果服务发现返回的是其他 IP（如 192.168.x.x），在 bridge 模式下应该可以直接访问
+				// 但如果 MainControl 运行在 host 模式的容器中，返回的 IP 是宿主机 IP，容器应该可以访问
+			}
+		}
+		envVars = append(envVars, fmt.Sprintf("MAIN_CONTROL_BASE=%s", mainControlBaseForContainer))
+		envVars = append(envVars, fmt.Sprintf("FSL_MAINCONTROL_BASE=%s", mainControlBaseForContainer))
+		log.Printf("Set MAIN_CONTROL_BASE=%s for instance %s", mainControlBaseForContainer, instanceID)
+	}
+	// 注意：如果服务发现失败，不注入环境变量，应用可以使用默认值或通过其他方式获取地址
+
 	// 添加自定义环境变量（支持多个，格式：PLUM_CONTAINER_ENV_xxx=value）
 	// 或者通过 PLUM_CONTAINER_ENV 设置（格式：KEY1=value1,KEY2=value2）
 	customEnvStr := os.Getenv("PLUM_CONTAINER_ENV")
@@ -319,7 +353,7 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 
 	// 构建挂载列表
 	var mounts []mount.Mount
-	
+
 	if !isImageApp && appDir != "" {
 		// ZIP 应用：挂载应用目录
 		mounts = []mount.Mount{
@@ -337,7 +371,7 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 			dataDir = "/tmp/plum-agent"
 		}
 		instanceDataDir := filepath.Join(dataDir, m.config.NodeID, "data", instanceID)
-		
+
 		// 确保数据目录存在
 		if err := os.MkdirAll(instanceDataDir, 0755); err != nil {
 			log.Printf("Warning: failed to create data directory %s: %v", instanceDataDir, err)
@@ -735,19 +769,19 @@ func (m *DockerManager) readFileFromContainer(containerID, filePath string) (str
 		AttachStdout: true,
 		AttachStderr: true,
 	}
-	
+
 	execResp, err := m.client.ContainerExecCreate(m.ctx, containerID, execConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to create exec: %w", err)
 	}
-	
+
 	// 连接到 exec
 	attachResp, err := m.client.ContainerExecAttach(m.ctx, execResp.ID, types.ExecStartCheck{})
 	if err != nil {
 		return "", fmt.Errorf("failed to attach exec: %w", err)
 	}
 	defer attachResp.Close()
-	
+
 	// 读取输出（Docker exec 输出格式：8字节头部 + 数据）
 	// 头部格式：STREAM_TYPE (1 byte) + PADDING (3 bytes) + LENGTH (4 bytes, big-endian)
 	var allData bytes.Buffer
@@ -755,7 +789,7 @@ func (m *DockerManager) readFileFromContainer(containerID, filePath string) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to read exec output: %w", err)
 	}
-	
+
 	// 检查 exec 是否成功
 	execInspect, err := m.client.ContainerExecInspect(m.ctx, execResp.ID)
 	if err != nil {
@@ -772,7 +806,7 @@ func (m *DockerManager) readFileFromContainer(containerID, filePath string) (str
 		}
 		return "", fmt.Errorf("exec failed with exit code %d, output: %s", execInspect.ExitCode, errorMsg)
 	}
-	
+
 	// 解析 Docker 流格式：跳过 8 字节头部，提取实际内容
 	data := allData.Bytes()
 	content := ""
@@ -799,7 +833,7 @@ func (m *DockerManager) readFileFromContainer(containerID, filePath string) (str
 		// 如果没有头部，直接使用全部内容
 		content = allData.String()
 	}
-	
+
 	return strings.TrimSpace(content), nil
 }
 
@@ -954,4 +988,9 @@ func (m *DockerManager) cleanupInstanceData(instanceID string) {
 	} else {
 		log.Printf("Cleaned up data directory %s for instance %s", instanceDataDir, instanceID)
 	}
+}
+
+// discoverMainControlBase 通过服务发现获取 MainControl 的地址（DockerManager 方法）
+func (m *DockerManager) discoverMainControlBase() string {
+	return discoverMainControlBase(m.config.Controller)
 }

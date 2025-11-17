@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -163,12 +165,24 @@ func (m *ProcessManager) StartApp(instanceID string, app Assignment, appDir stri
 
 	cmd := exec.Command("sh", "-c", cmdline)
 	cmd.Dir = appDir
-	cmd.Env = append(os.Environ(),
-		"PLUM_INSTANCE_ID="+app.InstanceID,
-		"PLUM_APP_NAME="+app.AppName,
-		"PLUM_APP_VERSION="+app.AppVersion,
-		"WORKER_NODE_ID="+m.config.NodeID,
-	)
+	envVars := []string{
+		"PLUM_INSTANCE_ID=" + app.InstanceID,
+		"PLUM_APP_NAME=" + app.AppName,
+		"PLUM_APP_VERSION=" + app.AppVersion,
+		"WORKER_NODE_ID=" + m.config.NodeID,
+	}
+
+	// 自动注入 MAIN_CONTROL_BASE 环境变量（如果 MainControl 服务可用）
+	// 所有应用都可以使用此环境变量来访问 MainControl 服务（如发送进度更新）
+	mainControlBase := discoverMainControlBase(m.config.Controller)
+	if mainControlBase != "" {
+		envVars = append(envVars, "MAIN_CONTROL_BASE="+mainControlBase)
+		envVars = append(envVars, "FSL_MAINCONTROL_BASE="+mainControlBase)
+		log.Printf("Set MAIN_CONTROL_BASE=%s for instance %s", mainControlBase, instanceID)
+	}
+	// 注意：如果服务发现失败，不注入环境变量，应用可以使用默认值或通过其他方式获取地址
+
+	cmd.Env = append(os.Environ(), envVars...)
 	// 创建新的进程组
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
@@ -463,4 +477,59 @@ func (m *ProcessManager) ListRunning() []string {
 		running = append(running, instanceID)
 	}
 	return running
+}
+
+// discoverMainControlBase 通过服务发现获取 MainControl 的地址（共享函数）
+// controllerBase: Controller 的基础 URL（如 "http://plum-controller:8080"）
+// 返回 MainControl 的完整 URL（如 "http://192.168.1.10:4000"），如果发现失败则返回空字符串
+func discoverMainControlBase(controllerBase string) string {
+	if controllerBase == "" {
+		return ""
+	}
+
+	// 构建服务发现 API URL
+	discoveryURL := fmt.Sprintf("%s/v1/discovery/one?service=maincontrol&strategy=lazy", controllerBase)
+
+	// 创建 HTTP 客户端（超时 3 秒）
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	// 发送请求
+	resp, err := client.Get(discoveryURL)
+	if err != nil {
+		log.Printf("Failed to discover MainControl service: %v", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("Service discovery returned status %d for maincontrol", resp.StatusCode)
+		return ""
+	}
+
+	// 解析响应
+	var endpoint map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&endpoint); err != nil {
+		log.Printf("Failed to parse service discovery response: %v", err)
+		return ""
+	}
+
+	// 提取 IP、端口和协议
+	ip, _ := endpoint["ip"].(string)
+	port, _ := endpoint["port"].(float64)
+	protocol, _ := endpoint["protocol"].(string)
+	if protocol == "" {
+		protocol = "http"
+	}
+
+	if ip == "" || port == 0 {
+		log.Printf("Invalid endpoint data: ip=%s, port=%v", ip, port)
+		return ""
+	}
+
+	// 构建完整 URL
+	mainControlBase := fmt.Sprintf("%s://%s:%d", protocol, ip, int(port))
+	log.Printf("Discovered MainControl address: %s", mainControlBase)
+	return mainControlBase
 }
