@@ -245,6 +245,7 @@ Agent会根据应用运行模式自动注入不同的环境变量。这些变量
 | `WORKER_NODE_ID` | 节点ID（Agent所在节点） | `nodeA`, `nodeB` | 用于StreamWorker注册，值为Agent的 `AGENT_NODE_ID` |
 | `CONTROLLER_BASE` | Controller HTTP API 地址 | `http://plum-controller:8080` | 用于HTTP API调用 |
 | `CONTROLLER_GRPC_ADDR` | Controller gRPC 地址 | `plum-controller:9090` | 用于StreamWorker连接 |
+| `MAIN_CONTROL_BASE` | MainControl 服务地址 | `http://192.168.1.10:4000` | **自动注入**，通过服务发现获取，用于访问 MainControl 服务（如发送进度更新） |
 | `LD_LIBRARY_PATH` | 库搜索路径 | `/app/lib:/usr/lib:/lib` | 仅当应用目录有 `lib/` 子目录时自动添加 |
 
 **网络模式说明**：
@@ -254,6 +255,13 @@ Agent会根据应用运行模式自动注入不同的环境变量。这些变量
 - **Bridge 网络模式**：Agent会自动解析并添加主机映射（ExtraHosts），确保容器内可以访问Controller
   - 如果 `CONTROLLER_BASE=http://127.0.0.1:8080`，会自动调整为 `http://172.17.0.1:8080`（Docker网关IP）
   - 如果 `CONTROLLER_BASE=http://plum-controller:8080`，会保持原样并通过ExtraHosts映射
+
+**MAIN_CONTROL_BASE 自动注入说明**：
+- Agent 会在启动应用时自动通过 Controller 的服务发现 API 获取 MainControl 服务地址
+- 如果 MainControl 服务已注册到服务发现系统，Agent 会自动注入 `MAIN_CONTROL_BASE` 环境变量
+- 如果服务发现失败（MainControl 未注册或网络问题），不会注入环境变量，应用可以使用默认值 `http://127.0.0.1:4000` 或通过其他方式获取地址
+- 在 Bridge 网络模式下，如果服务发现返回的是 `localhost/127.0.0.1`，Agent 会自动调整为容器可访问的地址（如 `http://172.17.0.1:4000`）
+- **用户无需手动配置**：这是完全自动化的，无需在 Agent 的 `.env` 文件中设置
 
 ### 3. 镜像应用（`ArtifactType=image`）
 
@@ -267,6 +275,7 @@ Agent会根据应用运行模式自动注入不同的环境变量。这些变量
 | `WORKER_NODE_ID` | 节点ID（Agent所在节点） | `nodeA`, `nodeB` | 用于StreamWorker注册，值为Agent的 `AGENT_NODE_ID` |
 | `CONTROLLER_BASE` | Controller HTTP API 地址 | `http://plum-controller:8080` | 用于HTTP API调用 |
 | `CONTROLLER_GRPC_ADDR` | Controller gRPC 地址 | `plum-controller:9090` | 用于StreamWorker连接 |
+| `MAIN_CONTROL_BASE` | MainControl 服务地址 | `http://192.168.1.10:4000` | **自动注入**，通过服务发现获取，用于访问 MainControl 服务（如发送进度更新） |
 
 **网络模式说明**：与ZIP应用容器模式相同，根据网络模式自动调整地址。
 

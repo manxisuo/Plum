@@ -27,9 +27,6 @@ public:
     StageProgressSender(const QString &taskId, const QString &stage)
         : taskId_(taskId), stage_(stage) {
         const char *env = std::getenv("MAIN_CONTROL_BASE");
-        if (!env || *env == '\0') {
-            env = std::getenv("FSL_MAINCONTROL_BASE");
-        }
         base_ = env ? env : "http://127.0.0.1:4000";
         if (!base_.empty() && base_.back() == '/') {
             base_.pop_back();

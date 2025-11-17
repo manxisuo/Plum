@@ -177,7 +177,6 @@ func (m *ProcessManager) StartApp(instanceID string, app Assignment, appDir stri
 	mainControlBase := discoverMainControlBase(m.config.Controller)
 	if mainControlBase != "" {
 		envVars = append(envVars, "MAIN_CONTROL_BASE="+mainControlBase)
-		envVars = append(envVars, "FSL_MAINCONTROL_BASE="+mainControlBase)
 		log.Printf("Set MAIN_CONTROL_BASE=%s for instance %s", mainControlBase, instanceID)
 	}
 	// 注意：如果服务发现失败，不注入环境变量，应用可以使用默认值或通过其他方式获取地址

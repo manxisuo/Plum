@@ -232,7 +232,6 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 			}
 		}
 		envVars = append(envVars, fmt.Sprintf("MAIN_CONTROL_BASE=%s", mainControlBaseForContainer))
-		envVars = append(envVars, fmt.Sprintf("FSL_MAINCONTROL_BASE=%s", mainControlBaseForContainer))
 		log.Printf("Set MAIN_CONTROL_BASE=%s for instance %s", mainControlBaseForContainer, instanceID)
 	}
 	// 注意：如果服务发现失败，不注入环境变量，应用可以使用默认值或通过其他方式获取地址
