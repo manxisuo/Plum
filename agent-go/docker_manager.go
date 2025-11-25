@@ -422,6 +422,9 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		RestartPolicy: container.RestartPolicy{Name: "no"},
 		// 添加主机映射（用于容器内解析 Controller 主机名，仅在非 host 模式下需要）
 		ExtraHosts: extraHosts,
+		// 安全选项：禁用 seccomp 以支持 Ubuntu 24.04 的 glibc 2.38（需要 clone3 系统调用）
+		// 这对于在旧版 Docker 环境中运行基于 Ubuntu 24.04 的镜像很重要
+		SecurityOpt: []string{"seccomp=unconfined"},
 	}
 
 	// 如果使用 host 网络模式，端口映射不需要
