@@ -37,9 +37,12 @@ RUN if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
 # 安装运行时依赖（只需要运行时库，不需要编译工具）
 # 这层会被缓存，除非你修改了依赖列表
 # 使用 --no-install-recommends 减少不必要的包，加快安装速度
+# 同时安装 ping 和 curl 用于调试
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libqt5core5a \
     libprotobuf32t64 \
+    iputils-ping \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建应用目录

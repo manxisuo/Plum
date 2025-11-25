@@ -81,9 +81,9 @@ Dockerfile 已经配置了国内镜像源作为备选方案：
 
 1. **架构匹配**：确保下载的包是 ARM64 架构（`manylinux2014_aarch64`）
 2. **Python 版本**：
-   - Ubuntu 24.04 默认是 Python 3.12
-   - 下载脚本已更新为使用 Python 3.12
-   - 如果某些包没有 3.12 版本，可以尝试 3.11（通常兼容）
+   - Ubuntu 22.04 默认是 Python 3.10
+   - 下载脚本默认使用 Python 3.10（可通过 `PYTHON_VERSION` 覆盖）
+   - 如果某些包没有 3.10 版本，可以尝试 3.11（通常兼容）
 3. **目录位置**：离线包目录应该在项目根目录下（`examples-local/<项目名>/offline-pip-packages/`）
 4. **使用项目脚本**：推荐使用项目自带的 `download_dependencies.sh` 脚本，它会自动处理版本和平台
 

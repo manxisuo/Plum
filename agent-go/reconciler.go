@@ -355,16 +355,63 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 		}
 
 		// 这个实例不应该运行，但正在运行，需要停止
-		if _, exists := r.stopSentTimes[instanceID]; !exists {
-			// 还没有标记停止，现在标记并立即尝试停止
-			r.markForStop(instanceID)
+		// 但是，如果容器刚启动（在已知实例列表中，说明之前有 assignment），
+		// 可能是 assignment 同步延迟，给一点时间等待同步
+		if r.knownInstances[instanceID] {
+			// 这个实例之前存在，但现在 Desired 不是 Running
+			// 可能是用户停止了部署，应该停止
+			if _, exists := r.stopSentTimes[instanceID]; !exists {
+				// 还没有标记停止，现在标记并立即尝试停止
+				r.markForStop(instanceID)
+				appManager := r.getAppManagerByInstanceID(instanceID)
+				if appManager != nil {
+					// 立即尝试停止（不等待下一次循环）
+					if err := appManager.StopApp(instanceID); err != nil {
+						log.Printf("Failed to stop app %s: %v", instanceID, err)
+					} else {
+						r.stopSentTimes[instanceID] = now
+						log.Printf("Sent stop signal to instance %s (not in keep list, was known)", instanceID)
+					}
+				}
+			}
+		} else {
+			// 这个实例不在已知列表中，可能是：
+			// 1. 手动启动的容器（不在 Agent 管理范围内）- 不应该停止
+			// 2. 刚启动的容器，assignment 还没有同步到 Agent - 应该等待
+			// 3. 旧的残留容器（已经运行很久）- 应该停止
+			// 我们通过检查容器启动时间来判断：如果启动时间 < 15秒，可能是刚启动的，等待同步
 			appManager := r.getAppManagerByInstanceID(instanceID)
 			if appManager != nil {
-				// 立即尝试停止（不等待下一次循环）
-				if err := appManager.StopApp(instanceID); err != nil {
-					log.Printf("Failed to stop app %s: %v", instanceID, err)
-				} else {
-					r.stopSentTimes[instanceID] = now
+				// 尝试获取容器启动时间（仅对 Docker 容器有效）
+				shouldStop := true
+				if dockerMgr, ok := appManager.(*DockerManager); ok {
+					containerName := fmt.Sprintf("plum-app-%s", instanceID)
+					info, err := dockerMgr.client.ContainerInspect(dockerMgr.ctx, containerName)
+					if err == nil && info.State.Running && info.State.StartedAt != "" {
+						// 解析容器启动时间（Docker API 返回 RFC3339 格式字符串）
+						startedAt, err := time.Parse(time.RFC3339Nano, info.State.StartedAt)
+						if err == nil {
+							age := time.Since(startedAt)
+							if age < 15*time.Second {
+								// 容器刚启动不久（< 15秒），可能是 assignment 同步延迟，等待一下
+								log.Printf("Instance %s is running but not in known instances, started %v ago, waiting for assignment sync (may be just deployed)", instanceID, age)
+								shouldStop = false
+							}
+						}
+					}
+				}
+
+				if shouldStop {
+					// 容器已经运行了一段时间，或者无法获取启动时间，停止它
+					if _, exists := r.stopSentTimes[instanceID]; !exists {
+						r.markForStop(instanceID)
+						if err := appManager.StopApp(instanceID); err != nil {
+							log.Printf("Failed to stop app %s: %v", instanceID, err)
+						} else {
+							r.stopSentTimes[instanceID] = now
+							log.Printf("Sent stop signal to instance %s (not in keep list, not in known instances, may be manually started or old container)", instanceID)
+						}
+					}
 				}
 			}
 		}
@@ -634,13 +681,13 @@ func (r *Reconciler) readMetaFromContainer(instanceID string) string {
 	if r.dockerManager == nil {
 		return ""
 	}
-	
+
 	// 类型断言获取 DockerManager
 	dm, ok := r.dockerManager.(*DockerManager)
 	if !ok {
 		return ""
 	}
-	
+
 	// 获取容器ID
 	containerID, exists := dm.containers[instanceID]
 	if !exists {
@@ -651,11 +698,10 @@ func (r *Reconciler) readMetaFromContainer(instanceID string) string {
 			return ""
 		}
 		containerID = info.ID
-		if !info.State.Running {
-			return ""
-		}
+		// 注意：如果容器已停止，readFileFromContainer 会使用 docker cp 读取文件
+		// 但更重要的是确保容器正常运行，这样服务才能被健康检查通过
 	}
-	
+
 	// 尝试多个常见路径
 	metaPaths := []string{"/app/meta.ini", "/meta.ini", "/app/bin/meta.ini", "/usr/local/app/meta.ini"}
 	for _, metaPath := range metaPaths {
@@ -665,7 +711,7 @@ func (r *Reconciler) readMetaFromContainer(instanceID string) string {
 			return content
 		}
 	}
-	
+
 	return ""
 }
 

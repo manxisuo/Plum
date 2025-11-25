@@ -762,7 +762,7 @@ func getHostLibraryPaths() []string {
 
 // readFileFromContainer 从容器内读取文件内容
 func (m *DockerManager) readFileFromContainer(containerID, filePath string) (string, error) {
-	// 使用 docker exec 读取文件
+	// 使用 docker exec 读取文件（要求容器运行中）
 	execConfig := types.ExecConfig{
 		Cmd:          []string{"cat", filePath},
 		AttachStdout: true,

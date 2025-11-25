@@ -13,8 +13,11 @@ ARG APP_NAME
 WORKDIR /app
 
 # 安装系统依赖（如果需要）
+# 同时安装 ping 和 curl 用于调试
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    iputils-ping \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 从构建上下文复制 requirements.txt 和源代码

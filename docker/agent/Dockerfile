@@ -31,7 +31,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o plum-agent .
 FROM alpine:3.18
 
 # 安装必要的运行时依赖
-RUN apk add --no-cache ca-certificates tzdata curl
+# 同时安装 ping 用于调试（curl 已安装）
+RUN apk add --no-cache ca-certificates tzdata curl iputils-ping
 
 # 创建非root用户
 RUN addgroup -g 1001 -S plum && \

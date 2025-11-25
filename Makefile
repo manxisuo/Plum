@@ -280,7 +280,7 @@ examples_Sim_TargetRecognize:
 	@cd examples-local/Sim_TargetRecognize && mkdir -p build && cd build && $(QMAKE) CONFIG+=release .. && $(MAKE)
 	@echo "✅ Sim_TargetRecognize built: examples-local/Sim_TargetRecognize/bin/Sim_TargetRecognize"
 
-examples_Sim__All: examples_Sim_RoutePlan examples_Sim_NaviControl examples_Sim_Sonar examples_Sim_TargetHit examples_Sim_TargetRecognize
+examples_Sim_All: examples_Sim_RoutePlan examples_Sim_NaviControl examples_Sim_Sonar examples_Sim_TargetHit examples_Sim_TargetRecognize
 	@echo "🎉 All Sim_ components built."
 
 examples_FSL_All_Pkg:
