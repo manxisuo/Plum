@@ -2,7 +2,7 @@ package httpapi
 
 import (
 	"archive/zip"
-	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,11 +11,13 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	imagetypes "github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
+	"github.com/dustin/go-humanize"
 	"github.com/manxisuo/plum/controller/internal/store"
 )
 
@@ -353,41 +355,57 @@ func handleListDockerImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 执行 docker images 命令
-	cmd := exec.Command("docker", "images", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}\t{{.Size}}")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
+	images, err := fetchDockerImages()
 	if err != nil {
-		// Docker 命令执行失败，返回空列表而不是错误
-		// 这样前端可以正常显示，只是没有可选的镜像列表
-		log.Printf("Failed to list docker images: %v, stderr: %s", err, stderr.String())
+		log.Printf("Failed to list docker images via SDK: %v", err)
 		writeJSON(w, []DockerImageInfo{})
 		return
 	}
 
-	// 解析输出
-	output := stdout.String()
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	images := make([]DockerImageInfo, 0, len(lines))
+	writeJSON(w, images)
+}
 
-	for _, line := range lines {
-		if line == "" {
-			continue
+func fetchDockerImages() ([]DockerImageInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	imageSummaries, err := cli.ImageList(ctx, imagetypes.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	images := make([]DockerImageInfo, 0, len(imageSummaries))
+	for _, summary := range imageSummaries {
+		repoTags := summary.RepoTags
+		if len(repoTags) == 0 {
+			repoTags = []string{"<none>:<none>"}
 		}
-		parts := strings.Split(line, "\t")
-		if len(parts) >= 5 {
+
+		created := time.Unix(summary.Created, 0).Format(time.RFC3339)
+		size := humanize.Bytes(uint64(summary.Size))
+
+		for _, repoTag := range repoTags {
+			repo := repoTag
+			tag := ""
+			if idx := strings.LastIndex(repoTag, ":"); idx != -1 {
+				repo = repoTag[:idx]
+				tag = repoTag[idx+1:]
+			}
 			images = append(images, DockerImageInfo{
-				Repository: parts[0],
-				Tag:        parts[1],
-				ImageID:    parts[2],
-				Created:    parts[3],
-				Size:       parts[4],
+				Repository: repo,
+				Tag:        tag,
+				ImageID:    summary.ID,
+				Created:    created,
+				Size:       size,
 			})
 		}
 	}
 
-	writeJSON(w, images)
+	return images, nil
 }
