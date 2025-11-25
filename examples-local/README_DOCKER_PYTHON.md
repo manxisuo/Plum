@@ -141,7 +141,7 @@ docker run --rm -p 3000:3000 sim_decision:1.0.0
 | 构建脚本 | `build-docker-local.sh` | `build-docker-python.sh` |
 | 依赖复制 | `copy-deps.sh` | `copy-deps-python.sh` |
 | Dockerfile 模板 | `Dockerfile.local.template` | `Dockerfile.python.template` |
-| 基础镜像 | `ubuntu:24.04` | `python:3.11-slim`（或 `ubuntu:22.04` 离线模板） |
+| 基础镜像 | `ubuntu:24.04` | `python:3.11-slim`（或 `ubuntu:24.04` 离线模板） |
 | 需要编译 | 是（需要先编译） | 否（直接复制源代码） |
 | 依赖管理 | 系统库（.so 文件） | Python 包（requirements.txt） |
 

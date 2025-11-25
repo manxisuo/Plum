@@ -152,12 +152,15 @@ copy_lib_with_symlinks() {
 
 if [ -s "$DEPS_FILE" ]; then
     copied_libs=()
+    # 第一遍：复制直接依赖
     while IFS= read -r lib_path; do
         if [ -n "$lib_path" ] && [ -f "$lib_path" ]; then
             lib_name=$(basename "$lib_path")
             # 复制 gRPC、protobuf、absl 以及 gRPC 的依赖库（gpr, cares, re2, upb, address_sorting 等）
-            # 同时复制系统库（libc, libstdc++）以解决 GLIBC 版本不匹配问题
-            if echo "$lib_name" | grep -qE "(grpc|protobuf|absl|gpr|cares|re2|upb|address_sorting|ssl|crypto|libc\.so|libstdc\+\+\.so|libm\.so|libgcc_s\.so|libpthread\.so)"; then
+            # 排除系统核心库（libc, libpthread, libdl, libm, libgcc_s, libstdc++），容器有自己的 glibc
+            # 这些系统库会导致符号不匹配错误（如 __tunable_is_initialized）
+            if echo "$lib_name" | grep -qE "(grpc|protobuf|absl|gpr|cares|re2|upb|address_sorting|ssl|crypto)" && \
+               ! echo "$lib_name" | grep -qE "^(libc|libpthread|libdl|libm|libgcc_s|libstdc\+\+|ld-|linux-vdso)"; then
                 # 避免重复复制
                 if [[ ! " ${copied_libs[@]} " =~ " ${lib_name} " ]]; then
                     echo "  复制系统库: $lib_name"
@@ -168,6 +171,36 @@ if [ -s "$DEPS_FILE" ]; then
             fi
         fi
     done < "$DEPS_FILE"
+    
+    # 第二遍：递归查找已复制库的依赖（处理间接依赖，如 libcares）
+    echo "查找间接依赖..."
+    for lib_name in "${copied_libs[@]}"; do
+        # 在已复制的库中查找对应的文件路径
+        for lib_dir in /usr/lib /usr/local/lib /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu; do
+            lib_path="$lib_dir/$lib_name"
+            if [ -f "$lib_path" ] || [ -L "$lib_path" ]; then
+                # 使用 ldd 查找这个库的依赖
+                deps_of_lib=$(ldd "$lib_path" 2>/dev/null | grep -E "\.so" | awk '{print $3}' || true)
+                if [ -n "$deps_of_lib" ]; then
+                    while IFS= read -r dep_path; do
+                        if [ -n "$dep_path" ] && [ -f "$dep_path" ]; then
+                            dep_name=$(basename "$dep_path")
+                            # 只复制 gRPC 相关的间接依赖，排除系统核心库
+                            if echo "$dep_name" | grep -qE "(grpc|protobuf|absl|gpr|cares|re2|upb|address_sorting|ssl|crypto)" && \
+                               ! echo "$dep_name" | grep -qE "^(libc|libpthread|libdl|libm|libgcc_s|libstdc\+\+|ld-|linux-vdso)" && \
+                               [[ ! " ${copied_libs[@]} " =~ " ${dep_name} " ]]; then
+                                echo "  复制间接依赖: $dep_name (来自 $lib_name)"
+                                if copy_lib_with_symlinks "$dep_path"; then
+                                    copied_libs+=("$dep_name")
+                                fi
+                            fi
+                        fi
+                    done <<< "$deps_of_lib"
+                fi
+                break
+            fi
+        done
+    done
 else
     echo "  警告: 无法获取依赖库列表，尝试手动查找 gRPC 库..."
     # 手动查找 gRPC 库

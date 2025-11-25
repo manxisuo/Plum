@@ -77,7 +77,7 @@ DOCKERFILE="$APP_DIR/Dockerfile.python"
 if [ ! -f "$DOCKERFILE" ]; then
     # 检查 Python 官方镜像是否可用（网络可能较慢，优先使用 Ubuntu 版本）
     # 如果网络正常，可以使用 Dockerfile.python.template（基于 python:3.11-slim）
-    # 如果网络较慢，使用 Dockerfile.python.template.ubuntu（基于 ubuntu:22.04）
+    # 如果网络较慢，使用 Dockerfile.python.template.ubuntu（基于 ubuntu:24.04）
     USE_UBUNTU="${USE_UBUNTU_BASE:-true}"
     if [ "$USE_UBUNTU" = "true" ]; then
         DOCKERFILE="$SCRIPT_DIR/Dockerfile.python.template.ubuntu"

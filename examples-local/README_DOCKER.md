@@ -134,9 +134,9 @@ docker run --rm fsl-destroy:1.0.0
 ## 注意事项
 
 1. **架构要求**：脚本会自动使用 `--platform linux/arm64`，确保在树莓派上构建正确的镜像
-2. **网络要求**：首次构建需要下载 Ubuntu 22.04 基础镜像，后续构建会使用缓存
+2. **网络要求**：首次构建需要下载 Ubuntu 24.04 基础镜像，后续构建会使用缓存
 3. **依赖库**：脚本会自动识别并复制所有必需的库文件，包括 gRPC、protobuf 等
-4. **GLIBC 版本**：使用 Ubuntu 22.04 作为基础镜像，兼容旧版 Docker（避免 seccomp 限制新系统调用）
+4. **GLIBC 版本**：使用 Ubuntu 24.04 作为基础镜像，确保与宿主机（Ubuntu 24.04）的 GLIBC 版本匹配。Agent 会自动添加 `--security-opt seccomp=unconfined` 以支持旧版 Docker 环境
 
 ## 故障排除
 
