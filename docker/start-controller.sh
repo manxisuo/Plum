@@ -31,13 +31,13 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# 检查镜像是否存在
-if ! docker images | grep -q "plum-controller.*offline"; then
+# 检查镜像是否存在（使用 docker image inspect 更可靠）
+if ! docker image inspect plum-controller:offline > /dev/null 2>&1; then
     log_error "镜像 plum-controller:offline 不存在，请先构建镜像"
     exit 1
 fi
 
-if ! docker images | grep -q "nginx.*alpine"; then
+if ! docker image inspect nginx:alpine > /dev/null 2>&1; then
     log_warn "镜像 nginx:alpine 不存在，正在拉取..."
     docker pull nginx:alpine || {
         log_error "拉取 nginx:alpine 失败"
