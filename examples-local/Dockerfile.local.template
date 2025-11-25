@@ -5,12 +5,12 @@
 #   2. 执行: ./examples-local/copy-deps.sh <项目名> /tmp/<项目名>-deps
 #   3. 构建镜像: docker buildx build --platform linux/arm64 --load -f examples-local/Dockerfile.local.template --build-arg APP_NAME=<项目名> -t <项目名>:1.0.0 /tmp/<项目名>-deps
 
-FROM ubuntu:24.04
+FROM ubuntu:22.04
 
 ARG APP_NAME
 
 # 使用国内镜像源加速（使用清华镜像源）
-# Ubuntu 24.04 使用 deb822 格式，源文件在 /etc/apt/sources.list.d/ubuntu.sources
+# Ubuntu 22.04 默认使用传统 sources.list；为了兼容其它版本，这里同时检查 deb822 配置
 # 注意：先使用 HTTP 源安装 ca-certificates，然后再切换到 HTTPS 源
 RUN if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then \
         sed -i 's|http://ports.ubuntu.com/ubuntu-ports|http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports|g' /etc/apt/sources.list.d/ubuntu.sources && \
