@@ -89,6 +89,8 @@ WORKDIR /app
 # 注意：这里假设alpine:3.18已经包含了必要的包
 # 如果alpine镜像中没有这些包，需要预先准备一个包含这些包的镜像
 COPY controller/bin/controller ./bin/controller
+COPY controller/static ./controller/static
+COPY controller/env.example ./.env
 RUN addgroup -g 1001 -S plum && adduser -u 1001 -S plum -G plum
 RUN mkdir -p /app/data && chown -R plum:plum /app
 USER plum
@@ -102,6 +104,7 @@ FROM alpine:3.18
 WORKDIR /app
 # 注意：这里假设alpine:3.18已经包含了必要的包
 COPY agent-go/plum-agent ./plum-agent
+COPY agent-go/env.example ./.env
 RUN addgroup -g 1001 -S plum && adduser -u 1001 -S plum -G plum
 RUN mkdir -p /app/data && chown -R plum:plum /app
 USER plum
