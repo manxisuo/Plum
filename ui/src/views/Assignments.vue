@@ -9,12 +9,13 @@ const API_BASE = (import.meta as any).env?.VITE_API_BASE || ''
 type Assignment = { instanceId: string; deploymentId?: string; desired: string; artifactUrl: string; startCmd: string; healthy?: boolean; phase?: string; lastReportAt?: number; appName?: string; appVersion?: string; artifactType?: string; imageRepository?: string; imageTag?: string }
 type Assignments = { items: Assignment[] }
 type NodeDTO = { nodeId: string; ip: string }
-const nodeId = ref('nodeA')
+const nodeId = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 const data = ref<Assignments>({ items: [] })
 const nodes = ref<NodeDTO[]>([])
-const url = computed(() => `${API_BASE}/v1/assignments?nodeId=${encodeURIComponent(nodeId.value)}`)
+const hasNodes = computed(() => nodes.value.length > 0)
+const url = computed(() => nodeId.value ? `${API_BASE}/v1/assignments?nodeId=${encodeURIComponent(nodeId.value)}` : '')
 
 // 分页相关
 const currentPage = ref(1)
@@ -47,6 +48,10 @@ const totalPages = computed(() => {
 })
 
 async function fetchAssignments(){
+  if (!nodeId.value) {
+    data.value = { items: [] }
+    return
+  }
   loading.value=true; error.value=null
   try{ 
     const res=await fetch(url.value); 
@@ -59,13 +64,15 @@ async function fetchAssignments(){
     loading.value=false 
   }
 }
-fetchAssignments()
 
 async function loadNodes(){
   try {
     const res = await fetch(`${API_BASE}/v1/nodes`)
     if (res.ok) {
       nodes.value = await res.json() as NodeDTO[]
+      if (!nodeId.value && nodes.value.length > 0) {
+        nodeId.value = nodes.value[0].nodeId
+      }
     }
   } catch {}
 }
@@ -117,6 +124,7 @@ const { t } = useI18n()
 
 <template>
   <div>
+    <template v-if="hasNodes">
     <!-- 操作按钮和统计信息 -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:24px;">
       <!-- 操作按钮和节点选择 -->
@@ -267,6 +275,8 @@ const { t } = useI18n()
         />
       </div>
     </el-card>
+    </template>
+    <el-empty v-else description="暂无节点数据" />
   </div>
 </template>
 
