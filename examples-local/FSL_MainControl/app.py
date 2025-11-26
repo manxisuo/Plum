@@ -335,8 +335,17 @@ class TaskManager:
                 endpoint_info=plan_endpoint_info,
             )
             state.record_event("plan", "完成作业区划分")
+        except requests.exceptions.ConnectionError as e:
+            # 连接错误：服务不可用，返回友好的错误信息
+            call_duration = (time.time() - call_start) * 1000
+            error_msg = f"无法连接到 FSL_Plan 服务 ({plan_service_url})，请确保服务已启动并注册"
+            logger.error(f"{error_msg}: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=error_msg
+            )
         except Exception as e:
-            # 记录异常
+            # 记录其他异常
             call_duration = (time.time() - call_start) * 1000
             task_id = str(uuid.uuid4())
             state = TaskState(
@@ -355,7 +364,11 @@ class TaskManager:
                 duration_ms=call_duration,
                 endpoint_info=plan_endpoint_info,
             )
-            raise
+            logger.error(f"FSL_Plan 调用异常: {e}")
+            raise HTTPException(
+                status_code=502,
+                detail=f"FSL_Plan 服务调用失败: {str(e)}"
+            )
 
         with self.lock:
             self.tasks[task_id] = state
@@ -749,6 +762,12 @@ def api_run_workflow(workflow_id: str, payload: Optional[Dict[str, Any]] = None)
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/healthz")
+def healthz():
+    """健康检查端点"""
+    return {"status": "ok"}
 
 
 @app.get("/api/config/defaults")

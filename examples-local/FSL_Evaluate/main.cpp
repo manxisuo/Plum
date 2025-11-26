@@ -72,20 +72,27 @@ public:
 
         try {
             httplib::Client client(base_.c_str());
-            client.set_connection_timeout(1, 0);
-            client.set_read_timeout(2, 0);
+            // 增加超时时间：连接超时5秒，读取超时5秒，确保有足够时间建立连接和接收响应
+            client.set_connection_timeout(5, 0);
+            client.set_read_timeout(5, 0);
             auto res = client.Post(path.c_str(),
                                    doc.toJson(QJsonDocument::Compact).toStdString(),
                                    "application/json");
-            if (!res || res->status >= 300) {
-                std::cerr << "[FSL_Evaluate] 进度上报失败 status="
-                          << (res ? res->status : 0) << std::endl;
+            if (!res) {
+                // 连接失败（res为nullptr），可能是网络问题或服务不可达
+                // 不打印错误日志，避免日志过多，但返回false表示本次上报失败
+                // 任务会继续执行，不会因为进度上报失败而中断
+                return false;
+            }
+            if (res->status >= 300) {
+                std::cerr << "[FSL_Evaluate] 进度上报失败 status=" << res->status << std::endl;
                 return false;
             }
             sent_ = true;
             return true;
         } catch (const std::exception &ex) {
-            std::cerr << "[FSL_Evaluate] 进度上报异常: " << ex.what() << std::endl;
+            // 异常情况下也不打印日志，避免日志过多
+            // 进度上报失败不应该影响任务执行
             return false;
         }
     }
