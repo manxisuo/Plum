@@ -169,9 +169,53 @@ func handleHeartbeatEndpoints(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		if err := store.Current.TouchEndpointsForInstance(req.InstanceID, time.Now().Unix()); err != nil {
-			http.Error(w, "db error", http.StatusInternalServerError)
-			return
+		// 如果没有提供健康覆盖，自动检查并更新健康状态
+		// 这样可以处理注册时服务未启动的情况
+		// 通过查询所有服务来找到该实例的端点（临时方案）
+		allServices, err := store.Current.ListServices()
+		if err == nil {
+			updatedEps := make([]store.Endpoint, 0)
+			for _, serviceName := range allServices {
+				// 获取该服务的所有端点（包括不健康的）
+				eps, err := store.Current.ListAllEndpointsByService(serviceName)
+				if err == nil {
+					for _, ep := range eps {
+						if ep.InstanceID == req.InstanceID {
+							// 对每个端点进行健康检查
+							isHealthy := checkEndpointHealth(ep.IP, ep.Port, ep.Protocol)
+							updatedEps = append(updatedEps, store.Endpoint{
+								ServiceName: ep.ServiceName,
+								InstanceID:  ep.InstanceID,
+								IP:          ep.IP,
+								Port:        ep.Port,
+								Protocol:    ep.Protocol,
+								Healthy:     isHealthy,
+							})
+						}
+					}
+				}
+			}
+			if len(updatedEps) > 0 {
+				if err := store.Current.UpdateEndpointHealthForInstance(req.InstanceID, updatedEps); err != nil {
+					// 如果更新失败，只更新 LastSeen
+					if err := store.Current.TouchEndpointsForInstance(req.InstanceID, time.Now().Unix()); err != nil {
+						http.Error(w, "db error", http.StatusInternalServerError)
+						return
+					}
+				}
+			} else {
+				// 如果没有找到端点，只更新 LastSeen
+				if err := store.Current.TouchEndpointsForInstance(req.InstanceID, time.Now().Unix()); err != nil {
+					http.Error(w, "db error", http.StatusInternalServerError)
+					return
+				}
+			}
+		} else {
+			// 如果无法获取服务列表，只更新 LastSeen
+			if err := store.Current.TouchEndpointsForInstance(req.InstanceID, time.Now().Unix()); err != nil {
+				http.Error(w, "db error", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
