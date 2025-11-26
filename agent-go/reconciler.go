@@ -541,11 +541,42 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 		// 检查容器是否还在运行（如果容器重启了，需要重新注册）
 		if assignment != nil && assignment.ArtifactType == "image" {
 			if r.dockerManager != nil && r.dockerManager.IsRunning(instanceID) {
-				// 容器还在运行，且已经注册过，跳过注册
-				return
+				// 容器还在运行，检查是否是同一个容器
+				// 如果容器ID改变了（容器重启），需要重新注册
+				dm, ok := r.dockerManager.(*DockerManager)
+				if ok {
+					containerName := fmt.Sprintf("plum-app-%s", instanceID)
+					info, err := dm.client.ContainerInspect(dm.ctx, containerName)
+					if err == nil {
+						// 检查缓存的容器ID是否匹配
+						if cachedID, exists := dm.containers[instanceID]; exists {
+							if cachedID != info.ID {
+								// 容器ID改变了，说明容器重启了，需要重新注册
+								log.Printf("Container ID changed for instance %s (old: %s, new: %s), re-registering services", instanceID, cachedID[:12], info.ID[:12])
+								delete(r.registeredServices, instanceID)
+								// 继续执行注册流程
+							} else {
+								// 同一个容器，且已经注册过，跳过注册
+								return
+							}
+						} else {
+							// 没有缓存的容器ID，可能是新容器，需要重新注册
+							log.Printf("No cached container ID for instance %s, re-registering services", instanceID)
+							delete(r.registeredServices, instanceID)
+							// 继续执行注册流程
+						}
+					} else {
+						// 无法检查容器，保守处理：清除缓存，重新注册
+						delete(r.registeredServices, instanceID)
+					}
+				} else {
+					// 容器还在运行，且已经注册过，跳过注册
+					return
+				}
+			} else {
+				// 容器不在运行，清除缓存，稍后会重新注册
+				delete(r.registeredServices, instanceID)
 			}
-			// 容器不在运行，清除缓存，稍后会重新注册
-			delete(r.registeredServices, instanceID)
 		} else {
 			// ZIP 应用，如果已经注册过就跳过
 			return
