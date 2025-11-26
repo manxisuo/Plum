@@ -54,16 +54,19 @@ func main() {
 		}
 	}
 
+	// 初始化日志级别（必须在加载.env之后）
+	InitLogger()
+
 	nodeID := getEnv("AGENT_NODE_ID", "nodeA")
 	controller := getEnv("CONTROLLER_BASE", "http://plum-controller:8080")
 	dataDir := getEnv("AGENT_DATA_DIR", "/tmp/plum-agent")
 	agentIP := getEnv("AGENT_IP", "127.0.0.1")
 
-	log.Printf("Starting Plum Agent")
-	log.Printf("  NodeID: %s", nodeID)
-	log.Printf("  Controller: %s", controller)
-	log.Printf("  DataDir: %s", dataDir)
-	log.Printf("  AdvertiseIP: %s", agentIP)
+	LogInfo("Starting Plum Agent")
+	LogInfo("  NodeID: %s", nodeID)
+	LogInfo("  Controller: %s", controller)
+	LogInfo("  DataDir: %s", dataDir)
+	LogInfo("  AdvertiseIP: %s", agentIP)
 
 	httpClient := NewHTTPClient()
 	reconciler := NewReconciler(fmt.Sprintf("%s/%s", dataDir, nodeID), httpClient, controller, nodeID)

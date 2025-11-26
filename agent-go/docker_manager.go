@@ -46,7 +46,7 @@ func NewDockerManager(config ManagerConfig) (*DockerManager, error) {
 		return nil, fmt.Errorf("failed to connect to docker daemon: %w (is docker running?)", err)
 	}
 
-	log.Printf("Docker manager initialized successfully")
+	LogInfo("Docker manager initialized successfully")
 	return &DockerManager{
 		config:     config,
 		client:     cli,
@@ -62,7 +62,7 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		info, err := m.client.ContainerInspect(m.ctx, containerID)
 		if err == nil {
 			if info.State.Running {
-				log.Printf("Container %s for instance %s already running", containerID[:12], instanceID)
+				LogDebug("Container %s for instance %s already running", containerID[:12], instanceID)
 				return nil
 			}
 		}
@@ -80,8 +80,16 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		// 注意：删除容器不会删除数据卷中的数据（数据存储在宿主机的数据目录中）
 		// 新容器会挂载同一个数据目录，所以业务数据不会丢失
 		if !existing.State.Running {
-			log.Printf("Removing existing stopped container %s (data will be preserved in host data directory)", containerName)
-			m.client.ContainerRemove(m.ctx, containerName, types.ContainerRemoveOptions{Force: true})
+			LogInfo("Removing existing stopped container %s (data will be preserved in host data directory)", containerName)
+			if err := m.client.ContainerRemove(m.ctx, containerName, types.ContainerRemoveOptions{Force: true}); err != nil {
+				LogWarn("Failed to remove existing stopped container %s: %v, will retry before creating new container", containerName, err)
+			} else {
+				LogInfo("Successfully removed existing stopped container %s", containerName)
+			}
+		} else {
+			// 容器正在运行，不应该创建新容器
+			LogWarn("Container %s is already running, skipping creation", containerName)
+			return fmt.Errorf("container %s is already running", containerName)
 		}
 	}
 
@@ -92,7 +100,7 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		// 镜像应用：使用指定的镜像
 		imageName = fmt.Sprintf("%s:%s", app.ImageRepository, app.ImageTag)
 		isImageApp = true
-		log.Printf("Using image: %s", imageName)
+		LogInfo("Using image: %s", imageName)
 	} else {
 		// ZIP 应用：使用基础镜像
 		baseImage := os.Getenv("PLUM_BASE_IMAGE")
@@ -101,7 +109,7 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		}
 		imageName = baseImage
 		isImageApp = false
-		log.Printf("Using base image: %s", imageName)
+		LogInfo("Using base image: %s", imageName)
 	}
 
 	// 准备启动命令
@@ -457,11 +465,35 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		containerName,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create container: %w", err)
+		// 如果创建失败是因为容器名冲突，尝试强制删除后重试
+		if strings.Contains(err.Error(), "already in use") || strings.Contains(err.Error(), "Conflict") {
+			LogWarn("Container name %s is already in use, attempting to force remove and retry", containerName)
+			// 强制删除可能残留的容器
+			if removeErr := m.client.ContainerRemove(m.ctx, containerName, types.ContainerRemoveOptions{Force: true}); removeErr != nil {
+				LogError("Failed to force remove conflicting container %s: %v", containerName, removeErr)
+			} else {
+				LogInfo("Force removed conflicting container %s, retrying creation", containerName)
+				// 重试创建容器
+				resp, err = m.client.ContainerCreate(
+					m.ctx,
+					containerConfig,
+					hostConfig,
+					nil,
+					nil,
+					containerName,
+				)
+				if err != nil {
+					return fmt.Errorf("failed to create container after removing conflicting container: %w", err)
+				}
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to create container: %w", err)
+		}
 	}
 
 	containerID := resp.ID
-	log.Printf("Created container %s for instance %s", containerID[:12], instanceID)
+	LogInfo("Created container %s for instance %s", containerID[:12], instanceID)
 
 	// 启动容器
 	if err := m.client.ContainerStart(m.ctx, containerID, types.ContainerStartOptions{}); err != nil {
@@ -470,7 +502,7 @@ func (m *DockerManager) StartApp(instanceID string, app Assignment, appDir strin
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 
-	log.Printf("Started container %s for instance %s", containerID[:12], instanceID)
+	LogInfo("Started container %s for instance %s", containerID[:12], instanceID)
 	m.containers[instanceID] = containerID
 
 	// 延迟检查容器状态（给应用一点启动时间）
@@ -569,7 +601,7 @@ func (m *DockerManager) IsRunning(instanceID string) bool {
 		if !info.State.Running {
 			// 容器已停止，清理记录
 			delete(m.containers, instanceID)
-			log.Printf("Container %s for instance %s is not running (status: %s)",
+			LogDebug("Container %s for instance %s is not running (status: %s)",
 				containerID[:12], instanceID, info.State.Status)
 			return false
 		}
@@ -591,7 +623,7 @@ func (m *DockerManager) IsRunning(instanceID string) bool {
 	if !info.State.Running {
 		// 容器已停止，清理记录
 		delete(m.containers, instanceID)
-		log.Printf("Container %s for instance %s is not running (status: %s, exitCode: %d)",
+		LogDebug("Container %s for instance %s is not running (status: %s, exitCode: %d)",
 			containerID[:12], instanceID, info.State.Status, info.State.ExitCode)
 		return false
 	}

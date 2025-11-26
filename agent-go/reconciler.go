@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,8 +29,8 @@ func NewReconciler(baseDir string, http *HTTPClient, controller string, nodeID s
 
 	// 根据环境变量选择 ZIP 应用的运行模式
 	runMode := GetRunMode()
-	log.Printf("Using app run mode for ZIP apps: %s", runMode)
-	log.Printf("Image apps will always use Docker mode")
+	LogInfo("Using app run mode for ZIP apps: %s", runMode)
+	LogInfo("Image apps will always use Docker mode")
 
 	config := ManagerConfig{
 		BaseDir:    baseDir,
@@ -43,7 +42,7 @@ func NewReconciler(baseDir string, http *HTTPClient, controller string, nodeID s
 	// 总是创建 DockerManager（镜像应用需要，ZIP 应用在 docker 模式下也需要）
 	dockerManager, err := NewDockerManager(config)
 	if err != nil {
-		log.Printf("Warning: failed to create docker manager: %v (image apps will not work)", err)
+		LogWarn("failed to create docker manager: %v (image apps will not work)", err)
 		dockerManager = nil
 	}
 
@@ -154,15 +153,15 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 	if artifactType == "" {
 		artifactType = "zip"
 	}
-	log.Printf("DEBUG: ensureRunning - InstanceID=%s, ArtifactType=%s, ImageRepository=%s, ImageTag=%s, ArtifactURL=%s",
+	LogDebug("ensureRunning - InstanceID=%s, ArtifactType=%s, ImageRepository=%s, ImageTag=%s, ArtifactURL=%s",
 		a.InstanceID, artifactType, a.ImageRepository, a.ImageTag, a.ArtifactURL)
 
 	// 根据应用类型选择管理器
 	appManager := r.getAppManager(artifactType)
 	if appManager == nil {
-		log.Printf("ERROR: No suitable app manager for artifact type: %s (InstanceID: %s)", artifactType, a.InstanceID)
+		LogError("No suitable app manager for artifact type: %s (InstanceID: %s)", artifactType, a.InstanceID)
 		if artifactType == "image" {
-			log.Printf("ERROR: DockerManager is nil! Cannot start image-based app.")
+			LogError("DockerManager is nil! Cannot start image-based app.")
 		}
 		return
 	}
@@ -174,21 +173,27 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 
 	// 对于镜像应用，如果已经正常完成（exitCode: 0），不再自动重启
 	// 除非用户明确要求（通过重新部署）
+	// 注意：如果期望状态是 Running，应该清除已完成标记，允许重启
 	if artifactType == "image" {
 		if r.completedInstances[a.InstanceID] {
-			// 已经标记为已完成，跳过重启（不打印日志，避免重复）
-			return
+			// 如果期望状态是 Running，清除已完成标记，允许重启
+			// 这可以处理容器意外退出后需要重启的情况
+			if a.Desired == "Running" {
+				LogInfo("Instance %s was marked as completed, but desired state is Running, clearing completed flag to allow restart", a.InstanceID)
+				delete(r.completedInstances, a.InstanceID)
+				// 继续执行启动流程
+			} else {
+				// 期望状态不是 Running，跳过重启（不打印日志，避免重复）
+				return
+			}
 		}
-		// 检查容器状态，如果正常退出，也跳过
-		status, err := appManager.GetStatus(a.InstanceID)
-		if err == nil && !status.Running && status.ExitCode == 0 {
-			r.completedInstances[a.InstanceID] = true // 记录已标记为已完成
-			return
-		}
+		// 注意：不在这里检查容器状态，因为可能存在已停止的旧容器
+		// 应该在 StartApp 中处理已停止容器的删除，然后尝试启动新容器
+		// 如果新容器启动后立即退出，会在后续的故障检测中被发现并重启
 	}
 
 	// 实例未运行，需要启动
-	log.Printf("Instance %s not running, will start", a.InstanceID)
+	LogInfo("Instance %s not running, will start", a.InstanceID)
 
 	// 记录实例类型
 	r.instanceTypes[a.InstanceID] = artifactType
@@ -201,9 +206,9 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 
 	if artifactType == "image" {
 		// 镜像应用：直接使用 Docker 镜像启动，不需要下载 ZIP
-		log.Printf("Starting image-based app: %s:%s (InstanceID: %s)", a.ImageRepository, a.ImageTag, a.InstanceID)
+		LogInfo("Starting image-based app: %s:%s (InstanceID: %s)", a.ImageRepository, a.ImageTag, a.InstanceID)
 		if a.ImageRepository == "" || a.ImageTag == "" {
-			log.Printf("ERROR: ImageRepository or ImageTag is empty! ArtifactType=%s, ImageRepository=%s, ImageTag=%s",
+			LogError("ImageRepository or ImageTag is empty! ArtifactType=%s, ImageRepository=%s, ImageTag=%s",
 				a.ArtifactType, a.ImageRepository, a.ImageTag)
 			return
 		}
@@ -231,14 +236,14 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 
 			data, err := r.http.Get(artifactURL)
 			if err != nil {
-				log.Printf("Failed to download artifact: %v", err)
+				LogError("Failed to download artifact: %v", err)
 				return
 			}
 			if err := os.WriteFile(zipPath, data, 0644); err != nil {
-				log.Printf("Failed to save artifact: %v", err)
+				LogError("Failed to save artifact: %v", err)
 				return
 			}
-			log.Printf("Downloaded artifact to %s, size=%d", zipPath, len(data))
+			LogInfo("Downloaded artifact to %s, size=%d", zipPath, len(data))
 		}
 
 		// 解压
@@ -246,7 +251,7 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 		startSh := filepath.Join(appDir, "start.sh")
 		if !FileExists(startSh) {
 			if err := UnzipFile(zipPath, appDir); err != nil {
-				log.Printf("Failed to unzip: %v", err)
+				LogError("Failed to unzip: %v", err)
 				return
 			}
 		}
@@ -254,7 +259,7 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 		// 确保start.sh有执行权限（容器模式也需要）
 		if FileExists(startSh) {
 			if err := os.Chmod(startSh, 0755); err != nil {
-				log.Printf("Warning: failed to chmod start.sh: %v", err)
+				LogWarn("failed to chmod start.sh: %v", err)
 			}
 		}
 
@@ -262,7 +267,7 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 		// 遍历应用目录，找到所有没有扩展名的文件（很可能是可执行文件）
 		// 或者检查文件是否是ELF可执行文件
 		if err := ensureExecutablePermissions(appDir); err != nil {
-			log.Printf("Warning: failed to set executable permissions: %v", err)
+			LogWarn("failed to set executable permissions: %v", err)
 		}
 
 		// 使用AppManager启动应用
@@ -270,17 +275,17 @@ func (r *Reconciler) ensureRunning(a Assignment) {
 	}
 
 	if err != nil {
-		log.Printf("Failed to start app: %v", err)
+		LogError("Failed to start app: %v", err)
 		return
 	}
 
-	log.Printf("Started instance %s", a.InstanceID)
+	LogInfo("Started instance %s", a.InstanceID)
 	r.postStatus(a.InstanceID, "Running", 0, true)
 
 	// 性能监控：记录重启时间
 	if startTime, exists := r.restartStartTimes[a.InstanceID]; exists {
 		restartDuration := time.Since(startTime)
-		log.Printf("性能监控: 实例 %s 重启耗时 %v", a.InstanceID, restartDuration)
+		LogDebug("性能监控: 实例 %s 重启耗时 %v", a.InstanceID, restartDuration)
 		delete(r.restartStartTimes, a.InstanceID)
 	}
 }
@@ -329,10 +334,10 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 		if r.stopSentTimes[instanceID] == 0 {
 			// 第一次尝试停止
 			if err := appManager.StopApp(instanceID); err != nil {
-				log.Printf("Failed to stop app %s: %v", instanceID, err)
+				LogError("Failed to stop app %s: %v", instanceID, err)
 			} else {
 				r.stopSentTimes[instanceID] = now
-				log.Printf("Sent stop signal to instance %s", instanceID)
+				LogInfo("Sent stop signal to instance %s", instanceID)
 			}
 		} else if now-r.stopSentTimes[instanceID] >= 5 {
 			// 5秒后强制停止（DockerManager已经处理了强制停止）
@@ -342,7 +347,7 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 				delete(r.instanceTypes, instanceID)
 				r.postStatus(instanceID, "Stopped", 0, true)
 				r.deleteServices(instanceID)
-				log.Printf("Stopped instance %s", instanceID)
+				LogInfo("Stopped instance %s", instanceID)
 			}
 		}
 	}
@@ -367,10 +372,10 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 				if appManager != nil {
 					// 立即尝试停止（不等待下一次循环）
 					if err := appManager.StopApp(instanceID); err != nil {
-						log.Printf("Failed to stop app %s: %v", instanceID, err)
+						LogError("Failed to stop app %s: %v", instanceID, err)
 					} else {
 						r.stopSentTimes[instanceID] = now
-						log.Printf("Sent stop signal to instance %s (not in keep list, was known)", instanceID)
+						LogInfo("Sent stop signal to instance %s (not in keep list, was known)", instanceID)
 					}
 				}
 			}
@@ -394,7 +399,7 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 							age := time.Since(startedAt)
 							if age < 15*time.Second {
 								// 容器刚启动不久（< 15秒），可能是 assignment 同步延迟，等待一下
-								log.Printf("Instance %s is running but not in known instances, started %v ago, waiting for assignment sync (may be just deployed)", instanceID, age)
+								LogDebug("Instance %s is running but not in known instances, started %v ago, waiting for assignment sync (may be just deployed)", instanceID, age)
 								shouldStop = false
 							}
 						}
@@ -406,10 +411,10 @@ func (r *Reconciler) ensureStoppedExcept(keep map[string]bool) {
 					if _, exists := r.stopSentTimes[instanceID]; !exists {
 						r.markForStop(instanceID)
 						if err := appManager.StopApp(instanceID); err != nil {
-							log.Printf("Failed to stop app %s: %v", instanceID, err)
+							LogError("Failed to stop app %s: %v", instanceID, err)
 						} else {
 							r.stopSentTimes[instanceID] = now
-							log.Printf("Sent stop signal to instance %s (not in keep list, not in known instances, may be manually started or old container)", instanceID)
+							LogInfo("Sent stop signal to instance %s (not in keep list, not in known instances, may be manually started or old container)", instanceID)
 						}
 					}
 				}
@@ -453,8 +458,17 @@ func (r *Reconciler) reapExited(assignments []Assignment) {
 			// 检查是否是我们主动停止的
 			if _, wasStopping := r.stopSentTimes[a.InstanceID]; !wasStopping {
 				// 检查是否已经标记为已完成（避免重复标记）
+				// 但如果期望状态是 Running，应该清除已完成标记，允许重启
 				if r.completedInstances[a.InstanceID] {
-					continue // 已经标记为已完成，跳过
+					if a.Desired == "Running" {
+						// 期望状态是 Running，清除已完成标记，允许重启
+						LogInfo("Instance %s was marked as completed, but desired state is Running, clearing completed flag to allow restart", a.InstanceID)
+						delete(r.completedInstances, a.InstanceID)
+						// 继续执行故障检测和重启流程
+					} else {
+						// 期望状态不是 Running，跳过
+						continue
+					}
 				}
 
 				// 不是主动停止的，获取退出状态
@@ -478,21 +492,21 @@ func (r *Reconciler) reapExited(assignments []Assignment) {
 					healthy := true
 					r.postStatus(a.InstanceID, phase, exitCode, healthy)
 					r.completedInstances[a.InstanceID] = true // 记录已标记为已完成
-					log.Printf("✅ Instance %s (image app) completed successfully (exitCode: %d), marked as Completed", a.InstanceID, exitCode)
+					LogInfo("Instance %s (image app) completed successfully (exitCode: %d), marked as Completed", a.InstanceID, exitCode)
 					// 不自动重启已完成的任务
 				} else {
 					// 异常退出或 ZIP 应用退出，视为失败
-					log.Printf("⚠️  Detected instance %s process died unexpectedly (was not stopping, exitCode: %d)", a.InstanceID, exitCode)
+					LogWarn("Detected instance %s process died unexpectedly (was not stopping, exitCode: %d)", a.InstanceID, exitCode)
 					phase := "Failed"
 					healthy := false
 					r.postStatus(a.InstanceID, phase, exitCode, healthy)
-					log.Printf("✅ Reported instance %s as Failed, will restart in next ensureRunning", a.InstanceID)
+					LogInfo("Reported instance %s as Failed, will restart in next ensureRunning", a.InstanceID)
 				}
 
 				// 清理停止标记（如果有）
 				delete(r.stopSentTimes, a.InstanceID)
 			} else {
-				log.Printf("Instance %s is stopping (was marked for stop), skip restart", a.InstanceID)
+				LogDebug("Instance %s is stopping (was marked for stop), skip restart", a.InstanceID)
 			}
 		}
 	}
@@ -527,7 +541,7 @@ func (r *Reconciler) postStatus(instanceID, phase string, exitCode int, healthy 
 	}
 	url := r.controller + "/v1/instances/status"
 	if err := r.http.PostJSON(url, status); err != nil {
-		log.Printf("Failed to post status: %v", err)
+		LogError("Failed to post status: %v", err)
 	}
 }
 
@@ -552,7 +566,7 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 						if cachedID, exists := dm.containers[instanceID]; exists {
 							if cachedID != info.ID {
 								// 容器ID改变了，说明容器重启了，需要重新注册
-								log.Printf("Container ID changed for instance %s (old: %s, new: %s), re-registering services", instanceID, cachedID[:12], info.ID[:12])
+								LogDebug("Container ID changed for instance %s (old: %s, new: %s), re-registering services", instanceID, cachedID[:12], info.ID[:12])
 								delete(r.registeredServices, instanceID)
 								// 继续执行注册流程
 							} else {
@@ -561,7 +575,7 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 							}
 						} else {
 							// 没有缓存的容器ID，可能是新容器，需要重新注册
-							log.Printf("No cached container ID for instance %s, re-registering services", instanceID)
+							LogDebug("No cached container ID for instance %s, re-registering services", instanceID)
 							delete(r.registeredServices, instanceID)
 							// 继续执行注册流程
 						}
@@ -607,22 +621,22 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 			if err := os.WriteFile(tmpFile, []byte(metaContent), 0644); err == nil {
 				eps, err := ParseMetaINI(tmpFile)
 				if err != nil {
-					log.Printf("ERROR: Failed to parse meta.ini for instance %s: %v", instanceID, err)
+					LogError("Failed to parse meta.ini for instance %s: %v", instanceID, err)
 				} else if len(eps) == 0 {
 					// 没有服务端点（如 gRPC Worker），这是正常的，不需要警告
 					// 标记为已处理，避免重复读取
 					r.registeredServices[instanceID] = true
 				} else {
 					endpoints = eps
-					log.Printf("Read meta.ini from container for instance %s, found %d endpoint(s)", instanceID, len(eps))
+					LogInfo("Read meta.ini from container for instance %s, found %d endpoint(s)", instanceID, len(eps))
 					for i, ep := range eps {
-						log.Printf("  Endpoint %d: %s:%s:%d", i+1, ep.ServiceName, ep.Protocol, ep.Port)
+						LogDebug("  Endpoint %d: %s:%s:%d", i+1, ep.ServiceName, ep.Protocol, ep.Port)
 					}
 				}
 				// 清理临时文件
 				os.Remove(tmpFile)
 			} else {
-				log.Printf("ERROR: Failed to write temp meta.ini file for instance %s: %v", instanceID, err)
+				LogError("Failed to write temp meta.ini file for instance %s: %v", instanceID, err)
 			}
 		}
 	}
@@ -665,11 +679,11 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 						Protocol:    protocol,
 						Port:        port,
 					})
-					log.Printf("Registered service endpoint from port mapping: %s:%s:%d (instance: %s)", serviceName, protocol, port, instanceID)
+					LogDebug("Registered service endpoint from port mapping: %s:%s:%d (instance: %s)", serviceName, protocol, port, instanceID)
 				}
 			}
 		} else {
-			log.Printf("Failed to parse port mappings for instance %s: %v", instanceID, err)
+			LogWarn("Failed to parse port mappings for instance %s: %v", instanceID, err)
 		}
 	}
 
@@ -689,9 +703,9 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 	// 不会删除手动注册的其他服务端点
 	url := r.controller + "/v1/services/register"
 	if err := r.http.PostJSON(url, reg); err != nil {
-		log.Printf("ERROR: Failed to register services for instance %s: %v", instanceID, err)
+		LogError("Failed to register services for instance %s: %v", instanceID, err)
 	} else {
-		log.Printf("Successfully registered %d service endpoint(s) for instance %s", len(endpoints), instanceID)
+		LogInfo("Successfully registered %d service endpoint(s) for instance %s", len(endpoints), instanceID)
 		// 标记为已注册，避免重复注册
 		r.registeredServices[instanceID] = true
 	}
@@ -701,7 +715,7 @@ func (r *Reconciler) RegisterServices(instanceID, nodeID, ip string, assignment 
 func (r *Reconciler) HeartbeatServices(instanceID string) {
 	url := r.controller + "/v1/services/heartbeat"
 	if err := r.http.PostJSON(url, HeartbeatRequest{InstanceID: instanceID}); err != nil {
-		log.Printf("Failed to heartbeat services: %v", err)
+		LogError("Failed to heartbeat services: %v", err)
 	}
 }
 
@@ -738,7 +752,7 @@ func (r *Reconciler) readMetaFromContainer(instanceID string) string {
 	for _, metaPath := range metaPaths {
 		content, err := dm.readFileFromContainer(containerID, metaPath)
 		if err == nil && content != "" {
-			log.Printf("Found meta.ini at %s in container %s", metaPath, containerID[:12])
+			LogDebug("Found meta.ini at %s in container %s", metaPath, containerID[:12])
 			return content
 		}
 	}
