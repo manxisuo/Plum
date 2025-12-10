@@ -1,0 +1,302 @@
+The content has been copied to your clipboard. P{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "介绍 Plum 分布式编排系统的目标、用途及其总体架构",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Getting Started",
+      "purpose": "引导用户完成安装、初始化配置与首次部署",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Installation",
+      "purpose": "提供 Controller、Agent 及其依赖项的逐步安装说明",
+      "parent": "Getting Started",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Quick Start Tutorial",
+      "purpose": "通过实用示例演示如何完成首次部署",
+      "parent": "Getting Started",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Configuration Guide",
+      "purpose": "全面说明所有配置项，包括 .env 文件与环境变量方式",
+      "parent": "Getting Started",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Core Architecture",
+      "purpose": "深入解析系统架构与核心组件",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Controller",
+      "purpose": "详细说明 Controller 组件的子系统与 API",
+      "parent": "Core Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Agent",
+      "purpose": "详细说明 Agent 组件及应用生命周期管理机制",
+      "parent": "Core Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Data Model",
+      "purpose": "提供数据模型的完整参考，包括节点、实例、部署、服务等",
+      "parent": "Core Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Communication Patterns",
+      "purpose": "说明 HTTP API、gRPC 流、SSE 事件与组件间通信模式",
+      "parent": "Core Architecture",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Application Deployment",
+      "purpose": "指导如何在 Plum 中部署与管理应用",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Deployment Lifecycle",
+      "purpose": "解释部署从创建、执行到删除的完整生命周期",
+      "parent": "Application Deployment",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Execution Modes",
+      "purpose": "说明进程模式与 Docker 模式，以及 ZIP 构件与 Docker 镜像的差异",
+      "parent": "Application Deployment",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Service Discovery",
+      "purpose": "指导服务的注册、发现与健康监测机制",
+      "parent": "Application Deployment",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Network Configuration",
+      "purpose": "说明网络模式、地址转换及容器网络配置",
+      "parent": "Application Deployment",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Task & Workflow Orchestration",
+      "purpose": "全面说明任务执行与工作流编排系统",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Task System",
+      "purpose": "说明任务定义、任务执行流程以及三种执行器类型",
+      "parent": "Task & Workflow Orchestration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Task Executors",
+      "purpose": "详细说明嵌入式执行器、服务执行器与操作系统进程执行器",
+      "parent": "Task & Workflow Orchestration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Sequential Workflows",
+      "purpose": "说明传统顺序式工作流系统",
+      "parent": "Task & Workflow Orchestration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "DAG Workflows",
+      "purpose": "全面介绍包含分支、循环与并行执行的 DAG 工作流系统",
+      "parent": "Task & Workflow Orchestration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "DAG Node Types",
+      "purpose": "详细说明任务节点、分支节点、并行节点与循环节点类型",
+      "parent": "Task & Workflow Orchestration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "External Stage Control",
+      "purpose": "说明如何通过阶段控制 API 与外部编排系统集成",
+      "parent": "Task & Workflow Orchestration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Web User Interface",
+      "purpose": "指导如何使用基于 Web 的管理界面",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "UI Architecture",
+      "purpose": "说明 Vue.js UI 的结构、路由与国际化设计",
+      "parent": "Web User Interface",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Managing Deployments",
+      "purpose": "指导如何在界面中创建、监控和管理部署",
+      "parent": "Web User Interface",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Task Management UI",
+      "purpose": "指导如何在界面中管理任务与任务定义",
+      "parent": "Web User Interface",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Workflow Editor",
+      "purpose": "说明基于 VueFlow 的可视化 DAG 工作流编辑器",
+      "parent": "Web User Interface",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Monitoring & Operations",
+      "purpose": "指导如何监控节点、服务、资源及系统健康状况",
+      "parent": "Web User Interface",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "SDK & Application Integration",
+      "purpose": "为应用开发者提供与 Plum 集成的指导",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "C++ SDK",
+      "purpose": "说明 C++ SDK（libplumclient）与 StreamWorker 的用法与接口",
+      "parent": "SDK & Application Integration",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    }
+  ]
+}lease paste it here to complete the file creation.
